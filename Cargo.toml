@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/shield-core",
+    "crates/shield-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "UNLICENSED"
+authors = ["Gh0stDeveloper"]
+repository = "https://github.com/Gh0stDeveloper/Nexora-Shield"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
