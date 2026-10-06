@@ -1,6 +1,7 @@
 use crate::error::{DataProtectionError, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use zeroize::Zeroize;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct ExposureProbe {
@@ -32,6 +33,12 @@ impl ExposureProbe {
             needle,
             critical,
         })
+    }
+}
+
+impl Drop for ExposureProbe {
+    fn drop(&mut self) {
+        self.needle.zeroize();
     }
 }
 
