@@ -5,7 +5,13 @@
 use nexora_shield_core::{
     apk_inspection_json, protect_apk, ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
+use nexora_shield_dex::{
+    CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter, IrMethod,
+    MetadataReducer, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass, Selector, SelectorKind,
+    TypeAnalyzer,
+};
 use nexora_shield_package::{inspect_apk, verify_apk_structure, AndroidTools, SigningConfig};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -40,6 +46,10 @@ fn run() -> Result<(), String> {
         "inspect" => run_inspect(&args),
         "verify" => run_verify(&args),
         "protect" => run_protect(&args),
+        "dex-inspect" => run_dex_inspect(&args),
+        "dex-roundtrip" => run_dex_roundtrip(&args),
+        "dex-rewrite" => run_dex_rewrite(&args),
+        "dex-multidex-verify" => run_dex_multidex_verify(&args),
         _ => Err(format!(
             "unknown command '{command}'. Run 'nexora-shield --help'."
         )),
@@ -65,6 +75,245 @@ fn run_inspect(args: &[String]) -> Result<(), String> {
         print!("{}", apk_inspection_json(&inspection));
     } else {
         print_inspection(&input, &inspection);
+    }
+    Ok(())
+}
+
+fn run_dex_inspect(args: &[String]) -> Result<(), String> {
+    if args.len() != 1 || args.iter().any(|value| value == "--help" || value == "-h") {
+        print_dex_inspect_help();
+        return Ok(());
+    }
+
+    let path = PathBuf::from(&args[0]);
+    let bytes = fs::read(&path).map_err(|error| error.to_string())?;
+    let dex = DexParser::parse(&bytes).map_err(|error| error.to_string())?;
+    let validation = DexValidator::validate(&dex).map_err(|error| error.to_string())?;
+    let graph = ReferenceGraph::build(&dex);
+    let compatibility =
+        CompatibilityAnalyzer::analyze(&dex).map_err(|error| error.to_string())?;
+
+    let mut cfg_blocks = 0_usize;
+    let mut ir_blocks = 0_usize;
+    let mut phi_nodes = 0_usize;
+    for data in dex.class_data.values() {
+        for method in data.methods().filter(|method| method.code_off != 0) {
+            let code = dex
+                .code_items
+                .get(&method.code_off)
+                .ok_or_else(|| format!("missing code_item at {}", method.code_off))?;
+            cfg_blocks += ControlFlowGraph::build(code)
+                .map_err(|error| error.to_string())?
+                .blocks
+                .len();
+            let _ = TypeAnalyzer::analyze(&dex, method.method_idx)
+                .map_err(|error| error.to_string())?;
+            let ir = IrMethod::build(&dex, method.method_idx)
+                .map_err(|error| error.to_string())?;
+            ir_blocks += ir.blocks.len();
+            phi_nodes += ir.blocks.iter().map(|block| block.phis.len()).sum::<usize>();
+        }
+    }
+
+    println!("DEX: {}", path.display());
+    println!("Version: {}", dex.header.version);
+    println!("Classes: {}", validation.classes);
+    println!("Methods: {}", validation.methods);
+    println!("Fields: {}", dex.fields.len());
+    println!("Code items: {}", validation.code_items);
+    println!("Instructions: {}", validation.instructions);
+    println!("CFG blocks: {cfg_blocks}");
+    println!("IR blocks: {ir_blocks}");
+    println!("SSA phi nodes: {phi_nodes}");
+    println!("Reference graph nodes: {}", graph.nodes.len());
+    println!("Reference graph edges: {}", graph.edges.len());
+    println!("Reflection evidence: {}", compatibility.reflection_detected);
+    println!("Native methods: {}", compatibility.native_methods.len());
+    Ok(())
+}
+
+fn run_dex_roundtrip(args: &[String]) -> Result<(), String> {
+    if args.is_empty() || args.iter().any(|value| value == "--help" || value == "-h") {
+        print_dex_roundtrip_help();
+        return Ok(());
+    }
+
+    let input = PathBuf::from(&args[0]);
+    let mut output = None;
+    let mut index = 1_usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "-o" | "--output" => {
+                output = Some(PathBuf::from(require_value(args, index, "--output")?));
+                index += 2;
+            }
+            option => return Err(format!("unknown dex-roundtrip option '{option}'")),
+        }
+    }
+    let output = output.ok_or_else(|| "dex-roundtrip requires --output <file.dex>".to_owned())?;
+
+    let bytes = fs::read(&input).map_err(|error| error.to_string())?;
+    let dex = DexParser::parse(&bytes).map_err(|error| error.to_string())?;
+    let _ = DexValidator::validate(&dex).map_err(|error| error.to_string())?;
+    let rewritten = DexWriter::round_trip(&dex).map_err(|error| error.to_string())?;
+    fs::write(&output, &rewritten).map_err(|error| error.to_string())?;
+    let reparsed = DexParser::parse(&rewritten).map_err(|error| error.to_string())?;
+    let _ = DexValidator::validate(&reparsed).map_err(|error| error.to_string())?;
+
+    println!("DEX round-trip: OK");
+    println!("Input: {}", input.display());
+    println!("Output: {}", output.display());
+    println!("Byte-stable: {}", bytes == rewritten);
+    Ok(())
+}
+
+fn run_dex_rewrite(args: &[String]) -> Result<(), String> {
+    if args.is_empty() || args.iter().any(|value| value == "--help" || value == "-h") {
+        print_dex_rewrite_help();
+        return Ok(());
+    }
+
+    let input = PathBuf::from(&args[0]);
+    let mut output = None;
+    let mut rename = false;
+    let mut strip_metadata = false;
+    let mut seed = RenameConfig::default().seed;
+    let mut selectors = Vec::new();
+    let mut index = 1_usize;
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "-o" | "--output" => {
+                output = Some(PathBuf::from(require_value(args, index, "--output")?));
+                index += 2;
+            }
+            "--rename" => {
+                rename = true;
+                index += 1;
+            }
+            "--strip-metadata" => {
+                strip_metadata = true;
+                index += 1;
+            }
+            "--seed" => {
+                seed = parse_u64(require_value(args, index, "--seed")?, "--seed")?;
+                index += 2;
+            }
+            "--class" => {
+                let pattern = require_value(args, index, "--class")?;
+                selectors.push(
+                    Selector::new(SelectorKind::Class, pattern, None)
+                        .map_err(|error| error.to_string())?,
+                );
+                index += 2;
+            }
+            "--method" => {
+                let value = require_value(args, index, "--method")?;
+                let (class_pattern, member_pattern) = split_member_selector(value, "--method")?;
+                selectors.push(
+                    Selector::new(
+                        SelectorKind::Method,
+                        class_pattern,
+                        Some(member_pattern.to_owned()),
+                    )
+                    .map_err(|error| error.to_string())?,
+                );
+                index += 2;
+            }
+            "--field" => {
+                let value = require_value(args, index, "--field")?;
+                let (class_pattern, member_pattern) = split_member_selector(value, "--field")?;
+                selectors.push(
+                    Selector::new(
+                        SelectorKind::Field,
+                        class_pattern,
+                        Some(member_pattern.to_owned()),
+                    )
+                    .map_err(|error| error.to_string())?,
+                );
+                index += 2;
+            }
+            option => return Err(format!("unknown dex-rewrite option '{option}'")),
+        }
+    }
+
+    if !rename && !strip_metadata {
+        return Err("dex-rewrite requires --rename and/or --strip-metadata".into());
+    }
+    let output = output.ok_or_else(|| "dex-rewrite requires --output <file.dex>".to_owned())?;
+
+    let bytes = fs::read(&input).map_err(|error| error.to_string())?;
+    let mut dex = DexParser::parse(&bytes).map_err(|error| error.to_string())?;
+    let _ = DexValidator::validate(&dex).map_err(|error| error.to_string())?;
+    let mut current = bytes;
+    let mut renamed = 0_usize;
+
+    if rename {
+        let result = RenamePass::apply(
+            &dex,
+            &RenameConfig {
+                selectors,
+                seed,
+                ..RenameConfig::default()
+            },
+        )
+        .map_err(|error| error.to_string())?;
+        renamed = result.report.records.len();
+        current = result.bytes;
+        dex = DexParser::parse(&current).map_err(|error| error.to_string())?;
+    }
+
+    let mut source_files_removed = 0_usize;
+    let mut debug_info_detached = 0_usize;
+    if strip_metadata {
+        let (rewritten, report) =
+            MetadataReducer::strip_debug_metadata(&dex).map_err(|error| error.to_string())?;
+        current = rewritten;
+        source_files_removed = report.source_files_removed;
+        debug_info_detached = report.debug_info_detached;
+    }
+
+    let final_dex = DexParser::parse(&current).map_err(|error| error.to_string())?;
+    let _ = DexValidator::validate(&final_dex).map_err(|error| error.to_string())?;
+    fs::write(&output, current).map_err(|error| error.to_string())?;
+
+    println!("DEX rewrite: OK");
+    println!("Renamed string slots: {renamed}");
+    println!("Source-file metadata removed: {source_files_removed}");
+    println!("Debug-info links detached: {debug_info_detached}");
+    println!("Output: {}", output.display());
+    Ok(())
+}
+
+fn run_dex_multidex_verify(args: &[String]) -> Result<(), String> {
+    if args.is_empty() || args.iter().any(|value| value == "--help" || value == "-h") {
+        print_dex_multidex_help();
+        return Ok(());
+    }
+
+    let mut inputs = Vec::with_capacity(args.len());
+    for value in args {
+        let path = PathBuf::from(value);
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| format!("invalid DEX filename '{}'", path.display()))?
+            .to_owned();
+        let bytes = fs::read(&path).map_err(|error| error.to_string())?;
+        inputs.push(DexInput { name, bytes });
+    }
+
+    let set = MultiDexSet::parse(inputs).map_err(|error| error.to_string())?;
+    println!("Multidex set: OK");
+    println!("DEX files: {}", set.units.len());
+    for unit in set.units {
+        println!(
+            "  {}: classes={} methods={} strings={}",
+            unit.name,
+            unit.dex.classes.len(),
+            unit.dex.methods.len(),
+            unit.dex.strings.len()
+        );
     }
     Ok(())
 }
@@ -293,6 +542,23 @@ fn parse_u32(value: &str, option: &str) -> Result<u32, String> {
         .map_err(|_| format!("{option} expects an unsigned integer, got '{value}'"))
 }
 
+fn parse_u64(value: &str, option: &str) -> Result<u64, String> {
+    let parsed = value
+        .strip_prefix("0x")
+        .map_or_else(|| value.parse::<u64>(), |hex| u64::from_str_radix(hex, 16));
+    parsed.map_err(|_| format!("{option} expects an unsigned integer, got '{value}'"))
+}
+
+fn split_member_selector<'a>(value: &'a str, option: &str) -> Result<(&'a str, &'a str), String> {
+    let (class_pattern, member_pattern) = value
+        .split_once('#')
+        .ok_or_else(|| format!("{option} expects <class-glob>#<member-glob>"))?;
+    if class_pattern.is_empty() || member_pattern.is_empty() {
+        return Err(format!("{option} expects non-empty class and member patterns"));
+    }
+    Ok((class_pattern, member_pattern))
+}
+
 fn print_inspection(path: &Path, inspection: &nexora_shield_package::ApkInspection) {
     println!("APK: {}", path.display());
     println!("SHA-256: {}", inspection.sha256);
@@ -387,5 +653,40 @@ OPTIONS:\n\
   --force                     Replace an existing output transactionally\n\
   --public-report <file>      Write non-sensitive JSON report\n\
   --private-report <file>     Write private build JSON report"
+    );
+}
+
+
+fn print_dex_inspect_help() {
+    println!(
+        "USAGE:\n  nexora-shield dex-inspect <classes.dex>\n\n\
+Parses and validates DEX tables/code, then builds CFG, type analysis, SSA IR, reference graph and compatibility analysis."
+    );
+}
+
+fn print_dex_roundtrip_help() {
+    println!(
+        "USAGE:\n  nexora-shield dex-roundtrip <classes.dex> --output <out.dex>\n\n\
+Runs the Phase B writer without semantic transforms and validates the result."
+    );
+}
+
+fn print_dex_rewrite_help() {
+    println!(
+        "USAGE:\n  nexora-shield dex-rewrite <classes.dex> --output <out.dex> [OPTIONS]\n\n\
+OPTIONS:\n\
+  --rename                       Enable compatibility-aware fixed-layout renaming\n\
+  --strip-metadata               Remove source-file links and detach debug-info data\n\
+  --seed <u64|0xhex>             Deterministic rename seed\n\
+  --class <class-glob>           Restrict class renames\n\
+  --method <class#member>        Restrict method renames\n\
+  --field <class#member>         Restrict field renames"
+    );
+}
+
+fn print_dex_multidex_help() {
+    println!(
+        "USAGE:\n  nexora-shield dex-multidex-verify <classes.dex> [classes2.dex ...]\n\n\
+Validates canonical numbering and every DEX in the set."
     );
 }
