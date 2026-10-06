@@ -2,7 +2,7 @@
 
 Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
 
-> Estado: diseño y arquitectura inicial. El proyecto todavía no debe anunciarse como "imposible de romper". Ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta. Nexora Shield se diseña para aumentar el coste, reducir la automatización de ataques y detectar/manipular respuestas ante alteraciones.
+> Estado: **Fase 0 — Foundation implementada**. El workspace, contratos iniciales, esquema de configuración, CI, ADRs, threat model y política de seguridad ya están establecidos. La siguiente fase de implementación es **Fase A — Core Packaging**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
 
 ## Objetivos
 
