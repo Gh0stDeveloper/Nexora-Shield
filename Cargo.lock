@@ -7,8 +7,16 @@ name = "nexora-shield"
 version = "0.1.0"
 dependencies = [
  "nexora-shield-core",
+ "nexora-shield-package",
 ]
 
 [[package]]
 name = "nexora-shield-core"
+version = "0.1.0"
+dependencies = [
+ "nexora-shield-package",
+]
+
+[[package]]
+name = "nexora-shield-package"
 version = "0.1.0"
