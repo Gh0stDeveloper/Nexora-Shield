@@ -3,6 +3,8 @@ use crate::error::{DataProtectionError, Result};
 use crate::key::{hex_lower, KeyDomain, KeySchedule, ITEM_ID_LEN};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
+use zeroize::Zeroize;
 
 const BUNDLE_MAGIC: &[u8; 4] = b"NSRB";
 const BUNDLE_VERSION: u8 = 1;
@@ -106,10 +108,27 @@ pub struct ResourceDecision {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ResourceInput {
     pub path: String,
     pub bytes: Vec<u8>,
+}
+
+impl fmt::Debug for ResourceInput {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ResourceInput")
+            .field("path", &self.path)
+            .field("bytes", &"[REDACTED]")
+            .field("bytes_len", &self.bytes.len())
+            .finish()
+    }
+}
+
+impl Drop for ResourceInput {
+    fn drop(&mut self) {
+        self.bytes.zeroize();
+    }
 }
 
 impl ResourceInput {
