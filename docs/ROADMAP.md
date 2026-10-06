@@ -93,6 +93,8 @@ Estado actual: **COMPLETADA**. Las subfases A.1–A.10 están implementadas. Git
 Criterio:
 - golden apps funcionan tras round-trip y renaming compatible.
 
+Estado actual: **COMPLETADA**. Las subfases B.1–B.12 están implementadas y el GitHub Actions run #162 (`37522614748`) validó Rust quality, RustSec, regresión de Phase A y el gate E2E de Phase B con golden DEX, round-trip byte-stable, renaming compatible, metadata reduction y multidex.
+
 ---
 
 ## Fase C — Data Protection
