@@ -41,17 +41,15 @@ fn manifest_and_evidence() -> (IntegrityManifest, IntegrityEvidence) {
     )
     .expect("native integrity");
 
-    let manifest = IntegrityManifest::build(
-        "phase-d-build",
+    let manifest = IntegrityManifest::build(IntegrityManifestInput {
+        build_id: "phase-d-build".into(),
         certificate,
         package,
-        vec![dex],
-        vec![resource, native],
-        b"phase-d-distribution-seed",
-        5,
-        2,
-        ResponsePolicy::default(),
-    )
+        dex_files: vec![dex],
+        artifacts: vec![resource, native],
+        distribution: DistributionConfig::new(b"phase-d-distribution-seed".to_vec(), 5, 2),
+        response_policy: ResponsePolicy::default(),
+    })
     .expect("integrity manifest");
 
     let certificate =
