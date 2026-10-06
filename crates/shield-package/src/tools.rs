@@ -19,6 +19,12 @@ pub struct SigningConfig {
 }
 
 impl SigningConfig {
+    /// Validates local signing inputs without exposing password values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the keystore, alias, or referenced password
+    /// environment variables are unavailable.
     pub fn validate(&self) -> Result<()> {
         if !self.keystore.is_file() {
             return Err(PackageError::InvalidArgument(format!(
@@ -47,6 +53,11 @@ pub struct AndroidTools {
 }
 
 impl AndroidTools {
+    /// Discovers official Android Build Tools, preferring explicit overrides.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `zipalign` or `apksigner` cannot be found.
     pub fn discover(
         zipalign_override: Option<&Path>,
         apksigner_override: Option<&Path>,
@@ -66,6 +77,11 @@ impl AndroidTools {
         })
     }
 
+    /// Aligns an APK and immediately verifies the alignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `zipalign` cannot execute or reports failure.
     pub fn align(&self, input: &Path, output: &Path) -> Result<()> {
         let args = [
             OsString::from("-P"),
@@ -88,6 +104,12 @@ impl AndroidTools {
         Ok(())
     }
 
+    /// Signs an APK using V1/V2/V3 and verifies the produced artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid signing inputs or when `apksigner`
+    /// reports signing/verification failure.
     pub fn sign(&self, input: &Path, output: &Path, config: &SigningConfig) -> Result<()> {
         config.validate()?;
 
@@ -122,6 +144,11 @@ impl AndroidTools {
         Ok(())
     }
 
+    /// Verifies Android APK signatures and returns the signer diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `apksigner` cannot execute or rejects the APK.
     pub fn verify_signature(&self, apk: &Path, min_sdk: u32) -> Result<String> {
         let args = [
             OsString::from("verify"),
@@ -183,7 +210,7 @@ fn discover_build_tool(name: &str) -> Result<PathBuf> {
     let build_tools = PathBuf::from(sdk_root).join("build-tools");
     let mut versions = fs::read_dir(&build_tools)?
         .filter_map(std::result::Result::ok)
-        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
         .map(|entry| entry.path())
         .collect::<Vec<_>>();
 
