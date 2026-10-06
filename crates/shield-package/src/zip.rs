@@ -66,7 +66,9 @@ pub fn read_zip_directory(path: &Path) -> Result<ZipDirectory> {
     let mut file = File::open(path)?;
     let file_len = file.metadata()?.len();
     if file_len < EOCD_MIN_SIZE as u64 {
-        return Err(PackageError::InvalidZip("file is smaller than an EOCD record".into()));
+        return Err(PackageError::InvalidZip(
+            "file is smaller than an EOCD record".into(),
+        ));
     }
 
     let tail_len = usize::try_from(file_len.min((EOCD_MIN_SIZE + MAX_ZIP_COMMENT) as u64))
@@ -112,7 +114,9 @@ pub fn read_zip_directory(path: &Path) -> Result<ZipDirectory> {
             .checked_add(record_size)
             .ok_or_else(|| PackageError::InvalidZip("central directory cursor overflow".into()))?;
         if cursor > central.len() {
-            return Err(PackageError::InvalidZip("central directory is truncated".into()));
+            return Err(PackageError::InvalidZip(
+                "central directory is truncated".into(),
+            ));
         }
     }
 
@@ -196,9 +200,9 @@ pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary
     }
 
     let central_end = destination.stream_position()?;
-    let central_size = central_end.checked_sub(central_offset).ok_or_else(|| {
-        PackageError::InvalidZip("central directory position underflow".into())
-    })?;
+    let central_size = central_end
+        .checked_sub(central_offset)
+        .ok_or_else(|| PackageError::InvalidZip("central directory position underflow".into()))?;
     let central_size_u32 = u32::try_from(central_size).map_err(|_| {
         PackageError::UnsupportedZip("normalized APK central directory is too large".into())
     })?;
@@ -255,7 +259,11 @@ pub fn is_legacy_signature_entry(name: &str) -> bool {
         || rest.ends_with(".EC")
 }
 
-pub fn read_stored_entry(path: &Path, entry: &ZipEntry, max_size: usize) -> Result<Option<Vec<u8>>> {
+pub fn read_stored_entry(
+    path: &Path,
+    entry: &ZipEntry,
+    max_size: usize,
+) -> Result<Option<Vec<u8>>> {
     if entry.compression_method != 0 {
         return Ok(None);
     }
@@ -622,7 +630,9 @@ mod tests {
         assert!(is_legacy_signature_entry("META-INF/MANIFEST.MF"));
         assert!(is_legacy_signature_entry("META-INF/CERT.RSA"));
         assert!(is_legacy_signature_entry("meta-inf/cert.sf"));
-        assert!(!is_legacy_signature_entry("META-INF/services/example.Service"));
+        assert!(!is_legacy_signature_entry(
+            "META-INF/services/example.Service"
+        ));
     }
 
     #[test]
