@@ -3,9 +3,9 @@
 use nexora_shield_dex::{refresh_integrity, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE};
 use nexora_shield_integrity::{
     ArtifactIntegrity, ArtifactKind, CertificateBinding, CertificateObservation, CertificatePolicy,
-    DexIntegrity, DistributionPlan, IntegrityEvidence, IntegrityManifest, IntegrityResponse,
-    IntegritySeverity, IntegrityVerifier, PackageBinding, PackageObservation, ResponsePolicy,
-    Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
+    DexIntegrity, DistributionConfig, DistributionPlan, IntegrityEvidence, IntegrityManifest,
+    IntegrityManifestInput, IntegrityResponse, IntegritySeverity, IntegrityVerifier,
+    PackageBinding, PackageObservation, ResponsePolicy, Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
 };
 use std::collections::BTreeMap;
 
