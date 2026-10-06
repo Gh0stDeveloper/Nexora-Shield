@@ -1,6 +1,8 @@
 use crate::container::{open, seal, ContainerKind};
 use crate::error::{DataProtectionError, Result};
 use crate::key::KeySchedule;
+use std::fmt;
+use zeroize::Zeroize;
 
 const TAG_BOOL: u8 = 1;
 const TAG_I32: u8 = 2;
@@ -9,7 +11,7 @@ const TAG_F32: u8 = 4;
 const TAG_F64: u8 = 5;
 const TAG_BYTES: u8 = 6;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ConstantValue {
     Bool(bool),
     I32(i32),
@@ -17,6 +19,37 @@ pub enum ConstantValue {
     F32(f32),
     F64(f64),
     Bytes(Vec<u8>),
+}
+
+impl fmt::Debug for ConstantValue {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = match self {
+            Self::Bool(_) => "bool",
+            Self::I32(_) => "i32",
+            Self::I64(_) => "i64",
+            Self::F32(_) => "f32",
+            Self::F64(_) => "f64",
+            Self::Bytes(_) => "bytes",
+        };
+        formatter
+            .debug_struct("ConstantValue")
+            .field("kind", &kind)
+            .field("value", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl Drop for ConstantValue {
+    fn drop(&mut self) {
+        match self {
+            Self::Bool(value) => *value = false,
+            Self::I32(value) => *value = 0,
+            Self::I64(value) => *value = 0,
+            Self::F32(value) => *value = 0.0,
+            Self::F64(value) => *value = 0.0,
+            Self::Bytes(value) => value.zeroize(),
+        }
+    }
 }
 
 pub fn protect_constant(
