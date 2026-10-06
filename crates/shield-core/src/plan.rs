@@ -20,6 +20,12 @@ pub struct BuildPlan {
 }
 
 impl BuildPlan {
+    /// Freezes the build inputs before any artifact mutation occurs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when input/output paths are identical or a stable
+    /// creation timestamp cannot be obtained.
     pub fn create(
         input: &Path,
         output: &Path,
