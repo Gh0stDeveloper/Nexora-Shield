@@ -4,6 +4,7 @@ use crate::key::{hex_lower, KeySchedule};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
+use zeroize::Zeroize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -41,6 +42,12 @@ impl fmt::Debug for StringCandidate {
             .field("value_len", &self.value.len())
             .field("context", &self.context)
             .finish()
+    }
+}
+
+impl Drop for StringCandidate {
+    fn drop(&mut self) {
+        self.value.zeroize();
     }
 }
 
