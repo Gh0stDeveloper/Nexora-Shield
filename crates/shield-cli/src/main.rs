@@ -5,9 +5,7 @@
 use nexora_shield_core::{
     apk_inspection_json, protect_apk, ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
-use nexora_shield_package::{
-    inspect_apk, verify_apk_structure, AndroidTools, SigningConfig,
-};
+use nexora_shield_package::{inspect_apk, verify_apk_structure, AndroidTools, SigningConfig};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -42,7 +40,9 @@ fn run() -> Result<(), String> {
         "inspect" => run_inspect(&args),
         "verify" => run_verify(&args),
         "protect" => run_protect(&args),
-        _ => Err(format!("unknown command '{command}'. Run 'nexora-shield --help'.")),
+        _ => Err(format!(
+            "unknown command '{command}'. Run 'nexora-shield --help'."
+        )),
     }
 }
 
@@ -204,12 +204,19 @@ fn run_protect(args: &[String]) -> Result<(), String> {
                 index += 2;
             }
             "--public-report" => {
-                public_report = Some(PathBuf::from(require_value(args, index, "--public-report")?));
+                public_report = Some(PathBuf::from(require_value(
+                    args,
+                    index,
+                    "--public-report",
+                )?));
                 index += 2;
             }
             "--private-report" => {
-                private_report =
-                    Some(PathBuf::from(require_value(args, index, "--private-report")?));
+                private_report = Some(PathBuf::from(require_value(
+                    args,
+                    index,
+                    "--private-report",
+                )?));
                 index += 2;
             }
             option => return Err(format!("unknown protect option '{option}'")),
@@ -302,7 +309,10 @@ fn print_inspection(path: &Path, inspection: &nexora_shield_package::ApkInspecti
     );
     println!("DEX files: {}", inspection.dex_files.len());
     for dex in &inspection.dex_files {
-        println!("  {} (index {}, {} bytes)", dex.name, dex.index, dex.uncompressed_size);
+        println!(
+            "  {} (index {}, {} bytes)",
+            dex.name, dex.index, dex.uncompressed_size
+        );
     }
     println!(
         "DEX sequence contiguous: {}",
