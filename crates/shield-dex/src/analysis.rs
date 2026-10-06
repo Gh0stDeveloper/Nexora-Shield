@@ -320,11 +320,12 @@ pub(crate) fn register_accesses(
     };
 
     let access = match instruction.opcode {
-        0x01 | 0x04 | 0x07 | 0x20 | 0x21 | 0x23 | 0x52..=0x58 | 0x7b..=0x8f
-        | 0xd0..=0xd7 => RegisterAccess {
-            defs: vec![a4],
-            uses: vec![b4],
-        },
+        0x01 | 0x04 | 0x07 | 0x20 | 0x21 | 0x23 | 0x52..=0x58 | 0x7b..=0x8f | 0xd0..=0xd7 => {
+            RegisterAccess {
+                defs: vec![a4],
+                uses: vec![b4],
+            }
+        }
         0x02 | 0x05 | 0x08 => RegisterAccess {
             defs: vec![a8],
             uses: vec![unit1()?],
@@ -337,11 +338,12 @@ pub(crate) fn register_accesses(
             defs: vec![a8],
             uses: Vec::new(),
         },
-        0x0f..=0x11 | 0x1d | 0x1e | 0x26 | 0x27 | 0x2b | 0x2c | 0x38..=0x3d
-        | 0x67..=0x6d => RegisterAccess {
-            defs: Vec::new(),
-            uses: vec![a8],
-        },
+        0x0f..=0x11 | 0x1d | 0x1e | 0x26 | 0x27 | 0x2b | 0x2c | 0x38..=0x3d | 0x67..=0x6d => {
+            RegisterAccess {
+                defs: Vec::new(),
+                uses: vec![a8],
+            }
+        }
         0x12 => RegisterAccess {
             defs: vec![a4],
             uses: Vec::new(),
