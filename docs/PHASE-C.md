@@ -201,7 +201,7 @@ Cryptographic dependencies are locked and audited through RustSec. The `zeroize`
 
 ## Validation
 
-GitHub Actions run **#211** (ID `37526040505`) validated the implementation with:
+GitHub Actions run **#216** (ID `37526352684`) validated the final branch head with:
 
 - Rust quality;
 - RustSec audit;
