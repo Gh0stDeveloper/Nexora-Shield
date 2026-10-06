@@ -23,8 +23,6 @@ pub(crate) fn run_data_protect(args: &[String]) -> Result<(), String> {
         .logical_id
         .as_deref()
         .ok_or_else(|| "data-protect requires --id <logical-id>".to_owned())?;
-    let schedule = load_schedule(&options)?;
-
     let plaintext = fs::read(&input).map_err(|error| error.to_string())?;
     let protected =
         seal(&schedule, kind, logical_id, &plaintext).map_err(|error| error.to_string())?;
@@ -57,8 +55,6 @@ pub(crate) fn run_data_unprotect(args: &[String]) -> Result<(), String> {
         .logical_id
         .as_deref()
         .ok_or_else(|| "data-unprotect requires --id <logical-id>".to_owned())?;
-    let schedule = load_schedule(&options)?;
-
     let protected = fs::read(&input).map_err(|error| error.to_string())?;
     let plaintext =
         open(&schedule, kind, logical_id, &protected).map_err(|error| error.to_string())?;
