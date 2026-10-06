@@ -124,8 +124,7 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     ];
 
     let string_ids_off = DEX_HEADER_SIZE;
-    let type_ids_off =
-        string_ids_off + u32::try_from(strings.len()).expect("string count fits u32") * 4;
+    let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
     let proto_ids_off = type_ids_off + 3 * 4;
     let method_ids_off = proto_ids_off + 12;
     let class_defs_off = method_ids_off + 8;
@@ -135,10 +134,10 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     let mut string_offsets = Vec::with_capacity(strings.len());
 
     for value in strings {
-        string_offsets.push(u32::try_from(bytes.len()).expect("fixture size fits u32"));
+        string_offsets.push(len_u32(bytes.len()));
         write_uleb128(
             &mut bytes,
-            u32::try_from(value.encode_utf16().count()).expect("UTF-16 length fits u32"),
+            len_u32(value.encode_utf16().count()),
         );
         bytes.extend_from_slice(value.as_bytes());
         bytes.push(0);
@@ -148,7 +147,7 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
         bytes.push(0);
     }
 
-    let code_off = bytes.len() as u32;
+    let code_off = len_u32(bytes.len());
     push_u16(&mut bytes, 0);
     push_u16(&mut bytes, 0);
     push_u16(&mut bytes, 0);
@@ -157,7 +156,7 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     push_u32(&mut bytes, 1);
     push_u16(&mut bytes, 0x000e);
 
-    let class_data_off = bytes.len() as u32;
+    let class_data_off = len_u32(bytes.len());
     write_uleb128(&mut bytes, 0);
     write_uleb128(&mut bytes, 0);
     write_uleb128(&mut bytes, 1);
@@ -166,7 +165,7 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     write_uleb128(&mut bytes, 0x0009);
     write_uleb128(&mut bytes, code_off);
 
-    let file_size = bytes.len() as u32;
+    let file_size = len_u32(bytes.len());
     bytes[0..8].copy_from_slice(b"dex\n035\0");
     put_u32(&mut bytes, 32, file_size);
     put_u32(&mut bytes, 36, DEX_HEADER_SIZE);
@@ -174,7 +173,7 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     put_u32(&mut bytes, 44, 0);
     put_u32(&mut bytes, 48, 0);
     put_u32(&mut bytes, 52, 0);
-    put_u32(&mut bytes, 56, strings.len() as u32);
+    put_u32(&mut bytes, 56, len_u32(strings.len()));
     put_u32(&mut bytes, 60, string_ids_off);
     put_u32(&mut bytes, 64, 3);
     put_u32(&mut bytes, 68, type_ids_off);
@@ -216,6 +215,10 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
 
     refresh_integrity(&mut bytes).expect("refresh fixture integrity");
     bytes
+}
+
+fn len_u32(value: usize) -> u32 {
+    u32::try_from(value).expect("fixture length fits u32")
 }
 
 fn write_uleb128(output: &mut Vec<u8>, mut value: u32) {
