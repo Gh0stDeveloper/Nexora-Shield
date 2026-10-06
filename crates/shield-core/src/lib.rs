@@ -16,9 +16,7 @@ use core::str::FromStr;
 pub use error::{CoreError, Result};
 pub use pipeline::{protect_apk, PipelineResult, PipelineStage, ProtectionRequest};
 pub use plan::BuildPlan;
-pub use report::{
-    apk_inspection_json, write_report_atomic, PrivateBuildReport, PublicBuildReport,
-};
+pub use report::{apk_inspection_json, write_report_atomic, PrivateBuildReport, PublicBuildReport};
 
 /// Current configuration schema supported by the foundation.
 pub const CONFIG_SCHEMA_VERSION: u32 = 1;
