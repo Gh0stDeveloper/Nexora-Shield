@@ -320,7 +320,8 @@ pub(crate) fn register_accesses(
     };
 
     let access = match instruction.opcode {
-        0x01 | 0x04 | 0x07 => RegisterAccess {
+        0x01 | 0x04 | 0x07 | 0x20 | 0x21 | 0x23 | 0x52..=0x58 | 0x7b..=0x8f
+        | 0xd0..=0xd7 => RegisterAccess {
             defs: vec![a4],
             uses: vec![b4],
         },
@@ -332,11 +333,12 @@ pub(crate) fn register_accesses(
             defs: vec![unit1()?],
             uses: vec![unit2()?],
         },
-        0x0a..=0x0d => RegisterAccess {
+        0x0a..=0x0d | 0x13..=0x1c | 0x22 | 0x60..=0x66 | 0xfe | 0xff => RegisterAccess {
             defs: vec![a8],
             uses: Vec::new(),
         },
-        0x0f..=0x11 | 0x1d | 0x1e | 0x27 | 0x26 | 0x2b | 0x2c | 0x38..=0x3d => RegisterAccess {
+        0x0f..=0x11 | 0x1d | 0x1e | 0x26 | 0x27 | 0x2b | 0x2c | 0x38..=0x3d
+        | 0x67..=0x6d => RegisterAccess {
             defs: Vec::new(),
             uses: vec![a8],
         },
@@ -344,27 +346,15 @@ pub(crate) fn register_accesses(
             defs: vec![a4],
             uses: Vec::new(),
         },
-        0x13..=0x1c | 0x22 => RegisterAccess {
-            defs: vec![a8],
-            uses: Vec::new(),
-        },
         0x1f => RegisterAccess {
             defs: vec![a8],
             uses: vec![a8],
         },
-        0x20 | 0x23 => RegisterAccess {
-            defs: vec![a4],
-            uses: vec![b4],
-        },
-        0x21 => RegisterAccess {
-            defs: vec![a4],
-            uses: vec![b4],
-        },
-        0x24 | 0x6e..=0x72 => RegisterAccess {
+        0x24 | 0x6e..=0x72 | 0xfa | 0xfc => RegisterAccess {
             defs: Vec::new(),
             uses: invoke_35c_registers(code, instruction.offset)?,
         },
-        0x25 | 0x74..=0x78 => RegisterAccess {
+        0x25 | 0x74..=0x78 | 0xfb | 0xfd => RegisterAccess {
             defs: Vec::new(),
             uses: invoke_range_registers(code, instruction.offset)?,
         },
@@ -375,7 +365,7 @@ pub(crate) fn register_accesses(
                 uses: vec![second & 0x00ff, second >> 8],
             }
         }
-        0x32..=0x37 => RegisterAccess {
+        0x32..=0x37 | 0x59..=0x5f => RegisterAccess {
             defs: Vec::new(),
             uses: vec![a4, b4],
         },
@@ -386,33 +376,9 @@ pub(crate) fn register_accesses(
                 uses: vec![a8, second & 0x00ff, second >> 8],
             }
         }
-        0x52..=0x58 => RegisterAccess {
-            defs: vec![a4],
-            uses: vec![b4],
-        },
-        0x59..=0x5f => RegisterAccess {
-            defs: Vec::new(),
-            uses: vec![a4, b4],
-        },
-        0x60..=0x66 => RegisterAccess {
-            defs: vec![a8],
-            uses: Vec::new(),
-        },
-        0x67..=0x6d => RegisterAccess {
-            defs: Vec::new(),
-            uses: vec![a8],
-        },
-        0x7b..=0x8f => RegisterAccess {
-            defs: vec![a4],
-            uses: vec![b4],
-        },
         0xb0..=0xcf => RegisterAccess {
             defs: vec![a4],
             uses: vec![a4, b4],
-        },
-        0xd0..=0xd7 => RegisterAccess {
-            defs: vec![a4],
-            uses: vec![b4],
         },
         0xd8..=0xe2 => {
             let second = unit1()?;
@@ -421,18 +387,6 @@ pub(crate) fn register_accesses(
                 uses: vec![second & 0x00ff],
             }
         }
-        0xfa | 0xfc => RegisterAccess {
-            defs: Vec::new(),
-            uses: invoke_35c_registers(code, instruction.offset)?,
-        },
-        0xfb | 0xfd => RegisterAccess {
-            defs: Vec::new(),
-            uses: invoke_range_registers(code, instruction.offset)?,
-        },
-        0xfe | 0xff => RegisterAccess {
-            defs: vec![a8],
-            uses: Vec::new(),
-        },
         _ => RegisterAccess {
             defs: Vec::new(),
             uses: Vec::new(),
