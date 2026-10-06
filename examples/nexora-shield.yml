@@ -1,0 +1,65 @@
+schema: 1
+
+application:
+  id: com.example.app
+  minSdk: 24
+
+profile: hardened
+
+build:
+  diversity: true
+  reproducible: false
+
+selectors:
+  sensitive:
+    include:
+      - com.example.auth.**
+      - com.example.billing.**
+    exclude:
+      - com.example.generated.**
+
+dex:
+  rename: true
+  metadataReduction: true
+  controlFlow:
+    enabled: true
+    scope: sensitive
+
+crypto:
+  strings:
+    enabled: true
+    scope: sensitive
+  constants:
+    enabled: true
+    scope: sensitive
+
+resources:
+  enabled: true
+  include:
+    - assets/private/**
+
+integrity:
+  certificate: true
+  dex: true
+  resources: true
+  native: true
+
+rasp:
+  mode: enforce
+  policy: policies/release.yml
+
+native:
+  enabled: true
+
+vm:
+  enabled: true
+  scope: critical
+  maxMethods: 40
+
+attestation:
+  enabled: false
+
+budgets:
+  apkGrowthPercent: 20
+  startupMs: 80
+  buildMinutes: 10

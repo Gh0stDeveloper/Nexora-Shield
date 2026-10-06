@@ -1,0 +1,15 @@
+[package]
+name = "nexora-shield"
+description = "Command-line interface for Nexora Shield."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+nexora-shield-core = { path = "../shield-core" }
+
+[lints]
+workspace = true

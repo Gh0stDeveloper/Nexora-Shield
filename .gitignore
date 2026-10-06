@@ -1,0 +1,35 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets and signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Nexora Shield private build material
+/private/
+*.nshield-private
+*.nshield-seed
+*.nshield-map
+
+# Generated reports / samples
+/build/
+dist/
+out/
+coverage/

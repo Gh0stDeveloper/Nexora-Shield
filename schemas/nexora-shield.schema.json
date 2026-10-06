@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Gh0stDeveloper/Nexora-Shield/schemas/nexora-shield.schema.json",
+  "title": "Nexora Shield configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "application", "profile"],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "minSdk"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3,
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+        },
+        "minSdk": {
+          "type": "integer",
+          "minimum": 24
+        }
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["standard", "hardened", "maximum"]
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diversity": { "type": "boolean" },
+        "reproducible": { "type": "boolean" },
+        "seedRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "selectors": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/selector"
+      }
+    },
+    "dex": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "crypto": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "rasp": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "native": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "vm": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "budgetsPolicy": {
+      "type": "string",
+      "enum": ["fail", "warn", "adaptive"]
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "reports": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
