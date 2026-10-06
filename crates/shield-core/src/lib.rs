@@ -1,12 +1,22 @@
-//! Foundational contracts for Nexora Shield.
+//! Core orchestration contracts for Nexora Shield.
 //!
-//! Phase 0 intentionally keeps this crate small. Packaging, DEX processing,
-//! cryptography, RASP and VM functionality are introduced in later phases.
+//! Phase A adds immutable build planning, transactional APK packaging and
+//! public/private build reports. DEX transformations start in Phase B.
 
 #![forbid(unsafe_code)]
 
+mod error;
+mod pipeline;
+mod plan;
+mod report;
+
 use core::fmt;
 use core::str::FromStr;
+
+pub use error::{CoreError, Result};
+pub use pipeline::{protect_apk, PipelineResult, PipelineStage, ProtectionRequest};
+pub use plan::BuildPlan;
+pub use report::{apk_inspection_json, write_report_atomic, PrivateBuildReport, PublicBuildReport};
 
 /// Current configuration schema supported by the foundation.
 pub const CONFIG_SCHEMA_VERSION: u32 = 1;
@@ -23,7 +33,6 @@ pub enum ProtectionProfile {
 }
 
 impl ProtectionProfile {
-    /// Stable configuration name for this profile.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -55,7 +64,7 @@ impl std::error::Error for ParseProtectionProfileError {}
 impl FromStr for ProtectionProfile {
     type Err = ParseProtectionProfileError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "standard" => Ok(Self::Standard),
             "hardened" => Ok(Self::Hardened),

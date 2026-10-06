@@ -10,6 +10,7 @@ repository.workspace = true
 
 [dependencies]
 nexora-shield-core = { path = "../shield-core" }
+nexora-shield-package = { path = "../shield-package" }
 
 [lints]
 workspace = true

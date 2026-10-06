@@ -71,6 +71,8 @@ Estado actual: **COMPLETADA**. La fundación quedó validada por GitHub Actions 
 Criterio:
 - tomar APK simple, normalizarlo, reconstruirlo, firmarlo y verificarlo sin modificar semántica.
 
+Estado actual: **COMPLETADA**. Las subfases A.1–A.10 están implementadas. GitHub Actions run #96 (`37512809317`) validó `Rust quality`, `RustSec audit` y el pipeline APK E2E con `zipalign`, firma V1/V2/V3 y `apksigner verify`.
+
 ---
 
 ## Fase B — DEX Engine

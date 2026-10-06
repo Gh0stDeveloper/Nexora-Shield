@@ -4,9 +4,9 @@
 
 CI is a security boundary for Nexora Shield. A failed quality/security gate must not be interpreted as a protected/releasable build.
 
-## Phase 0 workflow
+## Core workflow
 
-`.github/workflows/ci.yml` runs two jobs.
+`.github/workflows/ci.yml` runs the quality, dependency-audit and Phase A packaging gates.
 
 ### Rust quality
 
@@ -20,6 +20,20 @@ CI is a security boundary for Nexora Shield. A failed quality/security gate must
 ### RustSec audit
 
 The committed `Cargo.lock` is checked against the RustSec advisory database.
+
+### Phase A APK pipeline
+
+The CI creates an isolated synthetic multidex APK and ephemeral signing key, then executes the real production path:
+
+- deterministic normalization;
+- stale signature removal;
+- `zipalign -P 16` alignment and verification;
+- APK signing with V1/V2/V3;
+- structural inspection;
+- `apksigner verify`;
+- public/private report validation.
+
+No production signing material is used.
 
 ## Permissions
 
