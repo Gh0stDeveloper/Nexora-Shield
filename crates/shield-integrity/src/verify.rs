@@ -55,6 +55,7 @@ struct NodeResult {
     reason: String,
 }
 
+#[derive(Debug, Default, Clone, Copy)]
 pub struct IntegrityVerifier;
 
 impl IntegrityVerifier {
