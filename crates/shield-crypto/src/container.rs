@@ -228,9 +228,9 @@ fn parse(bytes: &[u8], max_plaintext: u64) -> Result<ParsedContainer<'_>> {
             bytes.len()
         )));
     }
-    let expected_ciphertext_len = plaintext_len
-        .checked_add(16)
-        .ok_or_else(|| DataProtectionError::InvalidContainer("ciphertext length overflow".into()))?;
+    let expected_ciphertext_len = plaintext_len.checked_add(16).ok_or_else(|| {
+        DataProtectionError::InvalidContainer("ciphertext length overflow".into())
+    })?;
     if ciphertext_len != expected_ciphertext_len {
         return Err(DataProtectionError::InvalidContainer(format!(
             "ciphertext length {ciphertext_len} does not equal plaintext length plus AEAD tag {expected_ciphertext_len}"

@@ -32,7 +32,6 @@ impl SensitiveBytes {
     pub fn as_slice(&self) -> &[u8] {
         &self.bytes
     }
-
 }
 
 impl Clone for SensitiveBytes {
