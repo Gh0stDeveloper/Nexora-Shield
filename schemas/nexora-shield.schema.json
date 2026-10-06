@@ -50,11 +50,94 @@
     },
     "crypto": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "algorithm": {
+          "type": "string",
+          "const": "xchacha20poly1305-hkdf-sha256-v1"
+        },
+        "rootKeyRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reference to external secret material. Raw key material must not be stored in this configuration."
+        },
+        "stringThreshold": {
+          "type": "string",
+          "enum": ["internal", "sensitive", "critical"]
+        },
+        "forceProtect": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "forcePublic": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["disabled", "bounded"]
+            },
+            "maxEntries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxBytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ttlSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "mode": { "const": "bounded" } },
+                "required": ["mode"]
+              },
+              "then": {
+                "required": ["maxEntries", "maxBytes", "ttlSeconds"]
+              }
+            }
+          ]
+        },
+        "exposureMaxOverheadPercent": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
     },
     "resources": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "dataProtection": { "type": "boolean" },
+        "include": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "maxResourceBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "allowAssets": { "type": "boolean" },
+        "allowResRaw": { "type": "boolean" }
+      }
     },
     "integrity": {
       "type": "object",
