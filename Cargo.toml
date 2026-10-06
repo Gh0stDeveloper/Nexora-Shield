@@ -9,7 +9,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.81"
-license = "UNLICENSED"
+publish = false
 authors = ["Gh0stDeveloper"]
 repository = "https://github.com/Gh0stDeveloper/Nexora-Shield"
 
