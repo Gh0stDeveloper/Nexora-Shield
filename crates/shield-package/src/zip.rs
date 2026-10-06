@@ -62,6 +62,12 @@ struct CentralRecord {
     comment_len: u16,
 }
 
+/// Parses the standard ZIP32 central directory and validates entry metadata.
+///
+/// # Errors
+///
+/// Returns an error for malformed, unsafe, encrypted, ZIP64, multi-disk, or
+/// otherwise unsupported archives.
 pub fn read_zip_directory(path: &Path) -> Result<ZipDirectory> {
     let mut file = File::open(path)?;
     let file_len = file.metadata()?.len();
@@ -134,6 +140,12 @@ pub fn read_zip_directory(path: &Path) -> Result<ZipDirectory> {
     })
 }
 
+/// Rebuilds a deterministic APK archive while preserving compressed payload bytes.
+///
+/// # Errors
+///
+/// Returns an error when the input is malformed/unsupported, the output cannot
+/// be written, or standard ZIP32 limits would be exceeded.
 pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary> {
     if input == output {
         return Err(PackageError::InvalidArgument(
@@ -228,6 +240,12 @@ pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary
     })
 }
 
+/// Confirms that normalization preserved non-signature payload identities.
+///
+/// # Errors
+///
+/// Returns an error when either archive is invalid or the entry identity,
+/// content CRC, size, or compression method changed.
 pub fn verify_normalized_equivalence(input: &Path, normalized: &Path) -> Result<()> {
     let original = read_zip_directory(input)?;
     let result = read_zip_directory(normalized)?;
@@ -251,14 +269,19 @@ pub fn is_legacy_signature_entry(name: &str) -> bool {
         return false;
     };
 
-    rest == "MANIFEST.MF"
-        || rest.starts_with("SIG-")
-        || rest.ends_with(".SF")
-        || rest.ends_with(".RSA")
-        || rest.ends_with(".DSA")
-        || rest.ends_with(".EC")
+    let signature_extension = Path::new(rest)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| matches!(extension, "SF" | "RSA" | "DSA" | "EC"));
+
+    rest == "MANIFEST.MF" || rest.starts_with("SIG-") || signature_extension
 }
 
+/// Reads a bounded STORE-method entry for metadata inspection.
+///
+/// # Errors
+///
+/// Returns an error when local ZIP metadata is inconsistent or I/O fails.
 pub fn read_stored_entry(
     path: &Path,
     entry: &ZipEntry,
