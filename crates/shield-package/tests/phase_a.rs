@@ -5,7 +5,7 @@ use nexora_shield_package::{
     verify_normalized_equivalence, ManifestFormat,
 };
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
