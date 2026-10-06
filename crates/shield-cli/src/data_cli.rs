@@ -109,7 +109,7 @@ pub(crate) fn run_data_benchmark(args: &[String]) -> Result<(), String> {
                 index += 2;
             }
             "--label" => {
-                label = require_value(args, index, "--label")?.to_owned();
+                require_value(args, index, "--label")?.clone_into(&mut label);
                 index += 2;
             }
             "--max-overhead" => {
