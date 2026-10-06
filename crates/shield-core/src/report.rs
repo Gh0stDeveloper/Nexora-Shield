@@ -1,5 +1,6 @@
 use crate::pipeline::{PipelineResult, PipelineStage};
 use nexora_shield_package::ApkInspection;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -183,6 +184,12 @@ pub fn apk_inspection_json(inspection: &ApkInspection) -> String {
     )
 }
 
+/// Writes a report through a temporary sibling before replacing the destination.
+///
+/// # Errors
+///
+/// Returns an I/O error when directories/files cannot be created, flushed,
+/// removed, or atomically renamed.
 pub fn write_report_atomic(path: &Path, content: &str) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -229,7 +236,7 @@ fn json_escape(value: &str) -> String {
             '\r' => escaped.push_str("\\r"),
             '\t' => escaped.push_str("\\t"),
             character if character.is_control() => {
-                escaped.push_str(&format!("\\u{:04x}", u32::from(character)));
+                let _ = write!(escaped, "\\u{:04x}", u32::from(character));
             }
             character => escaped.push(character),
         }
