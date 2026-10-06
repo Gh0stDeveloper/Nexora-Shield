@@ -20,7 +20,10 @@ fn unsigned_no_align_pipeline_is_transactional_and_reports_are_written() {
         &input,
         &[
             ("classes.dex", b"dex-one"),
-            ("AndroidManifest.xml", b"<manifest package=\"dev.nexora.test\"/>"),
+            (
+                "AndroidManifest.xml",
+                b"<manifest package=\"dev.nexora.test\"/>",
+            ),
         ],
     );
 
