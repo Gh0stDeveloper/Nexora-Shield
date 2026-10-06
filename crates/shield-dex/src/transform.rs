@@ -190,7 +190,7 @@ impl RenamePass {
 
             let selected = symbols
                 .iter()
-                .filter(|symbol| symbol_enabled(symbol, &selection, config))
+                .filter(|symbol| symbol_enabled(**symbol, &selection, config))
                 .count();
             if selected == 0 {
                 continue;
@@ -290,8 +290,8 @@ fn collect_name_users(dex: &DexFile) -> BTreeMap<u32, Vec<SymbolUse>> {
     users
 }
 
-fn symbol_enabled(symbol: &SymbolUse, selection: &Selection, config: &RenameConfig) -> bool {
-    match *symbol {
+fn symbol_enabled(symbol: SymbolUse, selection: &Selection, config: &RenameConfig) -> bool {
+    match symbol {
         SymbolUse::Class(index) => config.rename_classes && selection.classes.contains(&index),
         SymbolUse::Method(index) => config.rename_methods && selection.methods.contains(&index),
         SymbolUse::Field(index) => config.rename_fields && selection.fields.contains(&index),
@@ -339,7 +339,7 @@ fn generate_replacement(
             )));
         };
         let split = body.rfind('/').map_or(0, |index| index + 1);
-        let prefix = &original[..split + 1];
+        let prefix = &original[..=split];
         let simple = &body[split..];
         if simple.is_empty() {
             return Err(DexError::UnsafeRename(
