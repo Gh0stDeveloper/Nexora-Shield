@@ -44,7 +44,7 @@ fn normalizer_preserves_payload_identity_and_discovers_multidex() {
     assert_eq!(inspection.manifest.format, ManifestFormat::TextXml);
     assert_eq!(inspection.dex_files.len(), 2);
     assert!(inspection.dex_sequence_contiguous);
-    assert!(inspection.legacy_signature_entries.is_empty());
+    assert_eq!(inspection.legacy_signature_entries, Vec::<String>::new());
 
     let zip = read_zip_directory(&output).expect("read normalized central directory");
     let names = zip
