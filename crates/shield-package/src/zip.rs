@@ -475,8 +475,8 @@ fn validate_entry_capabilities(entry: &ZipEntry) -> Result<()> {
 fn validate_entry_name(name: &str) -> Result<()> {
     if name.is_empty()
         || name.starts_with('/')
-        || name.starts_with('\\\\')
-        || name.contains('\\\\')
+        || name.starts_with('\\')
+        || name.contains('\\')
         || name.contains('\0')
         || name.split('/').any(|component| component == "..")
     {
