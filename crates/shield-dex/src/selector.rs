@@ -30,7 +30,7 @@ impl Selector {
             ));
         }
         if matches!(kind, SelectorKind::Method | SelectorKind::Field)
-            && member_pattern.as_deref().is_none_or(str::is_empty)
+            && matches!(member_pattern.as_deref(), None | Some(""))
         {
             return Err(DexError::InvalidSelector(
                 "member selector requires a member pattern".into(),
@@ -99,11 +99,10 @@ impl SelectorResolver {
                             kind: "string",
                             index: method.name_idx,
                         })?;
-                        if selector
-                            .member_pattern
-                            .as_deref()
-                            .is_none_or(|pattern| glob_match(pattern, name))
-                        {
+                        if match selector.member_pattern.as_deref() {
+                            None => true,
+                            Some(pattern) => glob_match(pattern, name),
+                        } {
                             selection.methods.insert(index as u32);
                         }
                     }
@@ -118,11 +117,10 @@ impl SelectorResolver {
                             kind: "string",
                             index: field.name_idx,
                         })?;
-                        if selector
-                            .member_pattern
-                            .as_deref()
-                            .is_none_or(|pattern| glob_match(pattern, name))
-                        {
+                        if match selector.member_pattern.as_deref() {
+                            None => true,
+                            Some(pattern) => glob_match(pattern, name),
+                        } {
                             selection.fields.insert(index as u32);
                         }
                     }
