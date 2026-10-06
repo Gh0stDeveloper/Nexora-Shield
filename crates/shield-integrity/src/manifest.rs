@@ -10,6 +10,35 @@ use std::collections::BTreeSet;
 
 pub const INTEGRITY_MANIFEST_SCHEMA: u32 = 1;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DistributionConfig {
+    pub seed: Vec<u8>,
+    pub check_count: u32,
+    pub redundancy: u8,
+}
+
+impl DistributionConfig {
+    #[must_use]
+    pub fn new(seed: impl Into<Vec<u8>>, check_count: u32, redundancy: u8) -> Self {
+        Self {
+            seed: seed.into(),
+            check_count,
+            redundancy,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntegrityManifestInput {
+    pub build_id: String,
+    pub certificate: CertificateBinding,
+    pub package: PackageBinding,
+    pub dex_files: Vec<DexIntegrity>,
+    pub artifacts: Vec<ArtifactIntegrity>,
+    pub distribution: DistributionConfig,
+    pub response_policy: ResponsePolicy,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IntegrityManifest {
     pub schema: u32,
@@ -24,42 +53,44 @@ pub struct IntegrityManifest {
 }
 
 impl IntegrityManifest {
-    pub fn build(
-        build_id: impl Into<String>,
-        certificate: CertificateBinding,
-        package: PackageBinding,
-        mut dex_files: Vec<DexIntegrity>,
-        mut artifacts: Vec<ArtifactIntegrity>,
-        distribution_seed: &[u8],
-        check_count: u32,
-        redundancy: u8,
-        response_policy: ResponsePolicy,
-    ) -> Result<Self> {
-        let build_id = build_id.into();
-        if build_id.trim().is_empty() || build_id.as_bytes().contains(&0) {
+    pub fn build(mut input: IntegrityManifestInput) -> Result<Self> {
+        if input.build_id.trim().is_empty() || input.build_id.as_bytes().contains(&0) {
             return Err(IntegrityError::InvalidManifest(
                 "build_id must be non-empty and contain no NUL".into(),
             ));
         }
 
-        dex_files.sort_by(|left, right| left.name.cmp(&right.name));
-        artifacts.sort_by(|left, right| left.path.cmp(&right.path));
-        validate_unique_inputs(&dex_files, &artifacts)?;
+        input
+            .dex_files
+            .sort_by(|left, right| left.name.cmp(&right.name));
+        input
+            .artifacts
+            .sort_by(|left, right| left.path.cmp(&right.path));
+        validate_unique_inputs(&input.dex_files, &input.artifacts)?;
 
-        let graph = IntegrityGraph::build(&certificate, &package, &dex_files, &artifacts)?;
-        let distribution =
-            DistributionPlan::compile(&graph, distribution_seed, check_count, redundancy)?;
+        let graph = IntegrityGraph::build(
+            &input.certificate,
+            &input.package,
+            &input.dex_files,
+            &input.artifacts,
+        )?;
+        let distribution = DistributionPlan::compile(
+            &graph,
+            &input.distribution.seed,
+            input.distribution.check_count,
+            input.distribution.redundancy,
+        )?;
 
         let manifest = Self {
             schema: INTEGRITY_MANIFEST_SCHEMA,
-            build_id,
-            certificate,
-            package,
-            dex_files,
-            artifacts,
+            build_id: input.build_id,
+            certificate: input.certificate,
+            package: input.package,
+            dex_files: input.dex_files,
+            artifacts: input.artifacts,
             graph,
             distribution,
-            response_policy,
+            response_policy: input.response_policy,
         };
         manifest.validate()?;
         Ok(manifest)
