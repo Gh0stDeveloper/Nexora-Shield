@@ -65,6 +65,13 @@ pub struct PipelineResult {
     pub stages: Vec<PipelineStage>,
 }
 
+/// Executes the Phase A APK packaging transaction.
+///
+/// # Errors
+///
+/// Returns an error when the request is invalid, APK inspection/normalization
+/// fails, Android Build Tools fail, verification fails, or publication cannot
+/// be completed transactionally.
 pub fn protect_apk(request: &ProtectionRequest) -> Result<PipelineResult> {
     validate_request(request)?;
 
