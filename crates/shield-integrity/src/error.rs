@@ -26,14 +26,20 @@ impl fmt::Display for IntegrityError {
             Self::InvalidPackageIdentity(message) => {
                 write!(formatter, "invalid package identity: {message}")
             }
-            Self::InvalidRegion(message) => write!(formatter, "invalid integrity region: {message}"),
+            Self::InvalidRegion(message) => {
+                write!(formatter, "invalid integrity region: {message}")
+            }
             Self::InvalidArtifact(message) => write!(formatter, "invalid artifact: {message}"),
             Self::InvalidGraph(message) => write!(formatter, "invalid integrity graph: {message}"),
             Self::InvalidDistribution(message) => {
                 write!(formatter, "invalid distributed-check plan: {message}")
             }
-            Self::InvalidManifest(message) => write!(formatter, "invalid integrity manifest: {message}"),
-            Self::MissingEvidence(message) => write!(formatter, "missing integrity evidence: {message}"),
+            Self::InvalidManifest(message) => {
+                write!(formatter, "invalid integrity manifest: {message}")
+            }
+            Self::MissingEvidence(message) => {
+                write!(formatter, "missing integrity evidence: {message}")
+            }
             Self::Io(message) => write!(formatter, "I/O error: {message}"),
             Self::Serialization(message) => write!(formatter, "serialization error: {message}"),
             Self::Dex(message) => write!(formatter, "DEX integrity error: {message}"),

@@ -2,10 +2,10 @@
 
 use nexora_shield_dex::{refresh_integrity, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE};
 use nexora_shield_integrity::{
-    ArtifactIntegrity, ArtifactKind, CertificateBinding, CertificateObservation,
-    CertificatePolicy, DexIntegrity, DistributionPlan, IntegrityEvidence, IntegrityManifest,
-    IntegrityResponse, IntegritySeverity, IntegrityVerifier, PackageBinding, PackageObservation,
-    ResponsePolicy, Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
+    ArtifactIntegrity, ArtifactKind, CertificateBinding, CertificateObservation, CertificatePolicy,
+    DexIntegrity, DistributionPlan, IntegrityEvidence, IntegrityManifest, IntegrityResponse,
+    IntegritySeverity, IntegrityVerifier, PackageBinding, PackageObservation, ResponsePolicy,
+    Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
 };
 use std::collections::BTreeMap;
 
@@ -18,11 +18,9 @@ fn signer_b() -> Sha256Digest {
 }
 
 fn manifest_and_evidence() -> (IntegrityManifest, IntegrityEvidence) {
-    let certificate =
-        CertificateBinding::new(CertificatePolicy::ExactCurrent, [signer_a()], [])
-            .expect("certificate binding");
-    let package =
-        PackageBinding::new("dev.nexora.integrity", 42, None).expect("package binding");
+    let certificate = CertificateBinding::new(CertificatePolicy::ExactCurrent, [signer_a()], [])
+        .expect("certificate binding");
+    let package = PackageBinding::new("dev.nexora.integrity", 42, None).expect("package binding");
 
     let dex_bytes = build_test_dex("Ldev/nexora/integrity/Main;", "run");
     let dex = DexIntegrity::build("classes.dex", &dex_bytes, DEFAULT_DEX_CHUNK_BYTES)
@@ -79,41 +77,28 @@ fn manifest_and_evidence() -> (IntegrityManifest, IntegrityEvidence) {
 
 #[test]
 fn d1_certificate_binding_detects_resign_and_accepts_configured_lineage() {
-    let exact = CertificateBinding::new(
-        CertificatePolicy::ExactCurrent,
-        [signer_a()],
-        [],
-    )
-    .expect("exact binding");
-    let original =
-        CertificateObservation::new([signer_a()], []).expect("original observation");
-    let resigned =
-        CertificateObservation::new([signer_b()], []).expect("resigned observation");
+    let exact = CertificateBinding::new(CertificatePolicy::ExactCurrent, [signer_a()], [])
+        .expect("exact binding");
+    let original = CertificateObservation::new([signer_a()], []).expect("original observation");
+    let resigned = CertificateObservation::new([signer_b()], []).expect("resigned observation");
 
     assert!(exact.verify(&original).matched);
     assert!(!exact.verify(&resigned).matched);
 
-    let lineage = CertificateBinding::new(
-        CertificatePolicy::CurrentOrLineage,
-        [signer_a()],
-        [],
-    )
-    .expect("lineage binding");
-    let rotated = CertificateObservation::new([signer_b()], [signer_a()])
-        .expect("rotated observation");
+    let lineage = CertificateBinding::new(CertificatePolicy::CurrentOrLineage, [signer_a()], [])
+        .expect("lineage binding");
+    let rotated =
+        CertificateObservation::new([signer_b()], [signer_a()]).expect("rotated observation");
     assert!(lineage.verify(&rotated).matched);
 }
 
 #[test]
 fn d2_package_binding_is_exact_for_name_version_and_split() {
-    let binding = PackageBinding::new("dev.nexora.integrity", 42, None)
-        .expect("package binding");
-    let same = PackageObservation::new("dev.nexora.integrity", 42, None)
-        .expect("same package");
-    let wrong_version = PackageObservation::new("dev.nexora.integrity", 43, None)
-        .expect("wrong version");
-    let wrong_package = PackageObservation::new("dev.other.app", 42, None)
-        .expect("wrong package");
+    let binding = PackageBinding::new("dev.nexora.integrity", 42, None).expect("package binding");
+    let same = PackageObservation::new("dev.nexora.integrity", 42, None).expect("same package");
+    let wrong_version =
+        PackageObservation::new("dev.nexora.integrity", 43, None).expect("wrong version");
+    let wrong_package = PackageObservation::new("dev.other.app", 42, None).expect("wrong package");
 
     assert!(binding.verify(&same).matched);
     assert!(!binding.verify(&wrong_version).matched);
@@ -123,8 +108,7 @@ fn d2_package_binding_is_exact_for_name_version_and_split() {
 #[test]
 fn d3_dex_regions_detect_local_patch_without_relying_on_one_digest() {
     let bytes = build_test_dex("Ldev/nexora/integrity/Main;", "run");
-    let integrity = DexIntegrity::build("classes.dex", &bytes, 32)
-        .expect("DEX integrity");
+    let integrity = DexIntegrity::build("classes.dex", &bytes, 32).expect("DEX integrity");
     assert!(integrity.regions.len() >= 4);
 
     let clean = integrity.verify(&bytes).expect("clean verification");
@@ -149,14 +133,18 @@ fn d4_resource_integrity_detects_content_replacement() {
         b"trusted-resource",
     )
     .expect("resource");
-    assert!(expected
-        .verify(b"trusted-resource")
-        .expect("verify clean")
-        .matched);
-    assert!(!expected
-        .verify(b"patched-resource")
-        .expect("verify patch")
-        .matched);
+    assert!(
+        expected
+            .verify(b"trusted-resource")
+            .expect("verify clean")
+            .matched
+    );
+    assert!(
+        !expected
+            .verify(b"patched-resource")
+            .expect("verify patch")
+            .matched
+    );
 }
 
 #[test]
@@ -167,14 +155,18 @@ fn d5_native_integrity_detects_library_replacement() {
         b"ELForiginal-native",
     )
     .expect("native");
-    assert!(expected
-        .verify(b"ELForiginal-native")
-        .expect("verify clean")
-        .matched);
-    assert!(!expected
-        .verify(b"ELFpatched-native")
-        .expect("verify patch")
-        .matched);
+    assert!(
+        expected
+            .verify(b"ELForiginal-native")
+            .expect("verify clean")
+            .matched
+    );
+    assert!(
+        !expected
+            .verify(b"ELFpatched-native")
+            .expect("verify patch")
+            .matched
+    );
 }
 
 #[test]
@@ -206,13 +198,9 @@ fn d7_distributed_checks_cover_each_node_with_configured_redundancy() {
         .validate(&manifest.graph)
         .expect("distribution valid");
 
-    let different = DistributionPlan::compile(
-        &manifest.graph,
-        b"different-distribution-seed",
-        5,
-        2,
-    )
-    .expect("different plan");
+    let different =
+        DistributionPlan::compile(&manifest.graph, b"different-distribution-seed", 5, 2)
+            .expect("different plan");
 
     assert_ne!(
         manifest.distribution.seed_fingerprint,
@@ -231,8 +219,7 @@ fn d7_distributed_checks_cover_each_node_with_configured_redundancy() {
 #[test]
 fn d8_response_api_denies_sensitive_operation_for_critical_tamper() {
     let (manifest, mut evidence) = manifest_and_evidence();
-    let clean = IntegrityVerifier::verify_all(&manifest, &evidence)
-        .expect("clean verdict");
+    let clean = IntegrityVerifier::verify_all(&manifest, &evidence).expect("clean verdict");
     assert!(clean.clean);
     assert_eq!(clean.severity, IntegritySeverity::Info);
     assert_eq!(clean.response, IntegrityResponse::Continue);
@@ -242,24 +229,18 @@ fn d8_response_api_denies_sensitive_operation_for_critical_tamper() {
         .get_mut("lib/arm64-v8a/libnexora.so")
         .expect("native evidence")
         .push(0xff);
-    let tampered = IntegrityVerifier::verify_all(&manifest, &evidence)
-        .expect("tampered verdict");
+    let tampered = IntegrityVerifier::verify_all(&manifest, &evidence).expect("tampered verdict");
     assert!(!tampered.clean);
     assert_eq!(tampered.severity, IntegritySeverity::Critical);
-    assert_eq!(
-        tampered.response,
-        IntegrityResponse::DenySensitiveOperation
-    );
+    assert_eq!(tampered.response, IntegrityResponse::DenySensitiveOperation);
 }
 
 #[test]
 fn d9_resign_evidence_is_critical_even_when_payload_is_unchanged() {
     let (manifest, mut evidence) = manifest_and_evidence();
-    evidence.certificate =
-        CertificateObservation::new([signer_b()], []).expect("new signer");
+    evidence.certificate = CertificateObservation::new([signer_b()], []).expect("new signer");
 
-    let verdict = IntegrityVerifier::verify_all(&manifest, &evidence)
-        .expect("re-sign verdict");
+    let verdict = IntegrityVerifier::verify_all(&manifest, &evidence).expect("re-sign verdict");
     assert!(!verdict.clean);
     assert_eq!(verdict.severity, IntegritySeverity::Critical);
     assert!(verdict
@@ -273,8 +254,7 @@ fn d10_patch_and_repack_variants_are_detected_and_distributed_checks_fail() {
     let (manifest, mut evidence) = manifest_and_evidence();
 
     evidence.package =
-        PackageObservation::new("dev.nexora.repacked", 42, None)
-            .expect("repacked package");
+        PackageObservation::new("dev.nexora.repacked", 42, None).expect("repacked package");
     evidence
         .dex_files
         .get_mut("classes.dex")
@@ -284,8 +264,7 @@ fn d10_patch_and_repack_variants_are_detected_and_distributed_checks_fail() {
         .get_mut("assets/config.json")
         .expect("resource evidence")[0] ^= 0x01;
 
-    let full = IntegrityVerifier::verify_all(&manifest, &evidence)
-        .expect("full verdict");
+    let full = IntegrityVerifier::verify_all(&manifest, &evidence).expect("full verdict");
     assert!(!full.clean);
     assert!(full.failures.len() >= 3);
 
@@ -308,8 +287,8 @@ fn missing_artifact_and_missing_dex_are_fail_closed() {
     evidence.dex_files.clear();
     evidence.artifacts.clear();
 
-    let verdict = IntegrityVerifier::verify_all(&manifest, &evidence)
-        .expect("missing evidence verdict");
+    let verdict =
+        IntegrityVerifier::verify_all(&manifest, &evidence).expect("missing evidence verdict");
     assert!(!verdict.clean);
     assert_eq!(verdict.response, IntegrityResponse::DenySensitiveOperation);
     assert!(verdict.failures.len() > 2);

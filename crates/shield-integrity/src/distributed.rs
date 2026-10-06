@@ -41,10 +41,7 @@ impl DistributionPlan {
             ));
         }
 
-        let seed_fingerprint = hash_components(
-            b"NexoraShield:D:distribution-seed:v1",
-            [seed],
-        );
+        let seed_fingerprint = hash_components(b"NexoraShield:D:distribution-seed:v1", [seed]);
         let mut assignments = (0..check_count)
             .map(|check_id| CheckAssignment {
                 check_id,
@@ -103,7 +100,11 @@ impl DistributionPlan {
             ));
         }
 
-        let graph_ids = graph.nodes.iter().map(|node| node.id).collect::<BTreeSet<_>>();
+        let graph_ids = graph
+            .nodes
+            .iter()
+            .map(|node| node.id)
+            .collect::<BTreeSet<_>>();
         let mut counts = BTreeMap::<Sha256Digest, u32>::new();
         let mut seen_check_ids = BTreeSet::new();
 

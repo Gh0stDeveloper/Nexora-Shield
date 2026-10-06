@@ -31,8 +31,9 @@ pub struct ArtifactCheck {
 impl ArtifactIntegrity {
     pub fn build(path: impl Into<String>, kind: ArtifactKind, bytes: &[u8]) -> Result<Self> {
         let path = normalize_path(&path.into())?;
-        let size = u64::try_from(bytes.len())
-            .map_err(|_| IntegrityError::InvalidArtifact("artifact size does not fit u64".into()))?;
+        let size = u64::try_from(bytes.len()).map_err(|_| {
+            IntegrityError::InvalidArtifact("artifact size does not fit u64".into())
+        })?;
         Ok(Self {
             path,
             kind,
@@ -42,8 +43,9 @@ impl ArtifactIntegrity {
     }
 
     pub fn verify(&self, bytes: &[u8]) -> Result<ArtifactCheck> {
-        let observed_size = u64::try_from(bytes.len())
-            .map_err(|_| IntegrityError::InvalidArtifact("artifact size does not fit u64".into()))?;
+        let observed_size = u64::try_from(bytes.len()).map_err(|_| {
+            IntegrityError::InvalidArtifact("artifact size does not fit u64".into())
+        })?;
         let observed = Sha256Digest::of(bytes);
         Ok(ArtifactCheck {
             path: self.path.clone(),
@@ -63,7 +65,9 @@ pub fn normalize_path(path: &str) -> Result<String> {
         || path.starts_with('\\')
         || path.contains('\\')
         || path.as_bytes().contains(&0)
-        || path.split('/').any(|component| component.is_empty() || component == "." || component == "..")
+        || path
+            .split('/')
+            .any(|component| component.is_empty() || component == "." || component == "..")
     {
         return Err(IntegrityError::InvalidArtifact(format!(
             "unsafe artifact path '{path}'"

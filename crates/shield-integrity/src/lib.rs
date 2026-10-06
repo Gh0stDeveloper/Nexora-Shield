@@ -37,13 +37,8 @@ pub use identity::{
     PackageBinding, PackageCheck, PackageObservation,
 };
 pub use manifest::{IntegrityManifest, INTEGRITY_MANIFEST_SCHEMA};
-pub use region::{
-    DexIntegrity, IntegrityRegion, RegionCheck, DEFAULT_DEX_CHUNK_BYTES,
-};
-pub use response::{
-    IntegrityResponse, IntegritySeverity, ResponsePolicy,
-};
+pub use region::{DexIntegrity, IntegrityRegion, RegionCheck, DEFAULT_DEX_CHUNK_BYTES};
+pub use response::{IntegrityResponse, IntegritySeverity, ResponsePolicy};
 pub use verify::{
-    IntegrityEvidence, IntegrityFailure, IntegrityFailureKind, IntegrityVerdict,
-    IntegrityVerifier,
+    IntegrityEvidence, IntegrityFailure, IntegrityFailureKind, IntegrityVerdict, IntegrityVerifier,
 };

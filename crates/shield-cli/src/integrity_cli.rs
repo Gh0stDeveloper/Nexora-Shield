@@ -1,7 +1,7 @@
 use nexora_shield_integrity::{
-    ArtifactIntegrity, ArtifactKind, CertificateBinding, CertificateObservation,
-    CertificatePolicy, DexIntegrity, IntegrityEvidence, IntegrityManifest, IntegrityVerifier,
-    PackageBinding, PackageObservation, ResponsePolicy, Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
+    ArtifactIntegrity, ArtifactKind, CertificateBinding, CertificateObservation, CertificatePolicy,
+    DexIntegrity, IntegrityEvidence, IntegrityManifest, IntegrityVerifier, PackageBinding,
+    PackageObservation, ResponsePolicy, Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
 };
 use std::collections::BTreeMap;
 use std::fs;
@@ -77,7 +77,10 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
                 index += 1;
             }
             "--dex" => {
-                dex_specs.push(parse_mapping(require_value(args, index, "--dex")?, "--dex")?);
+                dex_specs.push(parse_mapping(
+                    require_value(args, index, "--dex")?,
+                    "--dex",
+                )?);
                 index += 2;
             }
             "--resource" => {
@@ -103,10 +106,7 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
                 index += 2;
             }
             "--redundancy" => {
-                redundancy = parse_u8(
-                    require_value(args, index, "--redundancy")?,
-                    "--redundancy",
-                )?;
+                redundancy = parse_u8(require_value(args, index, "--redundancy")?, "--redundancy")?;
                 index += 2;
             }
             "--dex-chunk-bytes" => {
@@ -120,7 +120,8 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
         }
     }
 
-    let output = output.ok_or_else(|| "integrity-create requires --output <manifest.json>".to_owned())?;
+    let output =
+        output.ok_or_else(|| "integrity-create requires --output <manifest.json>".to_owned())?;
     let build_id = build_id.ok_or_else(|| "integrity-create requires --build-id".to_owned())?;
     let application_id =
         application_id.ok_or_else(|| "integrity-create requires --app-id".to_owned())?;
@@ -130,12 +131,8 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
         return Err("integrity-create requires at least one --signer-sha256".into());
     }
 
-    let certificate = CertificateBinding::new(
-        certificate_policy,
-        signer_digests,
-        lineage_digests,
-    )
-    .map_err(|error| error.to_string())?;
+    let certificate = CertificateBinding::new(certificate_policy, signer_digests, lineage_digests)
+        .map_err(|error| error.to_string())?;
     let package = PackageBinding::new(application_id, version_code, split_name)
         .map_err(|error| error.to_string())?;
 
@@ -143,8 +140,7 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
     for (logical, path) in dex_specs {
         let bytes = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
         dex_files.push(
-            DexIntegrity::build(logical, &bytes, chunk_bytes)
-                .map_err(|error| error.to_string())?,
+            DexIntegrity::build(logical, &bytes, chunk_bytes).map_err(|error| error.to_string())?,
         );
     }
 
@@ -176,7 +172,9 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
         ResponsePolicy::default(),
     )
     .map_err(|error| error.to_string())?;
-    let json = manifest.to_json_pretty().map_err(|error| error.to_string())?;
+    let json = manifest
+        .to_json_pretty()
+        .map_err(|error| error.to_string())?;
     write_atomic(&output, json.as_bytes())?;
 
     println!("Integrity manifest: OK");
@@ -239,7 +237,10 @@ pub(crate) fn run_integrity_verify(args: &[String]) -> Result<(), String> {
                 index += 2;
             }
             "--dex" => {
-                dex_specs.push(parse_mapping(require_value(args, index, "--dex")?, "--dex")?);
+                dex_specs.push(parse_mapping(
+                    require_value(args, index, "--dex")?,
+                    "--dex",
+                )?);
                 index += 2;
             }
             "--artifact" => {
@@ -340,8 +341,7 @@ pub(crate) fn run_integrity_inspect(args: &[String]) -> Result<(), String> {
         return Ok(());
     }
     let path = PathBuf::from(&args[0]);
-    let json = fs::read_to_string(&path)
-        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let json = fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))?;
     let manifest = IntegrityManifest::from_json(&json).map_err(|error| error.to_string())?;
 
     println!("Integrity manifest: {}", path.display());
@@ -411,7 +411,10 @@ fn wants_help(args: &[String]) -> bool {
 }
 
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
     let temporary = path.with_extension("tmp");

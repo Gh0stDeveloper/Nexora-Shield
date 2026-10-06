@@ -107,8 +107,14 @@ impl IntegrityManifest {
     }
 }
 
-fn validate_unique_inputs(dex_files: &[DexIntegrity], artifacts: &[ArtifactIntegrity]) -> Result<()> {
-    let dex_names = dex_files.iter().map(|dex| dex.name.as_str()).collect::<BTreeSet<_>>();
+fn validate_unique_inputs(
+    dex_files: &[DexIntegrity],
+    artifacts: &[ArtifactIntegrity],
+) -> Result<()> {
+    let dex_names = dex_files
+        .iter()
+        .map(|dex| dex.name.as_str())
+        .collect::<BTreeSet<_>>();
     if dex_names.len() != dex_files.len() {
         return Err(IntegrityError::InvalidManifest(
             "duplicate DEX names in integrity manifest".into(),

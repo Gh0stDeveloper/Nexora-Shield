@@ -1,4 +1,4 @@
-use crate::artifact::{ArtifactKind, ArtifactIntegrity};
+use crate::artifact::{ArtifactIntegrity, ArtifactKind};
 use crate::error::{IntegrityError, Result};
 use crate::graph::{IntegrityNode, IntegrityNodeKind};
 use crate::hash::Sha256Digest;
@@ -167,9 +167,10 @@ fn collect_results(
             } else {
                 format!("dex:{}:{}", dex.name, check.label)
             };
-            let node = manifest.graph.by_label(&label).ok_or_else(|| {
-                IntegrityError::InvalidGraph(format!("missing node '{label}'"))
-            })?;
+            let node = manifest
+                .graph
+                .by_label(&label)
+                .ok_or_else(|| IntegrityError::InvalidGraph(format!("missing node '{label}'")))?;
             results.insert(
                 node.id,
                 NodeResult {

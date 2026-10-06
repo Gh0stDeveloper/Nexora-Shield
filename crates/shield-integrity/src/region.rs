@@ -91,10 +91,9 @@ impl DexIntegrity {
             while relative < header.data_size {
                 let remaining = header.data_size - relative;
                 let length = remaining.min(chunk_bytes);
-                let offset = header
-                    .data_off
-                    .checked_add(relative)
-                    .ok_or_else(|| IntegrityError::InvalidRegion("DEX data offset overflow".into()))?;
+                let offset = header.data_off.checked_add(relative).ok_or_else(|| {
+                    IntegrityError::InvalidRegion("DEX data offset overflow".into())
+                })?;
                 push_region(
                     &mut regions,
                     &format!("data:{chunk_index}"),
@@ -102,9 +101,9 @@ impl DexIntegrity {
                     offset,
                     length,
                 )?;
-                relative = relative
-                    .checked_add(length)
-                    .ok_or_else(|| IntegrityError::InvalidRegion("DEX data chunk overflow".into()))?;
+                relative = relative.checked_add(length).ok_or_else(|| {
+                    IntegrityError::InvalidRegion("DEX data chunk overflow".into())
+                })?;
                 chunk_index = chunk_index
                     .checked_add(1)
                     .ok_or_else(|| IntegrityError::InvalidRegion("too many DEX chunks".into()))?;
