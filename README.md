@@ -2,7 +2,7 @@
 
 Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
 
-> Estado: **Fase A — Core Packaging completada y validada por CI**. Nexora Shield ya dispone de pipeline APK transaccional, normalizador ZIP32, inspección de manifest/multi-DEX, BuildPlan, reportes público/privado, integración oficial con `zipalign`/`apksigner` y comandos `protect`, `inspect` y `verify`. La siguiente fase es **Fase B — DEX Engine**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
+> Estado: **Fase B — DEX Engine completada y validada por CI**. Además del pipeline APK de la Fase A, Nexora Shield ya dispone de parser/validator DEX, CFG, análisis de tipos, IR/SSA, grafo de referencias, selectores, renaming conservador, reducción de metadata, análisis Reflection/JNI y reescritura multidex validada. La siguiente fase es **Fase C — Data Protection**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
 
 ## Objetivos
 
@@ -179,6 +179,8 @@ Gradle:
 - docs/ARCHITECTURE.md — arquitectura y límites entre módulos.
 - docs/PHASE-A.md — implementación y contrato de Core Packaging.
 - docs/APK-PACKAGING.md — invariantes de reconstrucción, alineación y firma APK.
+- docs/PHASE-B.md — implementación del DEX Engine.
+- docs/PHASE-B-CHECKLIST.md — evidencia de cierre B.1–B.12.
 - docs/THREAT-MODEL.md — activos, atacantes, escenarios y no-objetivos.
 - docs/SECURITY-DESIGN.md — capas de protección y decisiones de diseño.
 - docs/CONFIGURATION.md — modelo de configuración.

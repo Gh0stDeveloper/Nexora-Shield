@@ -157,3 +157,166 @@ jobs:
           assert "published" in public["stages"]
           assert private["build_id"] == public["build_id"]
           PY
+
+  phase-b-dex:
+    name: Phase B DEX engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create golden DEX fixtures
+        run: |
+          mkdir -p build/phase-b
+          python - <<'PY'
+          import hashlib
+          import struct
+          import zlib
+          from pathlib import Path
+
+          DEX_HEADER_SIZE = 0x70
+          DEX_ENDIAN_CONSTANT = 0x12345678
+
+          def uleb(value: int) -> bytes:
+              out = bytearray()
+              while True:
+                  byte = value & 0x7f
+                  value >>= 7
+                  if value:
+                      byte |= 0x80
+                  out.append(byte)
+                  if not value:
+                      return bytes(out)
+
+          def put_u16(buf: bytearray, off: int, value: int) -> None:
+              buf[off:off + 2] = struct.pack("<H", value)
+
+          def put_u32(buf: bytearray, off: int, value: int) -> None:
+              buf[off:off + 4] = struct.pack("<I", value)
+
+          def build(path: Path, descriptor: str, method_name: str) -> None:
+              strings = [
+                  descriptor,
+                  "Ljava/lang/Object;",
+                  "V",
+                  method_name,
+                  "A.java",
+              ]
+
+              string_ids_off = DEX_HEADER_SIZE
+              type_ids_off = string_ids_off + len(strings) * 4
+              proto_ids_off = type_ids_off + 3 * 4
+              method_ids_off = proto_ids_off + 12
+              class_defs_off = method_ids_off + 8
+              data_off = class_defs_off + 32
+
+              data = bytearray(data_off)
+              string_offsets = []
+              for value in strings:
+                  string_offsets.append(len(data))
+                  data += uleb(len(value.encode("utf-16-le")) // 2)
+                  data += value.encode("ascii")
+                  data.append(0)
+
+              while len(data) % 4:
+                  data.append(0)
+
+              code_off = len(data)
+              data += struct.pack("<HHHHIIH", 0, 0, 0, 0, 0, 1, 0x000e)
+
+              class_data_off = len(data)
+              data += uleb(0)
+              data += uleb(0)
+              data += uleb(1)
+              data += uleb(0)
+              data += uleb(0)
+              data += uleb(0x0009)
+              data += uleb(code_off)
+
+              file_size = len(data)
+              data[0:8] = b"dex\n035\0"
+              put_u32(data, 32, file_size)
+              put_u32(data, 36, DEX_HEADER_SIZE)
+              put_u32(data, 40, DEX_ENDIAN_CONSTANT)
+              put_u32(data, 44, 0)
+              put_u32(data, 48, 0)
+              put_u32(data, 52, 0)
+              put_u32(data, 56, len(strings))
+              put_u32(data, 60, string_ids_off)
+              put_u32(data, 64, 3)
+              put_u32(data, 68, type_ids_off)
+              put_u32(data, 72, 1)
+              put_u32(data, 76, proto_ids_off)
+              put_u32(data, 80, 0)
+              put_u32(data, 84, 0)
+              put_u32(data, 88, 1)
+              put_u32(data, 92, method_ids_off)
+              put_u32(data, 96, 1)
+              put_u32(data, 100, class_defs_off)
+              put_u32(data, 104, file_size - data_off)
+              put_u32(data, 108, data_off)
+
+              for index, offset in enumerate(string_offsets):
+                  put_u32(data, string_ids_off + index * 4, offset)
+
+              put_u32(data, type_ids_off, 0)
+              put_u32(data, type_ids_off + 4, 1)
+              put_u32(data, type_ids_off + 8, 2)
+
+              put_u32(data, proto_ids_off, 2)
+              put_u32(data, proto_ids_off + 4, 2)
+              put_u32(data, proto_ids_off + 8, 0)
+
+              put_u16(data, method_ids_off, 0)
+              put_u16(data, method_ids_off + 2, 0)
+              put_u32(data, method_ids_off + 4, 3)
+
+              put_u32(data, class_defs_off, 0)
+              put_u32(data, class_defs_off + 4, 1)
+              put_u32(data, class_defs_off + 8, 1)
+              put_u32(data, class_defs_off + 12, 0)
+              put_u32(data, class_defs_off + 16, 4)
+              put_u32(data, class_defs_off + 20, 0)
+              put_u32(data, class_defs_off + 24, class_data_off)
+              put_u32(data, class_defs_off + 28, 0)
+
+              data[12:32] = hashlib.sha1(data[32:]).digest()
+              put_u32(data, 8, zlib.adler32(data[12:]) & 0xffffffff)
+              path.write_bytes(data)
+
+          build(Path("build/phase-b/classes.dex"), "Lcom/test/A;", "run")
+          build(Path("build/phase-b/classes2.dex"), "Lcom/test/B;", "go")
+          PY
+
+      - name: Run targeted Phase B tests
+        run: cargo test --quiet -p nexora-shield-dex --test phase_b
+
+      - name: Inspect golden DEX
+        run: cargo run --quiet -p nexora-shield -- dex-inspect build/phase-b/classes.dex
+
+      - name: Verify writer round-trip
+        run: |
+          cargo run --quiet -p nexora-shield -- dex-roundtrip build/phase-b/classes.dex \
+            --output build/phase-b/roundtrip.dex
+          cmp build/phase-b/classes.dex build/phase-b/roundtrip.dex
+
+      - name: Apply compatible rename and metadata reduction
+        run: |
+          cargo run --quiet -p nexora-shield -- dex-rewrite build/phase-b/classes.dex \
+            --output build/phase-b/rewritten.dex \
+            --rename \
+            --strip-metadata \
+            --seed 0x4e45584f52415348
+          cargo run --quiet -p nexora-shield -- dex-inspect build/phase-b/rewritten.dex
+
+      - name: Validate multidex set
+        run: |
+          cargo run --quiet -p nexora-shield -- dex-multidex-verify \
+            build/phase-b/classes.dex \
+            build/phase-b/classes2.dex
+
