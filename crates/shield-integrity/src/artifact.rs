@@ -60,8 +60,8 @@ impl ArtifactIntegrity {
 pub fn normalize_path(path: &str) -> Result<String> {
     if path.is_empty()
         || path.starts_with('/')
-        || path.starts_with('\')
-        || path.contains('\')
+        || path.starts_with('\\')
+        || path.contains('\\')
         || path.as_bytes().contains(&0)
         || path.split('/').any(|component| component.is_empty() || component == "." || component == "..")
     {
