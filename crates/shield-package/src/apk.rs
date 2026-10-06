@@ -135,7 +135,10 @@ fn detect_manifest_format(bytes: &[u8]) -> ManifestFormat {
         return ManifestFormat::BinaryXml;
     }
 
-    let first_non_whitespace = bytes.iter().copied().find(|byte| !byte.is_ascii_whitespace());
+    let first_non_whitespace = bytes
+        .iter()
+        .copied()
+        .find(|byte| !byte.is_ascii_whitespace());
     if first_non_whitespace == Some(b'<') {
         ManifestFormat::TextXml
     } else {
