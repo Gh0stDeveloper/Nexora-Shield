@@ -1,7 +1,8 @@
 use nexora_shield_integrity::{
     ArtifactIntegrity, ArtifactKind, CertificateBinding, CertificateObservation, CertificatePolicy,
-    DexIntegrity, IntegrityEvidence, IntegrityManifest, IntegrityVerifier, PackageBinding,
-    PackageObservation, ResponsePolicy, Sha256Digest, DEFAULT_DEX_CHUNK_BYTES,
+    DexIntegrity, DistributionConfig, IntegrityEvidence, IntegrityManifest, IntegrityManifestInput,
+    IntegrityVerifier, PackageBinding, PackageObservation, ResponsePolicy, Sha256Digest,
+    DEFAULT_DEX_CHUNK_BYTES,
 };
 use std::collections::BTreeMap;
 use std::fs;
