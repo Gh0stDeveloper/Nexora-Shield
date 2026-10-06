@@ -36,7 +36,9 @@ pub use identity::{
     CertificateBinding, CertificateCheck, CertificateObservation, CertificatePolicy,
     PackageBinding, PackageCheck, PackageObservation,
 };
-pub use manifest::{DistributionConfig, IntegrityManifest, IntegrityManifestInput, INTEGRITY_MANIFEST_SCHEMA};
+pub use manifest::{
+    DistributionConfig, IntegrityManifest, IntegrityManifestInput, INTEGRITY_MANIFEST_SCHEMA,
+};
 pub use region::{DexIntegrity, IntegrityRegion, RegionCheck, DEFAULT_DEX_CHUNK_BYTES};
 pub use response::{IntegrityResponse, IntegritySeverity, ResponsePolicy};
 pub use verify::{

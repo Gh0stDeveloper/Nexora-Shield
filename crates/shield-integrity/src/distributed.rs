@@ -67,14 +67,12 @@ impl DistributionPlan {
                     );
                     let mut raw = [0_u8; 8];
                     raw.copy_from_slice(&digest.as_bytes()[..8]);
-                    let candidate = u32::try_from(
-                        u64::from_le_bytes(raw) % u64::from(check_count),
-                    )
-                    .map_err(|_| {
-                        IntegrityError::InvalidDistribution(
-                            "check assignment index does not fit u32".into(),
-                        )
-                    })?;
+                    let candidate = u32::try_from(u64::from_le_bytes(raw) % u64::from(check_count))
+                        .map_err(|_| {
+                            IntegrityError::InvalidDistribution(
+                                "check assignment index does not fit u32".into(),
+                            )
+                        })?;
                     if used.insert(candidate) {
                         break candidate;
                     }
