@@ -348,7 +348,10 @@ fn resource_logical_id(path: &str) -> String {
 fn is_never_encrypt_path(path: &str) -> bool {
     path == "AndroidManifest.xml"
         || path == "resources.arsc"
-        || path.starts_with("classes") && path.ends_with(".dex")
+        || path.starts_with("classes")
+            && std::path::Path::new(path)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("dex"))
         || path.starts_with("lib/")
         || path.starts_with("META-INF/")
         || path.starts_with("res/layout/")
@@ -417,8 +420,8 @@ mod tests {
         assert!(normalize_resource_path("assets/../secret").is_err());
         assert!(normalize_resource_path("/absolute").is_err());
         assert_eq!(
-            normalize_resource_path("assets/config.json").expect("valid path"),
-            "assets/config.json"
+            normalize_resource_path("assets/config.json").as_deref(),
+            Ok("assets/config.json")
         );
     }
 }
