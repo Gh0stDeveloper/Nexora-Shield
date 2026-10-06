@@ -85,7 +85,7 @@ Evidence:
 
 The workspace intentionally creates only crates with Phase 0 code. Planned crates are introduced in their corresponding phases.
 
-## 0.8 CI Baseline — DONE when latest workflow is green
+## 0.8 CI Baseline — DONE
 
 Evidence:
 
@@ -128,6 +128,12 @@ Evidence:
 - [x] automated format/lint/test/doc/audit pipeline defined;
 - [x] security disclosure policy established;
 - [x] ADR process established;
-- [ ] latest CI execution verified green.
+- [x] latest CI execution verified green.
 
-Phase 0 becomes fully CLOSED only after the CI checkbox above is backed by a successful GitHub Actions run on the Phase 0 branch.
+Phase 0 is **CLOSED**.
+
+Validation evidence:
+- GitHub Actions workflow run #28 (run id `37504965228`);
+- `Rust quality`: success;
+- `RustSec audit`: success;
+- validated on 2026-10-06 against the complete Phase 0 workspace.
