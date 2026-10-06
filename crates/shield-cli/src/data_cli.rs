@@ -13,6 +13,7 @@ pub(crate) fn run_data_protect(args: &[String]) -> Result<(), String> {
 
     let input = PathBuf::from(&args[0]);
     let options = parse_crypto_options(&args[1..], true)?;
+    let schedule = load_schedule(&options)?;
     let output = options
         .output
         .ok_or_else(|| "data-protect requires --output <file>".to_owned())?;
@@ -45,6 +46,7 @@ pub(crate) fn run_data_unprotect(args: &[String]) -> Result<(), String> {
 
     let input = PathBuf::from(&args[0]);
     let options = parse_crypto_options(&args[1..], true)?;
+    let schedule = load_schedule(&options)?;
     let output = options
         .output
         .ok_or_else(|| "data-unprotect requires --output <file>".to_owned())?;
