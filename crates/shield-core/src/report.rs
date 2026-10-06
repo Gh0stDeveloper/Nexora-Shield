@@ -151,7 +151,7 @@ pub fn apk_inspection_json(inspection: &ApkInspection) -> String {
         .manifest
         .content_sha256
         .as_ref()
-        .map_or_else(|| "null".to_owned(), |value| format!(""{}"", json_escape(value)));
+        .map_or_else(|| "null".to_owned(), |value| format!("\\\"{}\\\"", json_escape(value)));
 
     format!(
         concat!(
@@ -214,7 +214,7 @@ fn stage_names(stages: &[PipelineStage]) -> Vec<String> {
 fn json_string_array(values: &[String]) -> String {
     let body = values
         .iter()
-        .map(|value| format!(""{}"", json_escape(value)))
+        .map(|value| format!("\\\"{}\\\"", json_escape(value)))
         .collect::<Vec<_>>()
         .join(", ");
     format!("[{body}]")
