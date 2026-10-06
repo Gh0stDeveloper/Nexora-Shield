@@ -23,7 +23,10 @@ fn normalizer_preserves_payload_identity_and_discovers_multidex() {
             ("res/raw/data.bin", b"payload"),
             ("classes2.dex", b"dex-two"),
             ("META-INF/CERT.SF", b"stale-signature"),
-            ("AndroidManifest.xml", b"<manifest package=\"dev.nexora.test\"/>"),
+            (
+                "AndroidManifest.xml",
+                b"<manifest package=\"dev.nexora.test\"/>",
+            ),
             ("classes.dex", b"dex-one"),
             ("META-INF/CERT.RSA", b"stale-signature-block"),
             ("META-INF/MANIFEST.MF", b"stale-manifest"),
@@ -115,9 +118,18 @@ fn write_stored_zip(path: &Path, entries: &[(&str, &[u8])]) {
         write_u16(&mut file, 0);
         write_u16(&mut file, 0x0021);
         write_u32(&mut file, crc);
-        write_u32(&mut file, u32::try_from(data.len()).expect("fixture data length"));
-        write_u32(&mut file, u32::try_from(data.len()).expect("fixture data length"));
-        write_u16(&mut file, u16::try_from(name.len()).expect("fixture name length"));
+        write_u32(
+            &mut file,
+            u32::try_from(data.len()).expect("fixture data length"),
+        );
+        write_u32(
+            &mut file,
+            u32::try_from(data.len()).expect("fixture data length"),
+        );
+        write_u16(
+            &mut file,
+            u16::try_from(name.len()).expect("fixture name length"),
+        );
         write_u16(&mut file, 0);
         file.write_all(name.as_bytes()).expect("write local name");
         file.write_all(data).expect("write local payload");
