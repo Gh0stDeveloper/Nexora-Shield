@@ -312,7 +312,7 @@ pub fn build_resource_bundle(
 pub fn normalize_resource_path(path: &str) -> Result<String> {
     if path.is_empty()
         || path.starts_with('/')
-        || path.contains('\')
+        || path.contains('\\')
         || path.as_bytes().contains(&0)
     {
         return Err(DataProtectionError::InvalidResourcePath(path.into()));
