@@ -107,10 +107,7 @@ impl PrivateBuildReport {
                 .iter()
                 .map(|dex| dex.name.clone())
                 .collect(),
-            stripped_signature_entries: result
-                .normalization
-                .stripped_signature_entries
-                .clone(),
+            stripped_signature_entries: result.normalization.stripped_signature_entries.clone(),
             stages: stage_names(&result.stages),
         }
     }
@@ -147,11 +144,10 @@ pub fn apk_inspection_json(inspection: &ApkInspection) -> String {
         .iter()
         .map(|dex| dex.name.clone())
         .collect::<Vec<_>>();
-    let manifest_sha = inspection
-        .manifest
-        .content_sha256
-        .as_ref()
-        .map_or_else(|| "null".to_owned(), |value| format!("\"{}\"", json_escape(value)));
+    let manifest_sha = inspection.manifest.content_sha256.as_ref().map_or_else(
+        || "null".to_owned(),
+        |value| format!("\"{}\"", json_escape(value)),
+    );
 
     format!(
         concat!(
@@ -208,7 +204,10 @@ pub fn write_report_atomic(path: &Path, content: &str) -> std::io::Result<()> {
 }
 
 fn stage_names(stages: &[PipelineStage]) -> Vec<String> {
-    stages.iter().map(|stage| stage.as_str().to_owned()).collect()
+    stages
+        .iter()
+        .map(|stage| stage.as_str().to_owned())
+        .collect()
 }
 
 fn json_string_array(values: &[String]) -> String {
