@@ -229,30 +229,27 @@ fn run_protect(args: &[String]) -> Result<(), String> {
         return Err("--unsigned cannot be combined with --keystore".into());
     }
 
-    let signing = match keystore {
-        Some(keystore) => {
-            let key_alias = alias.ok_or_else(|| "--keystore requires --alias".to_owned())?;
-            let keystore_password_env =
-                ks_pass_env.ok_or_else(|| "--keystore requires --ks-pass-env".to_owned())?;
-            let key_password_env = key_pass_env.or_else(|| Some(keystore_password_env.clone()));
+    let signing = if let Some(keystore) = keystore {
+        let key_alias = alias.ok_or_else(|| "--keystore requires --alias".to_owned())?;
+        let keystore_password_env =
+            ks_pass_env.ok_or_else(|| "--keystore requires --ks-pass-env".to_owned())?;
+        let key_password_env = key_pass_env.or_else(|| Some(keystore_password_env.clone()));
 
-            Some(SigningConfig {
-                keystore,
-                key_alias,
-                keystore_password_env,
-                key_password_env,
-                min_sdk,
-                v1: true,
-                v2: true,
-                v3: true,
-            })
+        Some(SigningConfig {
+            keystore,
+            key_alias,
+            keystore_password_env,
+            key_password_env,
+            min_sdk,
+            v1: true,
+            v2: true,
+            v3: true,
+        })
+    } else {
+        if alias.is_some() || ks_pass_env.is_some() || key_pass_env.is_some() {
+            return Err("signing options require --keystore".into());
         }
-        None => {
-            if alias.is_some() || ks_pass_env.is_some() || key_pass_env.is_some() {
-                return Err("signing options require --keystore".into());
-            }
-            None
-        }
+        None
     };
 
     let request = ProtectionRequest {
