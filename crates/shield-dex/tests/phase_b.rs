@@ -51,7 +51,8 @@ fn selectors_safe_rename_and_metadata_reduction_compose() {
 
     let selector = Selector::new(SelectorKind::Method, "Lcom/test/*;", Some("run".to_owned()))
         .expect("selector");
-    let selection = SelectorResolver::resolve(&dex, std::slice::from_ref(&selector)).expect("selection");
+    let selection =
+        SelectorResolver::resolve(&dex, std::slice::from_ref(&selector)).expect("selection");
     assert!(selection.methods.contains(&0));
 
     let rename = RenamePass::apply(
@@ -123,7 +124,8 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     ];
 
     let string_ids_off = DEX_HEADER_SIZE;
-    let type_ids_off = string_ids_off + u32::try_from(strings.len()).expect("string count fits u32") * 4;
+    let type_ids_off =
+        string_ids_off + u32::try_from(strings.len()).expect("string count fits u32") * 4;
     let proto_ids_off = type_ids_off + 3 * 4;
     let method_ids_off = proto_ids_off + 12;
     let class_defs_off = method_ids_off + 8;
@@ -134,7 +136,10 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
 
     for value in strings {
         string_offsets.push(u32::try_from(bytes.len()).expect("fixture size fits u32"));
-        write_uleb128(&mut bytes, u32::try_from(value.encode_utf16().count()).expect("UTF-16 length fits u32"));
+        write_uleb128(
+            &mut bytes,
+            u32::try_from(value.encode_utf16().count()).expect("UTF-16 length fits u32"),
+        );
         bytes.extend_from_slice(value.as_bytes());
         bytes.push(0);
     }
