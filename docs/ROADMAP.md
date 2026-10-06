@@ -51,7 +51,7 @@ Criterio de salida:
 - estructura inicial compilable;
 - CI verde.
 
-Estado actual: **IMPLEMENTADA**. Cierre final condicionado a que el workflow CI de la fundación ejecute en verde sobre `main`/PR.
+Estado actual: **COMPLETADA**. La fundación quedó validada por GitHub Actions en el run #28 (`37504965228`): `Rust quality` y `RustSec audit` finalizaron correctamente.
 
 ---
 
