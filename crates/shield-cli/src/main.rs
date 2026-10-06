@@ -3,9 +3,13 @@
 #![forbid(unsafe_code)]
 
 mod data_cli;
+mod integrity_cli;
 
 use data_cli::{
     print_data_help, run_data_benchmark, run_data_inspect, run_data_protect, run_data_unprotect,
+};
+use integrity_cli::{
+    print_integrity_help, run_integrity_create, run_integrity_inspect, run_integrity_verify,
 };
 
 use nexora_shield_core::{
@@ -62,6 +66,13 @@ fn run() -> Result<(), String> {
         "data-benchmark" => run_data_benchmark(&args),
         "data-help" => {
             print_data_help();
+            Ok(())
+        }
+        "integrity-create" => run_integrity_create(&args),
+        "integrity-verify" => run_integrity_verify(&args),
+        "integrity-inspect" => run_integrity_inspect(&args),
+        "integrity-help" => {
+            print_integrity_help();
             Ok(())
         }
         _ => Err(format!(
@@ -630,6 +641,10 @@ COMMANDS:\n\
   data-inspect     Inspect non-secret protected-container metadata\n\
   data-benchmark   Measure plaintext exposure and protected-size overhead\n\
   data-help        Show Phase C data-protection commands\n\
+  integrity-create Build Phase D integrity manifest\n\
+  integrity-verify Verify full/distributed integrity evidence\n\
+  integrity-inspect Validate and inspect an integrity manifest\n\
+  integrity-help   Show Phase D integrity commands\n\
   profiles         List stable protection profiles\n\n\
 OPTIONS:\n\
   -h, --help       Print help\n\
