@@ -173,3 +173,23 @@ Phase D is complete only when:
 - real signer A vs signer B test passes;
 - DEX/resource/native/package patch tests fail closed;
 - documentation and configuration schema match the implementation.
+
+
+## Closure evidence
+
+Pull-request validation run **#264** (ID `37542495923`) passed the complete Phase D acceptance matrix:
+
+- Rust quality and documentation;
+- RustSec audit;
+- Phase A/B/C regression gates;
+- Rust 1.81 MSRV for integrity and CLI;
+- two independent PKCS12 signing identities;
+- official `apksigner` signer evidence;
+- clean distributed verification;
+- re-sign rejection;
+- DEX patch rejection;
+- resource patch rejection;
+- native replacement rejection;
+- package-identity repack rejection.
+
+No known critical Phase D error remains at closure.

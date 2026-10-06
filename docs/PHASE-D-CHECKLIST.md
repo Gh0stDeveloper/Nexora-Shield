@@ -61,7 +61,7 @@
 - [x] Unit-level signer mismatch
 - [x] Real independent PKCS12 keys in CI
 - [x] Official apksigner signer digest extraction
-- [ ] Final CI closure run
+- [x] Final CI closure run
 
 ## D.10 Patch/repack tests
 - [x] DEX patch unit test
@@ -69,8 +69,10 @@
 - [x] Native replacement unit test
 - [x] Package identity repack unit test
 - [x] Missing evidence fail-closed test
-- [ ] Final CI closure run
+- [x] Final CI closure run
 
-## Current closure state
+## Closure state
 
-Implementation is present on `feat/phase-d-integrity`. The phase remains open until the final branch CI and post-merge `main` CI are green.
+All D.1–D.10 implementation and adversarial gates are complete. Pull-request validation run #264 (`37542495923`) passed every required job, including the real two-signer re-sign scenario and patch/repack rejection matrix.
+
+The merge to `main` is performed only from this validated head; post-merge CI is the final repository-state confirmation.

@@ -2,7 +2,7 @@
 
 Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
 
-> Estado: **Fase C — Data Protection completada y validada por CI**. Nexora Shield ya dispone de clasificación de sensibilidad, contenedores cifrados autenticados, derivación de claves por build/ítem, decrypt-on-use, protección de constantes, bundles de recursos, políticas de caché/lifetime, metadata privada y benchmark de exposición. La siguiente fase es **Fase D — Integrity / Anti-Tamper**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
+> Estado: **Fase D — Integrity / Anti-Tamper completada y validada por CI**. Nexora Shield ya dispone de certificate/package binding, integridad regional DEX, recursos y bibliotecas nativas, Integrity Graph determinista, checks distribuidos, respuestas no destructivas y pruebas reales de re-firma/patch/repack. La siguiente fase es **Fase E — RASP**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
 
 ## Objetivos
 
@@ -181,6 +181,8 @@ Gradle:
 - docs/APK-PACKAGING.md — invariantes de reconstrucción, alineación y firma APK.
 - docs/PHASE-B.md — implementación del DEX Engine.
 - docs/PHASE-B-CHECKLIST.md — evidencia de cierre B.1–B.12.
+- docs/PHASE-D.md — diseño e implementación de Integrity / Anti-Tamper.
+- docs/PHASE-D-CHECKLIST.md — evidencia de cierre D.1–D.10.
 - docs/THREAT-MODEL.md — activos, atacantes, escenarios y no-objetivos.
 - docs/SECURITY-DESIGN.md — capas de protección y decisiones de diseño.
 - docs/CONFIGURATION.md — modelo de configuración.

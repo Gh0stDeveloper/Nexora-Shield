@@ -133,6 +133,8 @@ Estado actual: **COMPLETADA**. Las subfases C.1–C.10 están implementadas. Git
 Criterio:
 - modificaciones definidas por shield-lab se detectan sin un único check central.
 
+Estado actual: **COMPLETADA**. Las subfases D.1–D.10 están implementadas. GitHub Actions PR run #264 (`37542495923`) validó Rust quality, RustSec, regresiones de Fases A/B/C, compatibilidad Rust 1.81, re-firma con dos certificados PKCS12 independientes y rechazo fail-closed de modificaciones DEX, recursos, bibliotecas nativas e identidad de paquete.
+
 ---
 
 ## Fase E — RASP
