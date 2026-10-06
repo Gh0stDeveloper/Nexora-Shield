@@ -564,8 +564,12 @@ jobs:
           "$APKSIGNER" sign             --min-sdk-version 24             --ks build/phase-d/signer-a.p12             --ks-key-alias signer-a             --ks-pass pass:phase-d-pass             --key-pass pass:phase-d-pass             build/phase-d/app-a.apk
           "$APKSIGNER" sign             --min-sdk-version 24             --ks build/phase-d/signer-b.p12             --ks-key-alias signer-b             --ks-pass pass:phase-d-pass             --key-pass pass:phase-d-pass             build/phase-d/app-b.apk
 
-          SIGNER_A="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-d/app-a.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
-          SIGNER_B="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-d/app-b.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          CERTS_A="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-d/app-a.apk)"
+          CERTS_B="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-d/app-b.apk)"
+          printf '%s\n' "$CERTS_A"
+          printf '%s\n' "$CERTS_B"
+          SIGNER_A="$(printf '%s\n' "$CERTS_A" | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' | head -n 1)"
+          SIGNER_B="$(printf '%s\n' "$CERTS_B" | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' | head -n 1)"
           test -n "$SIGNER_A"
           test -n "$SIGNER_B"
           test "$SIGNER_A" != "$SIGNER_B"
