@@ -2,6 +2,12 @@
 
 #![forbid(unsafe_code)]
 
+mod data_cli;
+
+use data_cli::{
+    print_data_help, run_data_benchmark, run_data_inspect, run_data_protect, run_data_unprotect,
+};
+
 use nexora_shield_core::{
     apk_inspection_json, protect_apk, ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
@@ -50,6 +56,14 @@ fn run() -> Result<(), String> {
         "dex-roundtrip" => run_dex_roundtrip(&args),
         "dex-rewrite" => run_dex_rewrite(&args),
         "dex-multidex-verify" => run_dex_multidex_verify(&args),
+        "data-protect" => run_data_protect(&args),
+        "data-unprotect" => run_data_unprotect(&args),
+        "data-inspect" => run_data_inspect(&args),
+        "data-benchmark" => run_data_benchmark(&args),
+        "data-help" => {
+            print_data_help();
+            Ok(())
+        },
         _ => Err(format!(
             "unknown command '{command}'. Run 'nexora-shield --help'."
         )),
@@ -610,8 +624,13 @@ USAGE:\n  nexora-shield <COMMAND> [OPTIONS]\n\n\
 COMMANDS:\n\
   protect      Normalize, align, sign and verify an APK\n\
   inspect      Inspect APK structure, manifest and multi-DEX layout\n\
-  verify       Verify APK structure and optionally Android signatures\n\
-  profiles     List stable protection profiles\n\n\
+  verify           Verify APK structure and optionally Android signatures\n\
+  data-protect     Protect one string/constant/resource/generic data item\n\
+  data-unprotect   Authenticate and decrypt a protected data item\n\
+  data-inspect     Inspect non-secret protected-container metadata\n\
+  data-benchmark   Measure plaintext exposure and protected-size overhead\n\
+  data-help        Show Phase C data-protection commands\n\
+  profiles         List stable protection profiles\n\n\
 OPTIONS:\n\
   -h, --help       Print help\n\
   -V, --version    Print version\n\n\
