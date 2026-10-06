@@ -51,7 +51,9 @@ impl DexParser {
                         offset: method.code_off,
                     });
                 }
-                if !code_items.contains_key(&method.code_off) {
+                if let std::collections::btree_map::Entry::Vacant(entry) =
+                    code_items.entry(method.code_off)
+                {
                     let code = parse_code_item(
                         bytes,
                         method.code_off,
@@ -61,7 +63,7 @@ impl DexParser {
                         methods.len(),
                         protos.len(),
                     )?;
-                    code_items.insert(method.code_off, code);
+                    entry.insert(code);
                 }
             }
 
@@ -1057,11 +1059,14 @@ fn payload_width(units: &[u16], offset: usize) -> Result<(PseudoInstruction, u32
     }
 }
 
+type InstructionReference = Option<(ReferenceKind, u32)>;
+type InstructionReferences = (InstructionReference, InstructionReference);
+
 fn instruction_references(
     units: &[u16],
     offset: usize,
     opcode: u8,
-) -> Result<(Option<(ReferenceKind, u32)>, Option<(ReferenceKind, u32)>)> {
+) -> Result<InstructionReferences> {
     let unit1 = || -> Result<u32> {
         units
             .get(offset + 1)
@@ -1131,7 +1136,7 @@ fn branch_targets(units: &[u16], offset: usize, opcode: u8) -> Result<Vec<u32>> 
             let delta = i8::from_ne_bytes([(units[offset] >> 8) as u8]);
             Ok(vec![checked_target(offset, i64::from(delta))?])
         }
-        0x29 => {
+        0x29 | 0x32..=0x3d => {
             let delta = i16::from_le_bytes(units[offset + 1].to_le_bytes());
             Ok(vec![checked_target(offset, i64::from(delta))?])
         }
@@ -1145,10 +1150,6 @@ fn branch_targets(units: &[u16], offset: usize, opcode: u8) -> Result<Vec<u32>> 
             let payload_delta = i32::from_le_bytes(raw.to_le_bytes());
             let payload = checked_target(offset, i64::from(payload_delta))? as usize;
             parse_switch_targets(units, offset, payload, opcode)
-        }
-        0x32..=0x3d => {
-            let delta = i16::from_le_bytes(units[offset + 1].to_le_bytes());
-            Ok(vec![checked_target(offset, i64::from(delta))?])
         }
         _ => Ok(Vec::new()),
     }
@@ -1266,10 +1267,7 @@ fn read_sleb128(bytes: &[u8], offset: usize) -> Result<(i32, usize)> {
 }
 
 fn validate_index(kind: &'static str, index: u32, count: usize) -> Result<()> {
-    if usize::try_from(index)
-        .ok()
-        .is_some_and(|value| value < count)
-    {
+    if usize::try_from(index).is_ok_and(|value| value < count) {
         Ok(())
     } else {
         Err(DexError::InvalidIndex { kind, index })
