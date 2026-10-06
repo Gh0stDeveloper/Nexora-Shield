@@ -32,6 +32,11 @@ impl SensitiveBytes {
     pub fn as_slice(&self) -> &[u8] {
         &self.bytes
     }
+
+    #[must_use]
+    pub fn into_vec(mut self) -> Vec<u8> {
+        std::mem::take(&mut self.bytes)
+    }
 }
 
 impl Clone for SensitiveBytes {
@@ -71,8 +76,8 @@ pub struct SensitiveString {
 
 impl SensitiveString {
     pub fn from_bytes(bytes: SensitiveBytes) -> Result<Self> {
-        let value = String::from_utf8(bytes.as_slice().to_vec())
-            .map_err(|_| DataProtectionError::InvalidUtf8)?;
+        let value =
+            String::from_utf8(bytes.into_vec()).map_err(|_| DataProtectionError::InvalidUtf8)?;
         Ok(Self { value })
     }
 
@@ -114,20 +119,15 @@ impl Drop for SensitiveString {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CachePolicy {
+    #[default]
     Disabled,
     Bounded {
         max_entries: usize,
         max_bytes: usize,
         ttl: Duration,
     },
-}
-
-impl Default for CachePolicy {
-    fn default() -> Self {
-        Self::Disabled
-    }
 }
 
 #[derive(Debug)]
