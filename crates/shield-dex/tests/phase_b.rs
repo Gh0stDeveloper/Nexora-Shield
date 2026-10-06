@@ -135,10 +135,7 @@ fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
 
     for value in strings {
         string_offsets.push(len_u32(bytes.len()));
-        write_uleb128(
-            &mut bytes,
-            len_u32(value.encode_utf16().count()),
-        );
+        write_uleb128(&mut bytes, len_u32(value.encode_utf16().count()));
         bytes.extend_from_slice(value.as_bytes());
         bytes.push(0);
     }
