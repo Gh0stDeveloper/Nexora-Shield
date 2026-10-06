@@ -141,7 +141,86 @@
     },
     "integrity": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "certificatePolicy": {
+          "type": "string",
+          "enum": ["exact_current", "current_or_lineage"]
+        },
+        "allowedSignerSha256": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allowedLineageSha256": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "versionCode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dexChunkBytes": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "distributedChecks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["count", "redundancy"],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "redundancy": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "seedRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "resourcePaths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "nativePaths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "warning": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            },
+            "high": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            },
+            "critical": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            }
+          }
+        }
+      }
     },
     "rasp": {
       "type": "object",
