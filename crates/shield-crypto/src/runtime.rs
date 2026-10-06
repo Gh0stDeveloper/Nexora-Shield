@@ -33,10 +33,6 @@ impl SensitiveBytes {
         &self.bytes
     }
 
-    #[must_use]
-    pub fn into_vec(mut self) -> Vec<u8> {
-        std::mem::take(&mut self.bytes)
-    }
 }
 
 impl Clone for SensitiveBytes {
@@ -76,8 +72,10 @@ pub struct SensitiveString {
 
 impl SensitiveString {
     pub fn from_bytes(bytes: SensitiveBytes) -> Result<Self> {
-        let value =
-            String::from_utf8(bytes.into_vec()).map_err(|_| DataProtectionError::InvalidUtf8)?;
+        let value = std::str::from_utf8(bytes.as_slice())
+            .map_err(|_| DataProtectionError::InvalidUtf8)?
+            .to_owned();
+        drop(bytes);
         Ok(Self { value })
     }
 
