@@ -35,10 +35,7 @@ fn c1_sensitive_strings_are_classified_and_protected() {
     let protected = protect_string(&schedule, &model, &candidate)
         .expect("protect")
         .expect("selected");
-    assert!(!contains(
-        &protected.container,
-        candidate.value.as_bytes()
-    ));
+    assert!(!contains(&protected.container, candidate.value.as_bytes()));
 
     let plaintext = open(
         &schedule,
@@ -93,33 +90,16 @@ fn c3_per_build_key_derivation_changes_ids_nonces_and_ciphertext() {
     let second = schedule("build-c3-b");
     let plaintext = b"same highly sensitive value";
 
-    let a = seal(
-        &first,
-        ContainerKind::String,
-        "sensitive.value",
-        plaintext,
-    )
-    .expect("seal first");
-    let b = seal(
-        &second,
-        ContainerKind::String,
-        "sensitive.value",
-        plaintext,
-    )
-    .expect("seal second");
+    let a = seal(&first, ContainerKind::String, "sensitive.value", plaintext).expect("seal first");
+    let b =
+        seal(&second, ContainerKind::String, "sensitive.value", plaintext).expect("seal second");
 
     let info_a = inspect_container(&a).expect("inspect a");
     let info_b = inspect_container(&b).expect("inspect b");
     assert_ne!(info_a.item_id, info_b.item_id);
     assert_ne!(info_a.nonce, info_b.nonce);
     assert_ne!(a, b);
-    assert!(open(
-        &second,
-        ContainerKind::String,
-        "sensitive.value",
-        &a
-    )
-    .is_err());
+    assert!(open(&second, ContainerKind::String, "sensitive.value", &a).is_err());
 }
 
 #[test]
@@ -205,8 +185,7 @@ fn c5_constants_round_trip_without_plaintext_encoding() {
 
     for (index, value) in values.iter().enumerate() {
         let logical_id = format!("constant.{index}");
-        let protected =
-            protect_constant(&schedule, &logical_id, value).expect("protect constant");
+        let protected = protect_constant(&schedule, &logical_id, value).expect("protect constant");
         let recovered =
             unprotect_constant(&schedule, &logical_id, &protected).expect("unprotect constant");
         assert_eq!(&recovered, value);
@@ -216,14 +195,18 @@ fn c5_constants_round_trip_without_plaintext_encoding() {
 #[test]
 fn c6_resource_selection_is_conservative() {
     let selector = ResourceSelector::default();
-    assert!(selector
-        .evaluate("assets/secure/config.json", 128)
-        .expect("asset")
-        .protect);
-    assert!(selector
-        .evaluate("res/raw/model.bin", 128)
-        .expect("raw")
-        .protect);
+    assert!(
+        selector
+            .evaluate("assets/secure/config.json", 128)
+            .expect("asset")
+            .protect
+    );
+    assert!(
+        selector
+            .evaluate("res/raw/model.bin", 128)
+            .expect("raw")
+            .protect
+    );
 
     for path in [
         "AndroidManifest.xml",
@@ -264,7 +247,9 @@ fn c7_resource_bundle_hides_paths_and_payloads_and_round_trips() {
     let bundle = ResourceBundle::parse(&build.bytes).expect("parse bundle");
     assert_eq!(bundle.entry_count(), 1);
     assert_eq!(
-        bundle.decrypt(&schedule, secret_path).expect("decrypt resource"),
+        bundle
+            .decrypt(&schedule, secret_path)
+            .expect("decrypt resource"),
         secret
     );
 }

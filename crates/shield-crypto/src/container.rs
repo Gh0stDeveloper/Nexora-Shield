@@ -63,13 +63,12 @@ pub fn seal(
     logical_id: &str,
     plaintext: &[u8],
 ) -> Result<Vec<u8>> {
-    let plaintext_len = u64::try_from(plaintext.len()).map_err(|_| {
-        DataProtectionError::SizeLimitExceeded {
+    let plaintext_len =
+        u64::try_from(plaintext.len()).map_err(|_| DataProtectionError::SizeLimitExceeded {
             context: "plaintext".into(),
             size: u64::MAX,
             limit: DEFAULT_MAX_PLAINTEXT_BYTES,
-        }
-    })?;
+        })?;
     if plaintext_len > DEFAULT_MAX_PLAINTEXT_BYTES {
         return Err(DataProtectionError::SizeLimitExceeded {
             context: "plaintext".into(),

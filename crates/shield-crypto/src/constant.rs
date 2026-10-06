@@ -37,12 +37,7 @@ pub fn unprotect_constant(
     logical_id: &str,
     container: &[u8],
 ) -> Result<ConstantValue> {
-    let bytes = open(
-        schedule,
-        ContainerKind::Constant,
-        logical_id,
-        container,
-    )?;
+    let bytes = open(schedule, ContainerKind::Constant, logical_id, container)?;
     decode(&bytes)
 }
 
@@ -72,9 +67,7 @@ pub fn encode(value: &ConstantValue) -> Result<Vec<u8>> {
         ConstantValue::Bytes(value) => {
             output.push(TAG_BYTES);
             let length = u32::try_from(value.len()).map_err(|_| {
-                DataProtectionError::InvalidConstant(
-                    "byte constant exceeds u32 length".into(),
-                )
+                DataProtectionError::InvalidConstant("byte constant exceeds u32 length".into())
             })?;
             output.extend_from_slice(&length.to_le_bytes());
             output.extend_from_slice(value);
@@ -84,9 +77,9 @@ pub fn encode(value: &ConstantValue) -> Result<Vec<u8>> {
 }
 
 pub fn decode(bytes: &[u8]) -> Result<ConstantValue> {
-    let (&tag, body) = bytes.split_first().ok_or_else(|| {
-        DataProtectionError::InvalidConstant("constant payload is empty".into())
-    })?;
+    let (&tag, body) = bytes
+        .split_first()
+        .ok_or_else(|| DataProtectionError::InvalidConstant("constant payload is empty".into()))?;
 
     match tag {
         TAG_BOOL => {

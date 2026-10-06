@@ -32,8 +32,8 @@ pub use constant::{
     ConstantValue,
 };
 pub use container::{
-    inspect as inspect_container, open, seal, ContainerInfo, ContainerKind,
-    CONTAINER_HEADER_LEN, CONTAINER_MAGIC, CONTAINER_VERSION, DEFAULT_MAX_PLAINTEXT_BYTES,
+    inspect as inspect_container, open, seal, ContainerInfo, ContainerKind, CONTAINER_HEADER_LEN,
+    CONTAINER_MAGIC, CONTAINER_VERSION, DEFAULT_MAX_PLAINTEXT_BYTES,
 };
 pub use error::{DataProtectionError, Result};
 pub use key::{

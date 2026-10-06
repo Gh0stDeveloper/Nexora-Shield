@@ -179,9 +179,9 @@ impl ResourceBundle {
         let mut cursor = BUNDLE_HEADER_LEN;
         let mut entries = BTreeMap::new();
         for _ in 0..count {
-            let end_header = cursor
-                .checked_add(ENTRY_HEADER_LEN)
-                .ok_or_else(|| DataProtectionError::InvalidBundle("entry header overflow".into()))?;
+            let end_header = cursor.checked_add(ENTRY_HEADER_LEN).ok_or_else(|| {
+                DataProtectionError::InvalidBundle("entry header overflow".into())
+            })?;
             if end_header > bytes.len() {
                 return Err(DataProtectionError::InvalidBundle(
                     "truncated bundle entry header".into(),
@@ -230,12 +230,7 @@ impl ResourceBundle {
             .entries
             .get(&item_id)
             .ok_or(DataProtectionError::IdentifierMismatch)?;
-        open(
-            schedule,
-            ContainerKind::Resource,
-            &logical_id,
-            container,
-        )
+        open(schedule, ContainerKind::Resource, &logical_id, container)
     }
 
     #[must_use]
@@ -261,9 +256,7 @@ pub fn build_resource_bundle(
 
     for input in inputs {
         let size = u64::try_from(input.bytes.len()).map_err(|_| {
-            DataProtectionError::ResourceRejected(
-                "resource length does not fit u64".into(),
-            )
+            DataProtectionError::ResourceRejected("resource length does not fit u64".into())
         })?;
         let decision = selector.evaluate(&input.path, size)?;
         if !decision.protect {
@@ -272,19 +265,12 @@ pub fn build_resource_bundle(
         }
 
         if !seen_paths.insert(decision.path.clone()) {
-            return Err(DataProtectionError::DuplicateIdentifier(
-                decision.path,
-            ));
+            return Err(DataProtectionError::DuplicateIdentifier(decision.path));
         }
 
         let logical_id = resource_logical_id(&decision.path);
         let item_id = schedule.opaque_item_id(KeyDomain::Resource, &logical_id)?;
-        let container = seal(
-            schedule,
-            ContainerKind::Resource,
-            &logical_id,
-            &input.bytes,
-        )?;
+        let container = seal(schedule, ContainerKind::Resource, &logical_id, &input.bytes)?;
 
         records.push(ProtectedResourceRecord {
             path: decision.path,
@@ -329,9 +315,8 @@ pub fn normalize_resource_path(path: &str) -> Result<String> {
 }
 
 fn serialize_bundle(entries: &[BundleEntry]) -> Result<Vec<u8>> {
-    let count = u32::try_from(entries.len()).map_err(|_| {
-        DataProtectionError::InvalidBundle("too many resource entries".into())
-    })?;
+    let count = u32::try_from(entries.len())
+        .map_err(|_| DataProtectionError::InvalidBundle("too many resource entries".into()))?;
     if count > MAX_BUNDLE_ENTRIES {
         return Err(DataProtectionError::InvalidBundle(format!(
             "bundle entry count {count} exceeds {MAX_BUNDLE_ENTRIES}"
@@ -347,9 +332,7 @@ fn serialize_bundle(entries: &[BundleEntry]) -> Result<Vec<u8>> {
     for entry in entries {
         output.extend_from_slice(&entry.item_id);
         let length = u64::try_from(entry.container.len()).map_err(|_| {
-            DataProtectionError::InvalidBundle(
-                "container length does not fit u64".into(),
-            )
+            DataProtectionError::InvalidBundle("container length does not fit u64".into())
         })?;
         output.extend_from_slice(&length.to_le_bytes());
         output.extend_from_slice(&entry.container);
@@ -390,8 +373,8 @@ fn glob_match(pattern: &str, value: &str) -> bool {
             }
         } else {
             for index in 1..=value.len() {
-                current[index] = previous[index - 1]
-                    && (*token == b'?' || *token == value[index - 1]);
+                current[index] =
+                    previous[index - 1] && (*token == b'?' || *token == value[index - 1]);
             }
         }
         previous = current;

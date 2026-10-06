@@ -164,9 +164,7 @@ impl DecryptRuntime {
         logical_id: &str,
         container: &[u8],
     ) -> Result<SensitiveBytes> {
-        let item_id = self
-            .schedule
-            .opaque_item_id(kind.domain(), logical_id)?;
+        let item_id = self.schedule.opaque_item_id(kind.domain(), logical_id)?;
         self.touch_counter = self.touch_counter.wrapping_add(1);
         self.prune_expired();
 
@@ -175,12 +173,7 @@ impl DecryptRuntime {
             return Ok(entry.value.clone());
         }
 
-        let plaintext = SensitiveBytes::new(open(
-            &self.schedule,
-            kind,
-            logical_id,
-            container,
-        )?);
+        let plaintext = SensitiveBytes::new(open(&self.schedule, kind, logical_id, container)?);
         self.insert_cache(item_id, plaintext.clone());
         Ok(plaintext)
     }
@@ -190,11 +183,7 @@ impl DecryptRuntime {
         logical_id: &str,
         container: &[u8],
     ) -> Result<SensitiveString> {
-        SensitiveString::from_bytes(self.decrypt(
-            ContainerKind::String,
-            logical_id,
-            container,
-        )?)
+        SensitiveString::from_bytes(self.decrypt(ContainerKind::String, logical_id, container)?)
     }
 
     pub fn clear(&mut self) {
@@ -253,9 +242,7 @@ impl DecryptRuntime {
         let expired = self
             .cache
             .iter()
-            .filter_map(|(id, entry)| {
-                (now.duration_since(entry.inserted_at) >= ttl).then_some(*id)
-            })
+            .filter_map(|(id, entry)| (now.duration_since(entry.inserted_at) >= ttl).then_some(*id))
             .collect::<Vec<_>>();
 
         for id in expired {

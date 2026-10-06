@@ -16,9 +16,9 @@ pub(crate) fn run_data_protect(args: &[String]) -> Result<(), String> {
     let output = options
         .output
         .ok_or_else(|| "data-protect requires --output <file>".to_owned())?;
-    let kind = options
-        .kind
-        .ok_or_else(|| "data-protect requires --kind <string|constant|resource|generic>".to_owned())?;
+    let kind = options.kind.ok_or_else(|| {
+        "data-protect requires --kind <string|constant|resource|generic>".to_owned()
+    })?;
     let logical_id = options
         .logical_id
         .as_deref()
@@ -26,7 +26,8 @@ pub(crate) fn run_data_protect(args: &[String]) -> Result<(), String> {
     let schedule = load_schedule(&options)?;
 
     let plaintext = fs::read(&input).map_err(|error| error.to_string())?;
-    let protected = seal(&schedule, kind, logical_id, &plaintext).map_err(|error| error.to_string())?;
+    let protected =
+        seal(&schedule, kind, logical_id, &plaintext).map_err(|error| error.to_string())?;
     fs::write(&output, &protected).map_err(|error| error.to_string())?;
     let info = inspect_container(&protected).map_err(|error| error.to_string())?;
 
@@ -49,9 +50,9 @@ pub(crate) fn run_data_unprotect(args: &[String]) -> Result<(), String> {
     let output = options
         .output
         .ok_or_else(|| "data-unprotect requires --output <file>".to_owned())?;
-    let kind = options
-        .kind
-        .ok_or_else(|| "data-unprotect requires --kind <string|constant|resource|generic>".to_owned())?;
+    let kind = options.kind.ok_or_else(|| {
+        "data-unprotect requires --kind <string|constant|resource|generic>".to_owned()
+    })?;
     let logical_id = options
         .logical_id
         .as_deref()
@@ -83,7 +84,10 @@ pub(crate) fn run_data_inspect(args: &[String]) -> Result<(), String> {
     println!("Kind: {:?}", info.kind);
     println!("Plaintext bytes: {}", info.plaintext_len);
     println!("Ciphertext bytes: {}", info.ciphertext_len);
-    println!("Opaque ID: {}", nexora_shield_crypto::hex_lower(&info.item_id));
+    println!(
+        "Opaque ID: {}",
+        nexora_shield_crypto::hex_lower(&info.item_id)
+    );
     Ok(())
 }
 

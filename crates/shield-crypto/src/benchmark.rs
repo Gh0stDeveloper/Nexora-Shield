@@ -114,7 +114,11 @@ impl ExposureBenchmark {
         let protected_bytes = len_u64(protected.len())?;
         let overhead_bytes = signed_difference(protected_bytes, baseline_bytes);
         let overhead_percent = if baseline_bytes == 0 {
-            if protected_bytes == 0 { 0.0 } else { f64::INFINITY }
+            if protected_bytes == 0 {
+                0.0
+            } else {
+                f64::INFINITY
+            }
         } else {
             (overhead_bytes as f64 / baseline_bytes as f64) * 100.0
         };

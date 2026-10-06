@@ -63,7 +63,7 @@ fn run() -> Result<(), String> {
         "data-help" => {
             print_data_help();
             Ok(())
-        },
+        }
         _ => Err(format!(
             "unknown command '{command}'. Run 'nexora-shield --help'."
         )),

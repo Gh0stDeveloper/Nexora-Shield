@@ -194,10 +194,8 @@ pub fn protect_string(
         &candidate.logical_id,
         candidate.value.as_bytes(),
     )?;
-    let opaque_id = schedule.opaque_item_id(
-        crate::key::KeyDomain::String,
-        &candidate.logical_id,
-    )?;
+    let opaque_id =
+        schedule.opaque_item_id(crate::key::KeyDomain::String, &candidate.logical_id)?;
 
     Ok(Some(ProtectedString {
         record: ProtectedStringRecord {
@@ -228,14 +226,7 @@ const CRITICAL_INDICATORS: &[&str] = &[
 ];
 
 const SENSITIVE_INDICATORS: &[&str] = &[
-    "oauth",
-    "session",
-    "license",
-    "billing",
-    "webhook",
-    "endpoint",
-    "secret",
-    "token",
+    "oauth", "session", "license", "billing", "webhook", "endpoint", "secret", "token",
 ];
 
 const fn context_floor(context: StringContext) -> Sensitivity {
@@ -268,7 +259,6 @@ fn looks_like_runtime_contract(value: &str) -> bool {
 }
 
 fn len_u64(value: usize) -> Result<u64> {
-    u64::try_from(value).map_err(|_| DataProtectionError::InvalidContainer(
-        "length does not fit u64".into(),
-    ))
+    u64::try_from(value)
+        .map_err(|_| DataProtectionError::InvalidContainer("length does not fit u64".into()))
 }
