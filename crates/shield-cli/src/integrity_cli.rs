@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
     if args.is_empty() || wants_help(args) {
         print_integrity_create_help();
@@ -185,6 +186,7 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn run_integrity_verify(args: &[String]) -> Result<(), String> {
     if args.is_empty() || wants_help(args) {
         print_integrity_verify_help();
