@@ -61,9 +61,4 @@ impl PrivateDataProtectionMetadata {
         }
         Ok(metadata)
     }
-
-    #[must_use]
-    pub fn contains_secret_material_fields(&self) -> bool {
-        false
-    }
 }
