@@ -51,7 +51,7 @@ Criterio de salida:
 - estructura inicial compilable;
 - CI verde.
 
-Estado actual: documentación base en progreso.
+Estado actual: **IMPLEMENTADA**. Cierre final condicionado a que el workflow CI de la fundación ejecute en verde sobre `main`/PR.
 
 ---
 
