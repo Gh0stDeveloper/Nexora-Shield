@@ -163,6 +163,7 @@ impl Sha256 {
         digest
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn compress(&mut self, block: &[u8; 64]) {
         let mut words = [0_u32; 64];
 
@@ -229,10 +230,15 @@ pub fn to_hex(bytes: &[u8]) -> String {
     output
 }
 
+/// Computes the SHA-256 digest of a file without loading the full file into memory.
+///
+/// # Errors
+///
+/// Returns an I/O error when the file cannot be opened or read.
 pub fn sha256_file(path: &Path) -> Result<String> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
+    let mut buffer = vec![0_u8; 64 * 1024];
 
     loop {
         let count = file.read(&mut buffer)?;
