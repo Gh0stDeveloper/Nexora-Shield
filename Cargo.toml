@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/shield-core",
     "crates/shield-package",
+    "crates/shield-dex",
     "crates/shield-cli",
 ]
 
