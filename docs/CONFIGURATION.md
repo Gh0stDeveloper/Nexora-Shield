@@ -37,17 +37,31 @@ dex:
     scope: sensitive
 
 crypto:
-  strings:
-    enabled: true
-    scope: sensitive
-  constants:
-    enabled: true
-    scope: sensitive
+  enabled: true
+  algorithm: xchacha20poly1305-hkdf-sha256-v1
+  rootKeyRef: NEXORA_DATA_ROOT
+  stringThreshold: sensitive
+  forceProtect:
+    - auth.client.secret
+  forcePublic:
+    - ui.public.label
+  cache:
+    mode: bounded
+    maxEntries: 32
+    maxBytes: 262144
+    ttlSeconds: 30
+  exposureMaxOverheadPercent: 10
 
 resources:
-  enabled: true
+  dataProtection: true
   include:
-    - assets/private/**
+    - assets/private/*
+    - res/raw/*
+  exclude:
+    - assets/public/*
+  maxResourceBytes: 67108864
+  allowAssets: true
+  allowResRaw: true
 
 integrity:
   certificate: true
@@ -172,7 +186,63 @@ responses:
 
 Los pesos son específicos de la aplicación; no se usará un default agresivo universal.
 
-## 7. Secrets providers
+## 7. Data Protection
+
+Phase C uses authenticated encryption and explicit secret references. Raw cryptographic root material must never be committed to YAML/JSON.
+
+~~~yaml
+crypto:
+  enabled: true
+  algorithm: xchacha20poly1305-hkdf-sha256-v1
+  rootKeyRef: NEXORA_DATA_ROOT
+  stringThreshold: sensitive
+  forceProtect:
+    - auth.client.secret
+  forcePublic:
+    - ui.public.label
+  cache:
+    mode: disabled
+  exposureMaxOverheadPercent: 10
+~~~
+
+`rootKeyRef` identifies an external 32-byte root secret. The current CLI provider expects the referenced environment variable to contain 64 hexadecimal characters. The raw value is not accepted as a command-line option and is not written to private metadata.
+
+Available string thresholds:
+
+- `internal`;
+- `sensitive`;
+- `critical`.
+
+The default runtime cache policy is `disabled`. A bounded cache must specify all limits explicitly:
+
+~~~yaml
+cache:
+  mode: bounded
+  maxEntries: 32
+  maxBytes: 262144
+  ttlSeconds: 30
+~~~
+
+Resource protection is conservative because many Android resources are loaded directly by the framework:
+
+~~~yaml
+resources:
+  dataProtection: true
+  include:
+    - assets/private/*
+    - res/raw/*
+  exclude:
+    - assets/public/*
+  maxResourceBytes: 67108864
+  allowAssets: true
+  allowResRaw: true
+~~~
+
+Android contract resources, DEX files, native libraries, signing metadata and framework-loaded resource classes are excluded by the Phase C selector even if a broad pattern would otherwise make them attractive targets.
+
+The public protected resource bundle contains opaque IDs rather than plaintext logical paths. Logical-to-opaque mappings belong only in the private build metadata.
+
+## 8. Secrets providers
 
 Configuración referencia IDs:
 
@@ -191,7 +261,7 @@ Providers previstos:
 - OS keychain;
 - external KMS futuro.
 
-## 8. Reproducibilidad
+## 9. Reproducibilidad
 
 ~~~yaml
 build:
@@ -202,7 +272,7 @@ build:
 
 Solo para investigación y reproducir errores. No reutilizar la misma seed entre releases normales.
 
-## 9. Budgets
+## 10. Budgets
 
 El planner debe estimar y el verifier medir:
 
@@ -223,7 +293,7 @@ budgetsPolicy: fail
 
 Opciones futuras: fail, warn, adaptive. Adaptive nunca se habilitará implícitamente en releases estrictos.
 
-## 10. Compatibilidad
+## 11. Compatibilidad
 
 ~~~yaml
 compatibility:
@@ -237,7 +307,7 @@ compatibility:
     enabled: true
 ~~~
 
-## 11. Reportes
+## 12. Reportes
 
 ~~~yaml
 reports:
@@ -250,7 +320,7 @@ reports:
 
 El private report no debe publicarse como artifact público.
 
-## 12. Firma
+## 13. Firma
 
 Nexora Shield recibirá referencias a material de firma, nunca contraseñas hardcoded.
 
@@ -263,7 +333,7 @@ signing:
   keyPasswordRef: ANDROID_KEY_PASSWORD
 ~~~
 
-## 13. Validation
+## 14. Validation
 
 Antes de proteger:
 
@@ -281,6 +351,6 @@ Después:
 - signature verification;
 - runtime smoke test en CI cuando esté habilitado.
 
-## 14. Config schema
+## 15. Config schema
 
 El proyecto mantendrá un JSON Schema generado para IDE completion y validación. Cambios breaking incrementan schema version.

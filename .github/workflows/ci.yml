@@ -320,3 +320,103 @@ jobs:
             build/phase-b/classes.dex \
             build/phase-b/classes2.dex
 
+  phase-c-data-protection:
+    name: Phase C Data Protection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXORA_PHASE_C_ROOT: "4242424242424242424242424242424242424242424242424242424242424242"
+      NEXORA_PHASE_C_PROBE: "NX_PHASE_C_CRITICAL_TOKEN_0123456789"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Phase C tests
+        run: cargo test --locked --quiet -p nexora-shield-crypto --test phase_c
+
+      - name: Create plaintext exposure fixture
+        run: |
+          mkdir -p build/phase-c
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          probe = os.environ["NEXORA_PHASE_C_PROBE"].encode()
+          payload = b"A" * 32768 + probe + b"B" * 32768
+          Path("build/phase-c/plain.bin").write_bytes(payload)
+          PY
+
+      - name: Protect fixture
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- data-protect build/phase-c/plain.bin             --output build/phase-c/protected.nsc             --kind generic             --id ci.phase-c.payload             --app-id dev.nexora.phasec             --build-id phase-c-ci             --key-env NEXORA_PHASE_C_ROOT
+
+      - name: Assert plaintext is absent
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          protected = Path("build/phase-c/protected.nsc").read_bytes()
+          probe = os.environ["NEXORA_PHASE_C_PROBE"].encode()
+          assert probe not in protected
+          assert b"ci.phase-c.payload" not in protected
+          PY
+
+      - name: Inspect protected container
+        run: cargo run --locked --quiet -p nexora-shield -- data-inspect build/phase-c/protected.nsc
+
+      - name: Authenticate and decrypt fixture
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- data-unprotect build/phase-c/protected.nsc             --output build/phase-c/recovered.bin             --kind generic             --id ci.phase-c.payload             --app-id dev.nexora.phasec             --build-id phase-c-ci             --key-env NEXORA_PHASE_C_ROOT
+          cmp build/phase-c/plain.bin build/phase-c/recovered.bin
+
+      - name: Reject tampered container
+        run: |
+          cp build/phase-c/protected.nsc build/phase-c/tampered.nsc
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("build/phase-c/tampered.nsc")
+          data = bytearray(path.read_bytes())
+          data[-1] ^= 0x80
+          path.write_bytes(data)
+          PY
+          if cargo run --locked --quiet -p nexora-shield -- data-unprotect build/phase-c/tampered.nsc             --output build/phase-c/should-not-exist.bin             --kind generic             --id ci.phase-c.payload             --app-id dev.nexora.phasec             --build-id phase-c-ci             --key-env NEXORA_PHASE_C_ROOT; then
+            echo "tampered container unexpectedly decrypted" >&2
+            exit 1
+          fi
+
+      - name: Verify per-build diversification
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- data-protect build/phase-c/plain.bin             --output build/phase-c/protected-second-build.nsc             --kind generic             --id ci.phase-c.payload             --app-id dev.nexora.phasec             --build-id phase-c-ci-second             --key-env NEXORA_PHASE_C_ROOT
+          if cmp -s build/phase-c/protected.nsc build/phase-c/protected-second-build.nsc; then
+            echo "different build identities produced identical protected bytes" >&2
+            exit 1
+          fi
+
+      - name: Enforce exposure and overhead budget
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- data-benchmark             build/phase-c/plain.bin build/phase-c/protected.nsc             --probe-env NEXORA_PHASE_C_PROBE             --label phase-c-critical-token             --max-overhead 2.0
+
+  phase-c-msrv:
+    name: Phase C Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test crypto crate on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-crypto --all-targets
+
+      - name: Check CLI on declared MSRV
+        run: cargo +1.81.0 check --locked -p nexora-shield
+

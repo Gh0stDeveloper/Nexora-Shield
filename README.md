@@ -2,7 +2,7 @@
 
 Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
 
-> Estado: **Fase B — DEX Engine completada y validada por CI**. Además del pipeline APK de la Fase A, Nexora Shield ya dispone de parser/validator DEX, CFG, análisis de tipos, IR/SSA, grafo de referencias, selectores, renaming conservador, reducción de metadata, análisis Reflection/JNI y reescritura multidex validada. La siguiente fase es **Fase C — Data Protection**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
+> Estado: **Fase C — Data Protection completada y validada por CI**. Nexora Shield ya dispone de clasificación de sensibilidad, contenedores cifrados autenticados, derivación de claves por build/ítem, decrypt-on-use, protección de constantes, bundles de recursos, políticas de caché/lifetime, metadata privada y benchmark de exposición. La siguiente fase es **Fase D — Integrity / Anti-Tamper**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
 
 ## Objetivos
 

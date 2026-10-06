@@ -113,6 +113,8 @@ Estado actual: **COMPLETADA**. Las subfases B.1–B.12 están implementadas y el
 Criterio:
 - strings críticas no aparecen trivialmente; overhead dentro de presupuesto.
 
+Estado actual: **COMPLETADA**. Las subfases C.1–C.10 están implementadas. GitHub Actions run #216 (`37526352684`) validó Rust quality, RustSec, regresiones de Fases A/B, data protection E2E, rechazo de tampering, ausencia del probe crítico en el contenedor protegido, diversificación por build, presupuesto de overhead y compatibilidad con Rust 1.81.
+
 ---
 
 ## Fase D — Integrity / Anti-Tamper

@@ -90,3 +90,14 @@ A failed step is actionable. Security checks are not silently skipped to obtain 
 The permanent Phase B gate generates deterministic DEX fixtures and executes the production CLI/engine path for parsing, validation, CFG/type/SSA analysis, byte-stable writer round-trip, compatible rename, metadata reduction and canonical multidex verification.
 
 This gate runs in addition to the workspace Rust quality checks, RustSec audit, and Phase A APK regression pipeline.
+
+
+### Phase C Data Protection
+
+The permanent Phase C gate exercises the real authenticated data-protection path. It runs the Phase C integration tests, creates a plaintext fixture with an out-of-band critical probe, protects it through the CLI, verifies the probe and logical identifier are absent from the public protected bytes, authenticates/decrypts the artifact, rejects a tampered artifact, verifies per-build diversification and enforces an explicit size-overhead budget.
+
+### Phase C Rust 1.81 MSRV
+
+The declared workspace MSRV is enforced for the new data-protection surface. CI runs the crypto crate tests and checks the production CLI with Rust 1.81 using the committed lockfile. Dependency upgrades that silently require a newer Cargo/Rust edition therefore fail before merge.
+
+Phase C cryptographic dependencies are also covered by the existing RustSec audit.
