@@ -83,3 +83,10 @@ Later phases add:
 ## Failure policy
 
 A failed step is actionable. Security checks are not silently skipped to obtain a green badge. Temporary exceptions require a documented reason, owner and expiry.
+
+
+### Phase B DEX engine
+
+The permanent Phase B gate generates deterministic DEX fixtures and executes the production CLI/engine path for parsing, validation, CFG/type/SSA analysis, byte-stable writer round-trip, compatible rename, metadata reduction and canonical multidex verification.
+
+This gate runs in addition to the workspace Rust quality checks, RustSec audit, and Phase A APK regression pipeline.
