@@ -58,6 +58,12 @@ pub struct ApkInspection {
     pub legacy_signature_entries: Vec<String>,
 }
 
+/// Inspects an APK without extracting archive entries to disk.
+///
+/// # Errors
+///
+/// Returns an error when the APK is malformed, unsupported, unreadable, or
+/// does not contain `AndroidManifest.xml`.
 pub fn inspect_apk(path: &Path) -> Result<ApkInspection> {
     let directory = read_zip_directory(path)?;
     let manifest_entry = directory
@@ -98,6 +104,12 @@ pub fn inspect_apk(path: &Path) -> Result<ApkInspection> {
     })
 }
 
+/// Verifies the Phase A APK structural invariants.
+///
+/// # Errors
+///
+/// Returns an error for malformed/unsupported APKs, a missing manifest, or a
+/// non-contiguous canonical `classes*.dex` sequence.
 pub fn verify_apk_structure(path: &Path) -> Result<ApkInspection> {
     let inspection = inspect_apk(path)?;
     if !inspection.dex_sequence_contiguous {
