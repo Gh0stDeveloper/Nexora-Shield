@@ -70,3 +70,90 @@ jobs:
 
       - name: Audit dependency lockfile
         run: cargo audit
+
+
+  phase-a-e2e:
+    name: Phase A APK pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java for keytool
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Create synthetic APK fixture
+        run: |
+          mkdir -p build/phase-a
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          path = Path("build/phase-a/input.apk")
+          with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as apk:
+              apk.writestr("classes2.dex", b"dex-two")
+              apk.writestr("META-INF/OLD.SF", b"stale-signature")
+              apk.writestr("AndroidManifest.xml", b'<manifest package="dev.nexora.phasea"/>')
+              apk.writestr("classes.dex", b"dex-one")
+              apk.writestr("META-INF/OLD.RSA", b"stale-signature-block")
+          PY
+
+      - name: Create ephemeral test signing key
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore build/phase-a/test.p12 \
+            -storetype PKCS12 \
+            -storepass phase-a-password \
+            -keypass phase-a-password \
+            -alias phase-a \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname "CN=Nexora Shield Phase A, O=CI, C=MX"
+
+      - name: Protect, align and sign APK
+        env:
+          NEXORA_TEST_KS_PASS: phase-a-password
+          NEXORA_TEST_KEY_PASS: phase-a-password
+        run: |
+          cargo run --quiet -p nexora-shield -- protect build/phase-a/input.apk \
+            --output build/phase-a/protected.apk \
+            --profile hardened \
+            --keystore build/phase-a/test.p12 \
+            --alias phase-a \
+            --ks-pass-env NEXORA_TEST_KS_PASS \
+            --key-pass-env NEXORA_TEST_KEY_PASS \
+            --min-sdk 24 \
+            --public-report build/phase-a/public-report.json \
+            --private-report build/phase-a/private-report.json
+
+      - name: Inspect protected APK
+        run: cargo run --quiet -p nexora-shield -- inspect build/phase-a/protected.apk --json
+
+      - name: Verify protected APK signature
+        run: cargo run --quiet -p nexora-shield -- verify build/phase-a/protected.apk --signature --min-sdk 24
+
+      - name: Validate build reports
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          public = json.loads(Path("build/phase-a/public-report.json").read_text())
+          private = json.loads(Path("build/phase-a/private-report.json").read_text())
+
+          assert public["signed"] is True
+          assert public["aligned"] is True
+          assert public["dex_count"] == 2
+          assert public["stripped_signature_entries"] == 2
+          assert "published" in public["stages"]
+          assert private["build_id"] == public["build_id"]
+          PY
