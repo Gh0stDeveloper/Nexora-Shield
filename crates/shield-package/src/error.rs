@@ -28,10 +28,18 @@ impl fmt::Display for PackageError {
             Self::Io(error) => write!(formatter, "I/O error: {error}"),
             Self::InvalidZip(message) => write!(formatter, "invalid ZIP/APK: {message}"),
             Self::UnsupportedZip(message) => write!(formatter, "unsupported ZIP/APK: {message}"),
-            Self::MissingManifest => formatter.write_str("APK does not contain AndroidManifest.xml"),
-            Self::DuplicateEntry(name) => write!(formatter, "ZIP contains duplicate entry '{name}'"),
-            Self::InvalidEntryName(name) => write!(formatter, "unsafe or invalid ZIP entry name '{name}'"),
-            Self::ToolNotFound(tool) => write!(formatter, "Android build tool '{tool}' was not found"),
+            Self::MissingManifest => {
+                formatter.write_str("APK does not contain AndroidManifest.xml")
+            }
+            Self::DuplicateEntry(name) => {
+                write!(formatter, "ZIP contains duplicate entry '{name}'")
+            }
+            Self::InvalidEntryName(name) => {
+                write!(formatter, "unsafe or invalid ZIP entry name '{name}'")
+            }
+            Self::ToolNotFound(tool) => {
+                write!(formatter, "Android build tool '{tool}' was not found")
+            }
             Self::ToolFailed {
                 tool,
                 status,
@@ -44,10 +52,15 @@ impl fmt::Display for PackageError {
                 stderr.trim()
             ),
             Self::MissingEnvironmentVariable(name) => {
-                write!(formatter, "required environment variable '{name}' is not set")
+                write!(
+                    formatter,
+                    "required environment variable '{name}' is not set"
+                )
             }
             Self::InvalidArgument(message) => write!(formatter, "invalid argument: {message}"),
-            Self::VerificationFailed(message) => write!(formatter, "verification failed: {message}"),
+            Self::VerificationFailed(message) => {
+                write!(formatter, "verification failed: {message}")
+            }
         }
     }
 }
