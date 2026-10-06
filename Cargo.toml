@@ -5,6 +5,7 @@ members = [
     "crates/shield-package",
     "crates/shield-dex",
     "crates/shield-crypto",
+    "crates/shield-integrity",
     "crates/shield-cli",
 ]
 

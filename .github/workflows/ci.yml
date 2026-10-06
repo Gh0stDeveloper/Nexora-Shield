@@ -420,3 +420,238 @@ jobs:
       - name: Check CLI on declared MSRV
         run: cargo +1.81.0 check --locked -p nexora-shield
 
+  phase-d-integrity:
+    name: Phase D Integrity / Anti-Tamper
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java for signing fixtures
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Run Phase D tests
+        run: cargo test --locked --quiet -p nexora-shield-integrity --test phase_d
+
+      - name: Create Phase D content fixtures
+        run: |
+          mkdir -p build/phase-d
+          printf '%s' '{"endpoint":"https://example.invalid/api","mode":"strict"}' > build/phase-d/config.json
+          printf '\177ELFphase-d-native-fixture-v1' > build/phase-d/libnexora.so
+          python - <<'PY'
+          import hashlib
+          import struct
+          import zlib
+          from pathlib import Path
+
+          DEX_HEADER_SIZE = 0x70
+          DEX_ENDIAN_CONSTANT = 0x12345678
+
+          def uleb(value: int) -> bytes:
+              out = bytearray()
+              while True:
+                  byte = value & 0x7f
+                  value >>= 7
+                  if value:
+                      byte |= 0x80
+                  out.append(byte)
+                  if not value:
+                      return bytes(out)
+
+          def put_u16(buf: bytearray, off: int, value: int) -> None:
+              buf[off:off + 2] = struct.pack("<H", value)
+
+          def put_u32(buf: bytearray, off: int, value: int) -> None:
+              buf[off:off + 4] = struct.pack("<I", value)
+
+          strings = [
+              "Ldev/nexora/phased/Main;",
+              "Ljava/lang/Object;",
+              "V",
+              "run",
+              "Main.java",
+          ]
+          string_ids_off = DEX_HEADER_SIZE
+          type_ids_off = string_ids_off + len(strings) * 4
+          proto_ids_off = type_ids_off + 3 * 4
+          method_ids_off = proto_ids_off + 12
+          class_defs_off = method_ids_off + 8
+          data_off = class_defs_off + 32
+
+          data = bytearray(data_off)
+          string_offsets = []
+          for value in strings:
+              string_offsets.append(len(data))
+              data += uleb(len(value.encode("utf-16-le")) // 2)
+              data += value.encode("ascii")
+              data.append(0)
+
+          while len(data) % 4:
+              data.append(0)
+
+          code_off = len(data)
+          data += struct.pack("<HHHHIIH", 0, 0, 0, 0, 0, 1, 0x000e)
+          class_data_off = len(data)
+          data += uleb(0) + uleb(0) + uleb(1) + uleb(0)
+          data += uleb(0) + uleb(0x0009) + uleb(code_off)
+
+          file_size = len(data)
+          data[0:8] = b"dex\n035\0"
+          put_u32(data, 32, file_size)
+          put_u32(data, 36, DEX_HEADER_SIZE)
+          put_u32(data, 40, DEX_ENDIAN_CONSTANT)
+          put_u32(data, 56, len(strings))
+          put_u32(data, 60, string_ids_off)
+          put_u32(data, 64, 3)
+          put_u32(data, 68, type_ids_off)
+          put_u32(data, 72, 1)
+          put_u32(data, 76, proto_ids_off)
+          put_u32(data, 88, 1)
+          put_u32(data, 92, method_ids_off)
+          put_u32(data, 96, 1)
+          put_u32(data, 100, class_defs_off)
+          put_u32(data, 104, file_size - data_off)
+          put_u32(data, 108, data_off)
+
+          for index, offset in enumerate(string_offsets):
+              put_u32(data, string_ids_off + index * 4, offset)
+
+          put_u32(data, type_ids_off, 0)
+          put_u32(data, type_ids_off + 4, 1)
+          put_u32(data, type_ids_off + 8, 2)
+          put_u32(data, proto_ids_off, 2)
+          put_u32(data, proto_ids_off + 4, 2)
+          put_u32(data, proto_ids_off + 8, 0)
+          put_u16(data, method_ids_off, 0)
+          put_u16(data, method_ids_off + 2, 0)
+          put_u32(data, method_ids_off + 4, 3)
+          put_u32(data, class_defs_off, 0)
+          put_u32(data, class_defs_off + 4, 1)
+          put_u32(data, class_defs_off + 8, 1)
+          put_u32(data, class_defs_off + 16, 4)
+          put_u32(data, class_defs_off + 24, class_data_off)
+
+          data[12:32] = hashlib.sha1(data[32:]).digest()
+          put_u32(data, 8, zlib.adler32(data[12:]) & 0xffffffff)
+          Path("build/phase-d/classes.dex").write_bytes(data)
+          PY
+
+      - name: Create two independent signing certificates
+        run: |
+          keytool -genkeypair -noprompt             -keystore build/phase-d/signer-a.p12             -storetype PKCS12             -storepass phase-d-pass             -keypass phase-d-pass             -alias signer-a             -keyalg RSA             -keysize 2048             -validity 3650             -dname "CN=Nexora Shield Phase D A, O=CI, C=MX"
+          keytool -genkeypair -noprompt             -keystore build/phase-d/signer-b.p12             -storetype PKCS12             -storepass phase-d-pass             -keypass phase-d-pass             -alias signer-b             -keyalg RSA             -keysize 2048             -validity 3650             -dname "CN=Nexora Shield Phase D B, O=CI, C=MX"
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          with zipfile.ZipFile("build/phase-d/base.apk", "w", compression=zipfile.ZIP_STORED) as apk:
+              apk.writestr("AndroidManifest.xml", b'<manifest package="dev.nexora.phased"/>')
+              apk.writestr("classes.dex", Path("build/phase-d/classes.dex").read_bytes())
+          PY
+          cp build/phase-d/base.apk build/phase-d/app-a.apk
+          cp build/phase-d/base.apk build/phase-d/app-b.apk
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" sign             --min-sdk-version 24             --ks build/phase-d/signer-a.p12             --ks-key-alias signer-a             --ks-pass pass:phase-d-pass             --key-pass pass:phase-d-pass             build/phase-d/app-a.apk
+          "$APKSIGNER" sign             --min-sdk-version 24             --ks build/phase-d/signer-b.p12             --ks-key-alias signer-b             --ks-pass pass:phase-d-pass             --key-pass pass:phase-d-pass             build/phase-d/app-b.apk
+
+          CERTS_A="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-d/app-a.apk)"
+          CERTS_B="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-d/app-b.apk)"
+          printf '%s\n' "$CERTS_A"
+          printf '%s\n' "$CERTS_B"
+          SIGNER_A="$(printf '%s\n' "$CERTS_A" | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' | head -n 1)"
+          SIGNER_B="$(printf '%s\n' "$CERTS_B" | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' | head -n 1)"
+          test -n "$SIGNER_A"
+          test -n "$SIGNER_B"
+          test "$SIGNER_A" != "$SIGNER_B"
+          echo "SIGNER_A=$SIGNER_A" >> "$GITHUB_ENV"
+          echo "SIGNER_B=$SIGNER_B" >> "$GITHUB_ENV"
+
+      - name: Build integrity manifest
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- integrity-create             --output build/phase-d/integrity.json             --build-id phase-d-ci             --app-id dev.nexora.phased             --version-code 77             --signer-sha256 "$SIGNER_A"             --dex classes.dex=build/phase-d/classes.dex             --resource assets/config.json=build/phase-d/config.json             --native lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so             --seed phase-d-ci-distribution             --checks 5             --redundancy 2
+
+      - name: Inspect and verify clean evidence
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- integrity-inspect build/phase-d/integrity.json
+          cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.phased             --version-code 77             --dex classes.dex=build/phase-d/classes.dex             --artifact assets/config.json=build/phase-d/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so
+
+      - name: Verify one distributed check
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.phased             --version-code 77             --dex classes.dex=build/phase-d/classes.dex             --artifact assets/config.json=build/phase-d/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so             --check-id 0
+
+      - name: Reject re-signed evidence
+        run: |
+          if cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_B"             --app-id dev.nexora.phased             --version-code 77             --dex classes.dex=build/phase-d/classes.dex             --artifact assets/config.json=build/phase-d/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so; then
+            echo "re-signed evidence unexpectedly passed" >&2
+            exit 1
+          fi
+
+      - name: Reject patched resource
+        run: |
+          cp build/phase-d/config.json build/phase-d/config-patched.json
+          printf '\npatched=true\n' >> build/phase-d/config-patched.json
+          if cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.phased             --version-code 77             --dex classes.dex=build/phase-d/classes.dex             --artifact assets/config.json=build/phase-d/config-patched.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so; then
+            echo "patched resource unexpectedly passed" >&2
+            exit 1
+          fi
+
+      - name: Reject patched DEX
+        run: |
+          cp build/phase-d/classes.dex build/phase-d/classes-patched.dex
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("build/phase-d/classes-patched.dex")
+          data = bytearray(path.read_bytes())
+          data[-1] ^= 0x01
+          path.write_bytes(data)
+          PY
+          if cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.phased             --version-code 77             --dex classes.dex=build/phase-d/classes-patched.dex             --artifact assets/config.json=build/phase-d/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so; then
+            echo "patched DEX unexpectedly passed" >&2
+            exit 1
+          fi
+
+      - name: Reject replaced native library
+        run: |
+          cp build/phase-d/libnexora.so build/phase-d/libnexora-patched.so
+          printf 'patch' >> build/phase-d/libnexora-patched.so
+          if cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.phased             --version-code 77             --dex classes.dex=build/phase-d/classes.dex             --artifact assets/config.json=build/phase-d/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora-patched.so; then
+            echo "replaced native library unexpectedly passed" >&2
+            exit 1
+          fi
+
+      - name: Reject repackaged package identity
+        run: |
+          if cargo run --locked --quiet -p nexora-shield -- integrity-verify build/phase-d/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.repacked             --version-code 77             --dex classes.dex=build/phase-d/classes.dex             --artifact assets/config.json=build/phase-d/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-d/libnexora.so; then
+            echo "repackaged identity unexpectedly passed" >&2
+            exit 1
+          fi
+
+  phase-d-msrv:
+    name: Phase D Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test integrity crate on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-integrity --all-targets
+
+      - name: Check CLI on declared MSRV
+        run: cargo +1.81.0 check --locked -p nexora-shield
+

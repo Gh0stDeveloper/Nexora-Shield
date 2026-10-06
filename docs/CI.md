@@ -101,3 +101,16 @@ The permanent Phase C gate exercises the real authenticated data-protection path
 The declared workspace MSRV is enforced for the new data-protection surface. CI runs the crypto crate tests and checks the production CLI with Rust 1.81 using the committed lockfile. Dependency upgrades that silently require a newer Cargo/Rust edition therefore fail before merge.
 
 Phase C cryptographic dependencies are also covered by the existing RustSec audit.
+
+
+### Phase D Integrity / Anti-Tamper
+
+The permanent Phase D gate generates validated DEX/resource/native fixtures and two independent PKCS12 signing identities. It signs equivalent APK fixtures with official Android `apksigner`, verifies signer SHA-256 evidence, builds a distributed Integrity Graph, confirms clean evidence, executes an individual distributed check, and requires fail-closed rejection for:
+
+- an independently re-signed APK;
+- a patched DEX;
+- a patched protected resource;
+- a replaced native library;
+- a repackaged application identity.
+
+A separate Rust 1.81 MSRV job verifies the integrity crate and production CLI. Phase D closure requires this gate plus Rust quality, RustSec and all Phase A/B/C regressions.
