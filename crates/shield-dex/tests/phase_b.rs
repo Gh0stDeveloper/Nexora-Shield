@@ -49,12 +49,8 @@ fn selectors_safe_rename_and_metadata_reduction_compose() {
     let bytes = build_test_dex("Lcom/test/A;", "run");
     let dex = DexParser::parse(&bytes).expect("parse");
 
-    let selector = Selector::new(
-        SelectorKind::Method,
-        "Lcom/test/*;",
-        Some("run".to_owned()),
-    )
-    .expect("selector");
+    let selector = Selector::new(SelectorKind::Method, "Lcom/test/*;", Some("run".to_owned()))
+        .expect("selector");
     let selection = SelectorResolver::resolve(&dex, &[selector.clone()]).expect("selection");
     assert!(selection.methods.contains(&0));
 

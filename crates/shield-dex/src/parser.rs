@@ -38,12 +38,8 @@ impl DexParser {
                 continue;
             }
 
-            let data = parse_class_data(
-                bytes,
-                class_def.class_data_off,
-                fields.len(),
-                methods.len(),
-            )?;
+            let data =
+                parse_class_data(bytes, class_def.class_data_off, fields.len(), methods.len())?;
 
             for method in data.methods() {
                 if method.code_off == 0 {
@@ -93,7 +89,9 @@ fn parse_header(bytes: &[u8]) -> Result<DexHeader> {
         return Err(DexError::InvalidHeader("magic is not dex\\nNNN\\0".into()));
     }
     if !bytes[4..7].iter().all(u8::is_ascii_digit) {
-        return Err(DexError::InvalidHeader("version is not three ASCII digits".into()));
+        return Err(DexError::InvalidHeader(
+            "version is not three ASCII digits".into(),
+        ));
     }
 
     let version = std::str::from_utf8(&bytes[4..7])
@@ -160,12 +158,48 @@ fn parse_header(bytes: &[u8]) -> Result<DexHeader> {
 }
 
 fn validate_fixed_sections(bytes: &[u8], header: &DexHeader) -> Result<()> {
-    validate_section(bytes, header.string_ids_off, header.string_ids_size, 4, "string_ids")?;
-    validate_section(bytes, header.type_ids_off, header.type_ids_size, 4, "type_ids")?;
-    validate_section(bytes, header.proto_ids_off, header.proto_ids_size, 12, "proto_ids")?;
-    validate_section(bytes, header.field_ids_off, header.field_ids_size, 8, "field_ids")?;
-    validate_section(bytes, header.method_ids_off, header.method_ids_size, 8, "method_ids")?;
-    validate_section(bytes, header.class_defs_off, header.class_defs_size, 32, "class_defs")?;
+    validate_section(
+        bytes,
+        header.string_ids_off,
+        header.string_ids_size,
+        4,
+        "string_ids",
+    )?;
+    validate_section(
+        bytes,
+        header.type_ids_off,
+        header.type_ids_size,
+        4,
+        "type_ids",
+    )?;
+    validate_section(
+        bytes,
+        header.proto_ids_off,
+        header.proto_ids_size,
+        12,
+        "proto_ids",
+    )?;
+    validate_section(
+        bytes,
+        header.field_ids_off,
+        header.field_ids_size,
+        8,
+        "field_ids",
+    )?;
+    validate_section(
+        bytes,
+        header.method_ids_off,
+        header.method_ids_size,
+        8,
+        "method_ids",
+    )?;
+    validate_section(
+        bytes,
+        header.class_defs_off,
+        header.class_defs_size,
+        32,
+        "class_defs",
+    )?;
 
     for (offset, name) in [
         (header.string_ids_off, "string_ids"),
@@ -627,9 +661,7 @@ fn parse_code_item(
     if ins_size > registers_size {
         return Err(DexError::InvalidInstruction {
             offset: 0,
-            reason: format!(
-                "ins_size {ins_size} exceeds registers_size {registers_size}"
-            ),
+            reason: format!("ins_size {ins_size} exceeds registers_size {registers_size}"),
         });
     }
 
@@ -739,10 +771,11 @@ fn parse_catch_handlers(
     let mut result = Vec::with_capacity(handler_count as usize);
 
     for _ in 0..handler_count {
-        let relative_offset = u32::try_from(cursor - start).map_err(|_| DexError::InvalidOffset {
-            context: "catch handler relative offset".into(),
-            offset: u32::MAX,
-        })?;
+        let relative_offset =
+            u32::try_from(cursor - start).map_err(|_| DexError::InvalidOffset {
+                context: "catch handler relative offset".into(),
+                offset: u32::MAX,
+            })?;
         let (signed_size, next) = read_sleb128(bytes, cursor)?;
         cursor = next;
         let typed_count = signed_size.unsigned_abs();
@@ -885,13 +918,52 @@ fn decode_instructions(
 
 fn opcode_width(opcode: u8) -> Option<u32> {
     match opcode {
-        0x00 | 0x01 | 0x04 | 0x07 | 0x0a..=0x12 | 0x1d | 0x1e | 0x21 | 0x27 | 0x28
-        | 0x7b..=0x8f | 0xb0..=0xcf => Some(1),
-        0x02 | 0x05 | 0x08 | 0x13 | 0x15 | 0x16 | 0x19 | 0x1a | 0x1c | 0x1f | 0x20
-        | 0x22 | 0x23 | 0x29 | 0x2d..=0x3d | 0x44..=0x6d | 0x90..=0xaf | 0xd0..=0xe2
-        | 0xfe | 0xff => Some(2),
-        0x03 | 0x06 | 0x09 | 0x14 | 0x17 | 0x1b | 0x24 | 0x25 | 0x26 | 0x2a..=0x2c
-        | 0x6e..=0x72 | 0x74..=0x78 | 0xfc | 0xfd => Some(3),
+        0x00
+        | 0x01
+        | 0x04
+        | 0x07
+        | 0x0a..=0x12
+        | 0x1d
+        | 0x1e
+        | 0x21
+        | 0x27
+        | 0x28
+        | 0x7b..=0x8f
+        | 0xb0..=0xcf => Some(1),
+        0x02
+        | 0x05
+        | 0x08
+        | 0x13
+        | 0x15
+        | 0x16
+        | 0x19
+        | 0x1a
+        | 0x1c
+        | 0x1f
+        | 0x20
+        | 0x22
+        | 0x23
+        | 0x29
+        | 0x2d..=0x3d
+        | 0x44..=0x6d
+        | 0x90..=0xaf
+        | 0xd0..=0xe2
+        | 0xfe
+        | 0xff => Some(2),
+        0x03
+        | 0x06
+        | 0x09
+        | 0x14
+        | 0x17
+        | 0x1b
+        | 0x24
+        | 0x25
+        | 0x26
+        | 0x2a..=0x2c
+        | 0x6e..=0x72
+        | 0x74..=0x78
+        | 0xfc
+        | 0xfd => Some(3),
         0x18 => Some(5),
         0xfa | 0xfb => Some(4),
         _ => None,
@@ -908,10 +980,13 @@ fn payload_width(units: &[u16], offset: usize) -> Result<(PseudoInstruction, u32
                 }
             })?);
             let width = 4_usize
-                .checked_add(size.checked_mul(2).ok_or_else(|| DexError::InvalidInstruction {
-                    offset: offset as u32,
-                    reason: "packed-switch payload size overflow".into(),
-                })?)
+                .checked_add(
+                    size.checked_mul(2)
+                        .ok_or_else(|| DexError::InvalidInstruction {
+                            offset: offset as u32,
+                            reason: "packed-switch payload size overflow".into(),
+                        })?,
+                )
                 .ok_or_else(|| DexError::InvalidInstruction {
                     offset: offset as u32,
                     reason: "packed-switch payload width overflow".into(),
@@ -927,10 +1002,13 @@ fn payload_width(units: &[u16], offset: usize) -> Result<(PseudoInstruction, u32
                 }
             })?);
             let width = 2_usize
-                .checked_add(size.checked_mul(4).ok_or_else(|| DexError::InvalidInstruction {
-                    offset: offset as u32,
-                    reason: "sparse-switch payload size overflow".into(),
-                })?)
+                .checked_add(
+                    size.checked_mul(4)
+                        .ok_or_else(|| DexError::InvalidInstruction {
+                            offset: offset as u32,
+                            reason: "sparse-switch payload size overflow".into(),
+                        })?,
+                )
                 .ok_or_else(|| DexError::InvalidInstruction {
                     offset: offset as u32,
                     reason: "sparse-switch payload width overflow".into(),
@@ -947,20 +1025,28 @@ fn payload_width(units: &[u16], offset: usize) -> Result<(PseudoInstruction, u32
                     reason: "fill-array-data element count does not fit host".into(),
                 }
             })?;
-            let bytes = element_width.checked_mul(size).ok_or_else(|| DexError::InvalidInstruction {
-                offset: offset as u32,
-                reason: "fill-array-data byte size overflow".into(),
-            })?;
-            let payload_units = bytes.checked_add(1).ok_or_else(|| DexError::InvalidInstruction {
-                offset: offset as u32,
-                reason: "fill-array-data width overflow".into(),
-            })? / 2;
-            let width = 4_usize.checked_add(payload_units).ok_or_else(|| {
-                DexError::InvalidInstruction {
-                    offset: offset as u32,
-                    reason: "fill-array-data width overflow".into(),
-                }
-            })?;
+            let bytes =
+                element_width
+                    .checked_mul(size)
+                    .ok_or_else(|| DexError::InvalidInstruction {
+                        offset: offset as u32,
+                        reason: "fill-array-data byte size overflow".into(),
+                    })?;
+            let payload_units =
+                bytes
+                    .checked_add(1)
+                    .ok_or_else(|| DexError::InvalidInstruction {
+                        offset: offset as u32,
+                        reason: "fill-array-data width overflow".into(),
+                    })?
+                    / 2;
+            let width =
+                4_usize
+                    .checked_add(payload_units)
+                    .ok_or_else(|| DexError::InvalidInstruction {
+                        offset: offset as u32,
+                        reason: "fill-array-data width overflow".into(),
+                    })?;
             ensure_units(units, offset, width, "fill-array-data payload")?;
             Ok((PseudoInstruction::FillArrayDataPayload, width as u32))
         }
@@ -1122,14 +1208,18 @@ fn checked_target(origin: usize, delta: i64) -> Result<u32> {
 }
 
 fn read_u32_units(units: &[u16], offset: usize) -> Result<u32> {
-    let low = *units.get(offset).ok_or_else(|| DexError::InvalidInstruction {
-        offset: offset as u32,
-        reason: "missing low 16-bit code unit".into(),
-    })?;
-    let high = *units.get(offset + 1).ok_or_else(|| DexError::InvalidInstruction {
-        offset: offset as u32,
-        reason: "missing high 16-bit code unit".into(),
-    })?;
+    let low = *units
+        .get(offset)
+        .ok_or_else(|| DexError::InvalidInstruction {
+            offset: offset as u32,
+            reason: "missing low 16-bit code unit".into(),
+        })?;
+    let high = *units
+        .get(offset + 1)
+        .ok_or_else(|| DexError::InvalidInstruction {
+            offset: offset as u32,
+            reason: "missing high 16-bit code unit".into(),
+        })?;
     Ok(u32::from(low) | (u32::from(high) << 16))
 }
 
@@ -1137,7 +1227,9 @@ fn read_uleb128(bytes: &[u8], offset: usize) -> Result<(u32, usize)> {
     let mut result = 0_u32;
     let mut cursor = offset;
     for shift in [0_u32, 7, 14, 21, 28] {
-        let byte = *bytes.get(cursor).ok_or(DexError::InvalidLeb128 { offset })?;
+        let byte = *bytes
+            .get(cursor)
+            .ok_or(DexError::InvalidLeb128 { offset })?;
         cursor += 1;
         if shift == 28 && byte & 0xf0 != 0 {
             return Err(DexError::InvalidLeb128 { offset });
@@ -1156,7 +1248,9 @@ fn read_sleb128(bytes: &[u8], offset: usize) -> Result<(i32, usize)> {
     let mut shift = 0_u32;
 
     for _ in 0..5 {
-        let byte = *bytes.get(cursor).ok_or(DexError::InvalidLeb128 { offset })?;
+        let byte = *bytes
+            .get(cursor)
+            .ok_or(DexError::InvalidLeb128 { offset })?;
         cursor += 1;
         result |= i32::from(byte & 0x7f) << shift;
         shift += 7;
@@ -1172,7 +1266,10 @@ fn read_sleb128(bytes: &[u8], offset: usize) -> Result<(i32, usize)> {
 }
 
 fn validate_index(kind: &'static str, index: u32, count: usize) -> Result<()> {
-    if usize::try_from(index).ok().is_some_and(|value| value < count) {
+    if usize::try_from(index)
+        .ok()
+        .is_some_and(|value| value < count)
+    {
         Ok(())
     } else {
         Err(DexError::InvalidIndex { kind, index })
@@ -1195,10 +1292,12 @@ fn read_u32(bytes: &[u8], offset: usize, context: &str) -> Result<u32> {
 }
 
 fn ensure(bytes: &[u8], offset: usize, length: usize, context: &str) -> Result<()> {
-    let end = offset.checked_add(length).ok_or_else(|| DexError::Truncated {
-        context: context.to_owned(),
-        offset,
-    })?;
+    let end = offset
+        .checked_add(length)
+        .ok_or_else(|| DexError::Truncated {
+            context: context.to_owned(),
+            offset,
+        })?;
     if end > bytes.len() {
         return Err(DexError::Truncated {
             context: context.to_owned(),

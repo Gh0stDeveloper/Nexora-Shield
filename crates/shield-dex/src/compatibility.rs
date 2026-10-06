@@ -28,10 +28,9 @@ impl CompatibilityAnalyzer {
         let mut report = CompatibilityReport::default();
         let runtime_strings = runtime_string_indices(dex);
 
-        report.reflection_detected = runtime_strings.iter().any(|index| {
-            dex.string(*index)
-                .is_some_and(is_reflection_indicator)
-        });
+        report.reflection_detected = runtime_strings
+            .iter()
+            .any(|index| dex.string(*index).is_some_and(is_reflection_indicator));
 
         for data in dex.class_data.values() {
             for encoded in data.methods() {
@@ -39,21 +38,21 @@ impl CompatibilityAnalyzer {
                     continue;
                 }
                 report.native_methods.insert(encoded.method_idx);
-                let method = dex
-                    .methods
-                    .get(encoded.method_idx as usize)
-                    .ok_or(DexError::InvalidIndex {
-                        kind: "method",
-                        index: encoded.method_idx,
-                    })?;
+                let method =
+                    dex.methods
+                        .get(encoded.method_idx as usize)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "method",
+                            index: encoded.method_idx,
+                        })?;
                 report.protect(method.name_idx, "JNI/native method name");
-                let class_type = dex
-                    .types
-                    .get(method.class_idx as usize)
-                    .ok_or(DexError::InvalidIndex {
-                        kind: "type",
-                        index: u32::from(method.class_idx),
-                    })?;
+                let class_type =
+                    dex.types
+                        .get(method.class_idx as usize)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "type",
+                            index: u32::from(method.class_idx),
+                        })?;
                 report.protect(class_type.descriptor_idx, "JNI/native declaring class");
             }
         }
@@ -66,12 +65,12 @@ impl CompatibilityAnalyzer {
 
             for class in &dex.classes {
                 let type_id = &dex.types[class.class_idx as usize];
-                let descriptor = dex.string(type_id.descriptor_idx).ok_or(
-                    DexError::InvalidIndex {
-                        kind: "string",
-                        index: type_id.descriptor_idx,
-                    },
-                )?;
+                let descriptor =
+                    dex.string(type_id.descriptor_idx)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "string",
+                            index: type_id.descriptor_idx,
+                        })?;
                 let dotted = descriptor_to_dotted(descriptor);
                 if runtime_values
                     .iter()

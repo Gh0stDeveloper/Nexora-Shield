@@ -112,50 +112,46 @@ impl IrMethod {
             } else {
                 (0..register_count)
                     .map(|register| {
-                        phi_ids
-                            .get(&(block.start, register))
-                            .copied()
-                            .ok_or(DexError::InvalidControlFlow {
+                        phi_ids.get(&(block.start, register)).copied().ok_or(
+                            DexError::InvalidControlFlow {
                                 offset: block.start,
                                 target: i64::from(block.start),
-                            })
+                            },
+                        )
                     })
                     .collect::<Result<Vec<_>>>()?
             };
 
             let mut ir_instructions = Vec::with_capacity(block.instruction_offsets.len());
             for offset in &block.instruction_offsets {
-                let instruction = instruction_by_offset
-                    .get(offset)
-                    .copied()
-                    .ok_or(DexError::InvalidInstruction {
+                let instruction = instruction_by_offset.get(offset).copied().ok_or(
+                    DexError::InvalidInstruction {
                         offset: *offset,
                         reason: "instruction missing while building IR".into(),
-                    })?;
+                    },
+                )?;
                 let access = register_accesses(code, instruction)?;
                 let uses = access
                     .uses
                     .iter()
                     .map(|register| {
-                        current
-                            .get(usize::from(*register))
-                            .copied()
-                            .ok_or(DexError::InvalidInstruction {
+                        current.get(usize::from(*register)).copied().ok_or(
+                            DexError::InvalidInstruction {
                                 offset: *offset,
                                 reason: format!("IR use register v{register} out of range"),
-                            })
+                            },
+                        )
                     })
                     .collect::<Result<Vec<_>>>()?;
 
                 let mut defs = Vec::with_capacity(access.defs.len());
                 for register in access.defs {
-                    let value = definition_ids
-                        .get(&(*offset, register))
-                        .copied()
-                        .ok_or(DexError::InvalidInstruction {
+                    let value = definition_ids.get(&(*offset, register)).copied().ok_or(
+                        DexError::InvalidInstruction {
                             offset: *offset,
                             reason: "definition does not have an SSA value".into(),
-                        })?;
+                        },
+                    )?;
                     current[usize::from(register)] = value;
                     defs.push(value);
                 }
@@ -189,24 +185,22 @@ impl IrMethod {
             }
 
             for register in 0..register_count {
-                let output = phi_ids
-                    .get(&(ir_block.start, register))
-                    .copied()
-                    .ok_or(DexError::InvalidControlFlow {
+                let output = phi_ids.get(&(ir_block.start, register)).copied().ok_or(
+                    DexError::InvalidControlFlow {
                         offset: ir_block.start,
                         target: i64::from(ir_block.start),
-                    })?;
+                    },
+                )?;
                 let mut inputs = Vec::with_capacity(cfg_block.predecessors.len());
                 for predecessor in &cfg_block.predecessors {
                     let predecessor_exit =
-                        exit_maps.get(predecessor).ok_or(DexError::InvalidControlFlow {
-                            offset: *predecessor,
-                            target: i64::from(ir_block.start),
-                        })?;
-                    inputs.push((
-                        *predecessor,
-                        predecessor_exit[usize::from(register)],
-                    ));
+                        exit_maps
+                            .get(predecessor)
+                            .ok_or(DexError::InvalidControlFlow {
+                                offset: *predecessor,
+                                target: i64::from(ir_block.start),
+                            })?;
+                    inputs.push((*predecessor, predecessor_exit[usize::from(register)]));
                 }
                 ir_block.phis.push(IrPhi {
                     register,

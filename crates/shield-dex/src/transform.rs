@@ -19,10 +19,7 @@ impl DexWriter {
         Ok(output)
     }
 
-    pub fn patch_strings(
-        dex: &DexFile,
-        patches: &BTreeMap<u32, String>,
-    ) -> Result<Vec<u8>> {
+    pub fn patch_strings(dex: &DexFile, patches: &BTreeMap<u32, String>) -> Result<Vec<u8>> {
         let mut output = dex.bytes.clone();
 
         for (string_idx, replacement) in patches {
@@ -208,13 +205,8 @@ impl RenamePass {
                 .any(|symbol| matches!(symbol, SymbolUse::Class(_)));
             let mut salt = 0_u64;
             let replacement = loop {
-                let candidate = generate_replacement(
-                    old,
-                    class_descriptor,
-                    config.seed,
-                    string_idx,
-                    salt,
-                )?;
+                let candidate =
+                    generate_replacement(old, class_descriptor, config.seed, string_idx, salt)?;
                 if candidate != old && !existing.contains(&candidate) {
                     break candidate;
                 }
@@ -338,7 +330,10 @@ fn generate_replacement(
     }
 
     if class_descriptor {
-        let Some(body) = original.strip_prefix('L').and_then(|value| value.strip_suffix(';')) else {
+        let Some(body) = original
+            .strip_prefix('L')
+            .and_then(|value| value.strip_suffix(';'))
+        else {
             return Err(DexError::UnsafeRename(format!(
                 "class descriptor '{original}' is not canonical"
             )));
@@ -391,14 +386,18 @@ fn token_like(original: &str, seed: u64, string_idx: u32, salt: u64) -> String {
 }
 
 fn write_u32(bytes: &mut [u8], offset: usize, value: u32) -> Result<()> {
-    let end = offset.checked_add(4).ok_or_else(|| DexError::InvalidOffset {
-        context: "u32 write overflow".into(),
-        offset: offset as u32,
-    })?;
-    let destination = bytes.get_mut(offset..end).ok_or_else(|| DexError::InvalidOffset {
-        context: "u32 write".into(),
-        offset: offset as u32,
-    })?;
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| DexError::InvalidOffset {
+            context: "u32 write overflow".into(),
+            offset: offset as u32,
+        })?;
+    let destination = bytes
+        .get_mut(offset..end)
+        .ok_or_else(|| DexError::InvalidOffset {
+            context: "u32 write".into(),
+            offset: offset as u32,
+        })?;
     destination.copy_from_slice(&value.to_le_bytes());
     Ok(())
 }

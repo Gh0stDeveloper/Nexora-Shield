@@ -6,9 +6,9 @@ use nexora_shield_core::{
     apk_inspection_json, protect_apk, ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
-    CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter, IrMethod,
-    MetadataReducer, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass, Selector, SelectorKind,
-    TypeAnalyzer,
+    CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
+    IrMethod, MetadataReducer, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass, Selector,
+    SelectorKind, TypeAnalyzer,
 };
 use nexora_shield_package::{inspect_apk, verify_apk_structure, AndroidTools, SigningConfig};
 use std::fs;
@@ -90,8 +90,7 @@ fn run_dex_inspect(args: &[String]) -> Result<(), String> {
     let dex = DexParser::parse(&bytes).map_err(|error| error.to_string())?;
     let validation = DexValidator::validate(&dex).map_err(|error| error.to_string())?;
     let graph = ReferenceGraph::build(&dex);
-    let compatibility =
-        CompatibilityAnalyzer::analyze(&dex).map_err(|error| error.to_string())?;
+    let compatibility = CompatibilityAnalyzer::analyze(&dex).map_err(|error| error.to_string())?;
 
     let mut cfg_blocks = 0_usize;
     let mut ir_blocks = 0_usize;
@@ -108,10 +107,13 @@ fn run_dex_inspect(args: &[String]) -> Result<(), String> {
                 .len();
             let _ = TypeAnalyzer::analyze(&dex, method.method_idx)
                 .map_err(|error| error.to_string())?;
-            let ir = IrMethod::build(&dex, method.method_idx)
-                .map_err(|error| error.to_string())?;
+            let ir = IrMethod::build(&dex, method.method_idx).map_err(|error| error.to_string())?;
             ir_blocks += ir.blocks.len();
-            phi_nodes += ir.blocks.iter().map(|block| block.phis.len()).sum::<usize>();
+            phi_nodes += ir
+                .blocks
+                .iter()
+                .map(|block| block.phis.len())
+                .sum::<usize>();
         }
     }
 
@@ -554,7 +556,9 @@ fn split_member_selector<'a>(value: &'a str, option: &str) -> Result<(&'a str, &
         .split_once('#')
         .ok_or_else(|| format!("{option} expects <class-glob>#<member-glob>"))?;
     if class_pattern.is_empty() || member_pattern.is_empty() {
-        return Err(format!("{option} expects non-empty class and member patterns"));
+        return Err(format!(
+            "{option} expects non-empty class and member patterns"
+        ));
     }
     Ok((class_pattern, member_pattern))
 }
@@ -655,7 +659,6 @@ OPTIONS:\n\
   --private-report <file>     Write private build JSON report"
     );
 }
-
 
 fn print_dex_inspect_help() {
     println!(

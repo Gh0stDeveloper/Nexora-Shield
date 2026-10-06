@@ -104,7 +104,9 @@ pub struct ClassData {
 
 impl ClassData {
     pub fn methods(&self) -> impl Iterator<Item = &EncodedMethod> {
-        self.direct_methods.iter().chain(self.virtual_methods.iter())
+        self.direct_methods
+            .iter()
+            .chain(self.virtual_methods.iter())
     }
 }
 
@@ -210,7 +212,9 @@ pub struct DexFile {
 impl DexFile {
     #[must_use]
     pub fn string(&self, index: u32) -> Option<&str> {
-        self.strings.get(index as usize).map(|value| value.value.as_str())
+        self.strings
+            .get(index as usize)
+            .map(|value| value.value.as_str())
     }
 
     #[must_use]

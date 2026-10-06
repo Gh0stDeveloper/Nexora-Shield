@@ -36,12 +36,13 @@ impl TypeAnalyzer {
                 kind: "encoded method",
                 index: method_idx,
             })?;
-        let code = dex.code_items.get(&encoded.code_off).ok_or_else(|| {
-            DexError::InvalidInstruction {
-                offset: 0,
-                reason: format!("method {method_idx} does not have a code_item"),
-            }
-        })?;
+        let code =
+            dex.code_items
+                .get(&encoded.code_off)
+                .ok_or_else(|| DexError::InvalidInstruction {
+                    offset: 0,
+                    reason: format!("method {method_idx} does not have a code_item"),
+                })?;
         let cfg = ControlFlowGraph::build(code)?;
         if cfg.blocks.is_empty() {
             return Ok(TypeAnalysis {
@@ -109,14 +110,12 @@ impl TypeAnalyzer {
             .iter()
             .map(|block| BlockTypeState {
                 block_start: block.start,
-                entry: entries
-                    .get(&block.start)
-                    .cloned()
-                    .unwrap_or_else(|| vec![RegisterType::Unknown; usize::from(code.registers_size)]),
-                exit: exits
-                    .get(&block.start)
-                    .cloned()
-                    .unwrap_or_else(|| vec![RegisterType::Unknown; usize::from(code.registers_size)]),
+                entry: entries.get(&block.start).cloned().unwrap_or_else(|| {
+                    vec![RegisterType::Unknown; usize::from(code.registers_size)]
+                }),
+                exit: exits.get(&block.start).cloned().unwrap_or_else(|| {
+                    vec![RegisterType::Unknown; usize::from(code.registers_size)]
+                }),
             })
             .collect();
 
@@ -131,10 +130,13 @@ fn seed_parameters(
     code: &CodeItem,
     state: &mut [RegisterType],
 ) -> Result<()> {
-    let method = dex.methods.get(method_idx as usize).ok_or(DexError::InvalidIndex {
-        kind: "method",
-        index: method_idx,
-    })?;
+    let method = dex
+        .methods
+        .get(method_idx as usize)
+        .ok_or(DexError::InvalidIndex {
+            kind: "method",
+            index: method_idx,
+        })?;
     let proto = dex
         .protos
         .get(method.proto_idx as usize)
@@ -152,24 +154,28 @@ fn seed_parameters(
     }
 
     for type_index in &proto.parameters {
-        let descriptor = dex
-            .type_descriptor(u32::from(*type_index))
-            .ok_or(DexError::InvalidIndex {
-                kind: "type",
-                index: u32::from(*type_index),
-            })?;
+        let descriptor =
+            dex.type_descriptor(u32::from(*type_index))
+                .ok_or(DexError::InvalidIndex {
+                    kind: "type",
+                    index: u32::from(*type_index),
+                })?;
         let kind = descriptor_type(descriptor);
-        let slot = state.get_mut(register).ok_or(DexError::InvalidInstruction {
-            offset: 0,
-            reason: "parameter registers exceed registers_size".into(),
-        })?;
+        let slot = state
+            .get_mut(register)
+            .ok_or(DexError::InvalidInstruction {
+                offset: 0,
+                reason: "parameter registers exceed registers_size".into(),
+            })?;
         *slot = kind;
         if kind == RegisterType::Wide {
             register += 1;
-            let high = state.get_mut(register).ok_or(DexError::InvalidInstruction {
-                offset: 0,
-                reason: "wide parameter exceeds registers_size".into(),
-            })?;
+            let high = state
+                .get_mut(register)
+                .ok_or(DexError::InvalidInstruction {
+                    offset: 0,
+                    reason: "wide parameter exceeds registers_size".into(),
+                })?;
             *high = RegisterType::Wide;
         }
         register += 1;
@@ -287,13 +293,10 @@ pub(crate) fn register_accesses(
     }
 
     let offset = instruction.offset as usize;
-    let first = *code
-        .insns
-        .get(offset)
-        .ok_or(DexError::InvalidInstruction {
-            offset: instruction.offset,
-            reason: "missing first code unit".into(),
-        })?;
+    let first = *code.insns.get(offset).ok_or(DexError::InvalidInstruction {
+        offset: instruction.offset,
+        reason: "missing first code unit".into(),
+    })?;
     let a4 = (first >> 8) & 0x0f;
     let b4 = (first >> 12) & 0x0f;
     let a8 = first >> 8;
@@ -333,12 +336,10 @@ pub(crate) fn register_accesses(
             defs: vec![a8],
             uses: Vec::new(),
         },
-        0x0f..=0x11 | 0x1d | 0x1e | 0x27 | 0x26 | 0x2b | 0x2c | 0x38..=0x3d => {
-            RegisterAccess {
-                defs: Vec::new(),
-                uses: vec![a8],
-            }
-        }
+        0x0f..=0x11 | 0x1d | 0x1e | 0x27 | 0x26 | 0x2b | 0x2c | 0x38..=0x3d => RegisterAccess {
+            defs: Vec::new(),
+            uses: vec![a8],
+        },
         0x12 => RegisterAccess {
             defs: vec![a4],
             uses: Vec::new(),

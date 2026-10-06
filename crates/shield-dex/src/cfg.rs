@@ -98,29 +98,28 @@ impl ControlFlowGraph {
             .collect::<BTreeMap<_, _>>();
 
         for block_index in 0..blocks.len() {
-            let last_offset = *blocks[block_index]
-                .instruction_offsets
-                .last()
-                .ok_or(DexError::InvalidControlFlow {
+            let last_offset = *blocks[block_index].instruction_offsets.last().ok_or(
+                DexError::InvalidControlFlow {
                     offset: blocks[block_index].start,
                     target: i64::from(blocks[block_index].start),
-                })?;
-            let last = instruction_map
-                .get(&last_offset)
-                .copied()
-                .ok_or(DexError::InvalidControlFlow {
-                    offset: last_offset,
-                    target: i64::from(last_offset),
-                })?;
+                },
+            )?;
+            let last =
+                instruction_map
+                    .get(&last_offset)
+                    .copied()
+                    .ok_or(DexError::InvalidControlFlow {
+                        offset: last_offset,
+                        target: i64::from(last_offset),
+                    })?;
 
             let mut successors = BTreeSet::new();
             for target in &last.branch_targets {
-                let target_block = find_block_start(&blocks, *target).ok_or(
-                    DexError::InvalidControlFlow {
+                let target_block =
+                    find_block_start(&blocks, *target).ok_or(DexError::InvalidControlFlow {
                         offset: last.offset,
                         target: i64::from(*target),
-                    },
-                )?;
+                    })?;
                 successors.insert(target_block);
             }
             if last.falls_through() {
@@ -155,8 +154,7 @@ impl ControlFlowGraph {
             }
 
             blocks[block_index].successors = successors.into_iter().collect();
-            blocks[block_index].exception_successors =
-                exception_targets.into_iter().collect();
+            blocks[block_index].exception_successors = exception_targets.into_iter().collect();
         }
 
         let mut predecessor_map = BTreeMap::<u32, BTreeSet<u32>>::new();

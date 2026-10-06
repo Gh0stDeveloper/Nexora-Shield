@@ -159,12 +159,16 @@ pub fn verify_integrity(bytes: &[u8]) -> Result<()> {
     }
     let expected_signature = sha1(&bytes[32..]);
     if bytes[12..32] != expected_signature {
-        return Err(DexError::InvalidIntegrity("SHA-1 signature mismatch".into()));
+        return Err(DexError::InvalidIntegrity(
+            "SHA-1 signature mismatch".into(),
+        ));
     }
     let expected_checksum = adler32(&bytes[12..]);
     let actual_checksum = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
     if actual_checksum != expected_checksum {
-        return Err(DexError::InvalidIntegrity("Adler-32 checksum mismatch".into()));
+        return Err(DexError::InvalidIntegrity(
+            "Adler-32 checksum mismatch".into(),
+        ));
     }
     Ok(())
 }

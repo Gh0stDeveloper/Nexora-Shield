@@ -78,9 +78,8 @@ impl MultiDexSet {
 
         units.sort_by_key(|unit| unit.index);
         for (offset, unit) in units.iter().enumerate() {
-            let expected = u32::try_from(offset + 1).map_err(|_| {
-                DexError::InvalidMultiDex("DEX count exceeds u32".into())
-            })?;
+            let expected = u32::try_from(offset + 1)
+                .map_err(|_| DexError::InvalidMultiDex("DEX count exceeds u32".into()))?;
             if unit.index != expected {
                 return Err(DexError::InvalidMultiDex(format!(
                     "expected {}, found {}",

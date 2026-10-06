@@ -18,10 +18,12 @@ pub struct DexValidator;
 impl DexValidator {
     pub fn validate(dex: &DexFile) -> Result<ValidationReport> {
         for (index, type_id) in dex.types.iter().enumerate() {
-            let descriptor = dex.string(type_id.descriptor_idx).ok_or(DexError::InvalidIndex {
-                kind: "string",
-                index: type_id.descriptor_idx,
-            })?;
+            let descriptor = dex
+                .string(type_id.descriptor_idx)
+                .ok_or(DexError::InvalidIndex {
+                    kind: "string",
+                    index: type_id.descriptor_idx,
+                })?;
             validate_type_descriptor(descriptor).map_err(|message| {
                 DexError::InvalidHeader(format!("type[{index}] descriptor: {message}"))
             })?;
@@ -118,37 +120,40 @@ impl DexValidator {
 fn parameter_word_count(dex: &DexFile, proto: &crate::model::ProtoId) -> Result<usize> {
     let mut words = 0_usize;
     for type_index in &proto.parameters {
-        let descriptor = dex
-            .type_descriptor(u32::from(*type_index))
-            .ok_or(DexError::InvalidIndex {
-                kind: "type",
-                index: u32::from(*type_index),
-            })?;
+        let descriptor =
+            dex.type_descriptor(u32::from(*type_index))
+                .ok_or(DexError::InvalidIndex {
+                    kind: "type",
+                    index: u32::from(*type_index),
+                })?;
         words += usize::from(matches!(descriptor, "J" | "D")) + 1;
     }
     Ok(words)
 }
 
 fn proto_shorty(dex: &DexFile, proto_index: u32) -> Result<String> {
-    let proto = dex.protos.get(proto_index as usize).ok_or(DexError::InvalidIndex {
-        kind: "proto",
-        index: proto_index,
-    })?;
-    let mut shorty = String::new();
-    let return_descriptor = dex
-        .type_descriptor(proto.return_type_idx)
+    let proto = dex
+        .protos
+        .get(proto_index as usize)
         .ok_or(DexError::InvalidIndex {
-            kind: "type",
-            index: proto.return_type_idx,
+            kind: "proto",
+            index: proto_index,
         })?;
-    shorty.push(shorty_char(return_descriptor)?);
-    for parameter in &proto.parameters {
-        let descriptor = dex
-            .type_descriptor(u32::from(*parameter))
+    let mut shorty = String::new();
+    let return_descriptor =
+        dex.type_descriptor(proto.return_type_idx)
             .ok_or(DexError::InvalidIndex {
                 kind: "type",
-                index: u32::from(*parameter),
+                index: proto.return_type_idx,
             })?;
+    shorty.push(shorty_char(return_descriptor)?);
+    for parameter in &proto.parameters {
+        let descriptor =
+            dex.type_descriptor(u32::from(*parameter))
+                .ok_or(DexError::InvalidIndex {
+                    kind: "type",
+                    index: u32::from(*parameter),
+                })?;
         shorty.push(shorty_char(descriptor)?);
     }
     Ok(shorty)
@@ -193,7 +198,10 @@ fn validate_type_descriptor(descriptor: &str) -> std::result::Result<(), String>
             if body.starts_with('/') || body.ends_with('/') || body.contains("//") {
                 return Err("object descriptor has an invalid package path".into());
             }
-            if body.bytes().any(|byte| matches!(byte, b'.' | b';' | b'[' | 0)) {
+            if body
+                .bytes()
+                .any(|byte| matches!(byte, b'.' | b';' | b'[' | 0))
+            {
                 return Err("object descriptor contains a forbidden character".into());
             }
             Ok(())

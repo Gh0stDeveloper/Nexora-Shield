@@ -21,26 +21,43 @@ impl fmt::Display for DexError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Truncated { context, offset } => {
-                write!(formatter, "truncated DEX while reading {context} at 0x{offset:x}")
+                write!(
+                    formatter,
+                    "truncated DEX while reading {context} at 0x{offset:x}"
+                )
             }
             Self::InvalidHeader(message) => write!(formatter, "invalid DEX header: {message}"),
-            Self::InvalidIntegrity(message) => write!(formatter, "invalid DEX integrity: {message}"),
+            Self::InvalidIntegrity(message) => {
+                write!(formatter, "invalid DEX integrity: {message}")
+            }
             Self::InvalidIndex { kind, index } => write!(formatter, "invalid {kind} index {index}"),
             Self::InvalidOffset { context, offset } => {
                 write!(formatter, "invalid offset for {context}: 0x{offset:x}")
             }
             Self::InvalidLeb128 { offset } => write!(formatter, "invalid LEB128 at 0x{offset:x}"),
             Self::InvalidMutf8 { offset, reason } => {
-                write!(formatter, "invalid modified UTF-8 at 0x{offset:x}: {reason}")
+                write!(
+                    formatter,
+                    "invalid modified UTF-8 at 0x{offset:x}: {reason}"
+                )
             }
             Self::UnsupportedOpcode { opcode, offset } => {
-                write!(formatter, "unsupported DEX opcode 0x{opcode:02x} at code unit {offset}")
+                write!(
+                    formatter,
+                    "unsupported DEX opcode 0x{opcode:02x} at code unit {offset}"
+                )
             }
             Self::InvalidInstruction { offset, reason } => {
-                write!(formatter, "invalid instruction at code unit {offset}: {reason}")
+                write!(
+                    formatter,
+                    "invalid instruction at code unit {offset}: {reason}"
+                )
             }
             Self::InvalidControlFlow { offset, target } => {
-                write!(formatter, "invalid branch from code unit {offset} to {target}")
+                write!(
+                    formatter,
+                    "invalid branch from code unit {offset} to {target}"
+                )
             }
             Self::InvalidSelector(message) => write!(formatter, "invalid selector: {message}"),
             Self::UnsafeRename(message) => write!(formatter, "unsafe rename: {message}"),

@@ -76,12 +76,12 @@ impl SelectorResolver {
         let mut selection = Selection::default();
         for selector in selectors {
             for class in &dex.classes {
-                let descriptor = dex
-                    .type_descriptor(class.class_idx)
-                    .ok_or(DexError::InvalidIndex {
-                        kind: "type",
-                        index: class.class_idx,
-                    })?;
+                let descriptor =
+                    dex.type_descriptor(class.class_idx)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "type",
+                            index: class.class_idx,
+                        })?;
                 if !glob_match(&selector.class_pattern, descriptor) {
                     continue;
                 }
@@ -158,14 +158,10 @@ pub fn glob_match(pattern: &str, value: &str) -> bool {
         for value_index in 1..=value.len() {
             table[pattern_index][value_index] = match pattern[pattern_index - 1] {
                 b'*' => {
-                    table[pattern_index - 1][value_index]
-                        || table[pattern_index][value_index - 1]
+                    table[pattern_index - 1][value_index] || table[pattern_index][value_index - 1]
                 }
                 b'?' => table[pattern_index - 1][value_index - 1],
-                byte => {
-                    byte == value[value_index - 1]
-                        && table[pattern_index - 1][value_index - 1]
-                }
+                byte => byte == value[value_index - 1] && table[pattern_index - 1][value_index - 1],
             };
         }
     }
