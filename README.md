@@ -2,7 +2,7 @@
 
 Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
 
-> Estado: **Fase 0 — Foundation completada y validada por CI**. El workspace, contratos iniciales, esquema de configuración, CI, ADRs, threat model y política de seguridad ya están establecidos. La siguiente fase de implementación es **Fase A — Core Packaging**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
+> Estado: **Fase A — Core Packaging completada y validada por CI**. Nexora Shield ya dispone de pipeline APK transaccional, normalizador ZIP32, inspección de manifest/multi-DEX, BuildPlan, reportes público/privado, integración oficial con `zipalign`/`apksigner` y comandos `protect`, `inspect` y `verify`. La siguiente fase es **Fase B — DEX Engine**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
 
 ## Objetivos
 
@@ -33,7 +33,8 @@ Nexora Shield es una plataforma de protección avanzada para aplicaciones Androi
 
 | Componente | Responsabilidad |
 |---|---|
-| shield-core | Pipeline principal, modelo de proyecto protegido y orquestación |
+| shield-core | Pipeline principal, BuildPlan, transacciones, reportes y orquestación |
+| shield-package | Normalización APK/ZIP, inspección estructural y Android Build Tools |
 | shield-dex | Parser/IR DEX, CFG/SSA y pases de transformación |
 | shield-crypto | Primitivas, derivación de claves y protección de constantes |
 | shield-integrity | Grafo de integridad, firma, certificado y verificaciones de contenido |
@@ -176,6 +177,8 @@ Gradle:
 ## Documentación
 
 - docs/ARCHITECTURE.md — arquitectura y límites entre módulos.
+- docs/PHASE-A.md — implementación y contrato de Core Packaging.
+- docs/APK-PACKAGING.md — invariantes de reconstrucción, alineación y firma APK.
 - docs/THREAT-MODEL.md — activos, atacantes, escenarios y no-objetivos.
 - docs/SECURITY-DESIGN.md — capas de protección y decisiones de diseño.
 - docs/CONFIGURATION.md — modelo de configuración.
