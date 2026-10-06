@@ -2,6 +2,7 @@ use crate::error::{DataProtectionError, Result};
 use crate::key::{sha256, KeyDomain, KeySchedule, ITEM_ID_LEN, NONCE_LEN};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
+use subtle::ConstantTimeEq;
 
 pub const CONTAINER_MAGIC: &[u8; 4] = b"NSC1";
 pub const CONTAINER_VERSION: u8 = 1;
@@ -112,7 +113,7 @@ pub fn open(
     }
 
     let expected_id = schedule.opaque_item_id(expected_kind.domain(), logical_id)?;
-    if parsed.info.item_id != expected_id {
+    if parsed.info.item_id.ct_eq(&expected_id).unwrap_u8() != 1 {
         return Err(DataProtectionError::IdentifierMismatch);
     }
 
@@ -227,10 +228,13 @@ fn parse(bytes: &[u8], max_plaintext: u64) -> Result<ParsedContainer<'_>> {
             bytes.len()
         )));
     }
-    if ciphertext_len < 16 {
-        return Err(DataProtectionError::InvalidContainer(
-            "ciphertext is shorter than the AEAD tag".into(),
-        ));
+    let expected_ciphertext_len = plaintext_len
+        .checked_add(16)
+        .ok_or_else(|| DataProtectionError::InvalidContainer("ciphertext length overflow".into()))?;
+    if ciphertext_len != expected_ciphertext_len {
+        return Err(DataProtectionError::InvalidContainer(format!(
+            "ciphertext length {ciphertext_len} does not equal plaintext length plus AEAD tag {expected_ciphertext_len}"
+        )));
     }
 
     Ok(ParsedContainer {
