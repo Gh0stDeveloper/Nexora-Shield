@@ -9,6 +9,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+nexora-shield-integrity = { path = "../shield-integrity" }
 nexora-shield-crypto = { path = "../shield-crypto" }
 nexora-shield-dex = { path = "../shield-dex" }
 nexora-shield-core = { path = "../shield-core" }
