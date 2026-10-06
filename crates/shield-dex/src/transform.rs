@@ -234,7 +234,7 @@ impl RenamePass {
                 string_idx,
                 old: old.to_owned(),
                 new: replacement,
-                symbols: symbols.iter().map(SymbolUse::label).collect(),
+                symbols: symbols.iter().map(|symbol| (*symbol).label()).collect(),
             });
         }
 
