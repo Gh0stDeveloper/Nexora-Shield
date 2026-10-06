@@ -171,11 +171,7 @@ fn d5_native_integrity_detects_library_replacement() {
 fn d6_integrity_graph_is_certificate_rooted_and_manifest_is_self_consistent() {
     let (manifest, _) = manifest_and_evidence();
     manifest.validate().expect("manifest valid");
-    assert_eq!(
-        manifest.graph.nodes.first().is_some(),
-        true,
-        "graph contains nodes"
-    );
+    assert!(!manifest.graph.nodes.is_empty(), "graph contains nodes");
 
     let json = manifest.to_json_pretty().expect("manifest JSON");
     let round_trip = IntegrityManifest::from_json(&json).expect("manifest parse");
