@@ -169,6 +169,7 @@ fn run_dex_roundtrip(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 fn run_dex_rewrite(args: &[String]) -> Result<(), String> {
     if args.is_empty() || args.iter().any(|value| value == "--help" || value == "-h") {
         print_dex_rewrite_help();
