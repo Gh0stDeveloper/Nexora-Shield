@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+
 use nexora_shield_package::{
     inspect_apk, normalize_zip, read_zip_directory, verify_apk_structure,
     verify_normalized_equivalence, ManifestFormat,
