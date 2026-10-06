@@ -160,17 +160,15 @@ pub(crate) fn run_integrity_create(args: &[String]) -> Result<(), String> {
         );
     }
 
-    let manifest = IntegrityManifest::build(
+    let manifest = IntegrityManifest::build(IntegrityManifestInput {
         build_id,
         certificate,
         package,
         dex_files,
         artifacts,
-        &seed,
-        checks,
-        redundancy,
-        ResponsePolicy::default(),
-    )
+        distribution: DistributionConfig::new(seed, checks, redundancy),
+        response_policy: ResponsePolicy::default(),
+    })
     .map_err(|error| error.to_string())?;
     let json = manifest
         .to_json_pretty()
