@@ -78,6 +78,7 @@ impl ExposureReport {
 pub struct ExposureBenchmark;
 
 impl ExposureBenchmark {
+    #[allow(clippy::cast_precision_loss)]
     pub fn run(
         baseline: &[u8],
         protected: &[u8],
