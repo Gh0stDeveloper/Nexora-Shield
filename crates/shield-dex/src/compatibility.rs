@@ -1,0 +1,135 @@
+use crate::error::{DexError, Result};
+use crate::model::{DexFile, ReferenceKind, ACC_NATIVE};
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CompatibilityReport {
+    pub reflection_detected: bool,
+    pub native_methods: BTreeSet<u32>,
+    pub protected_string_indices: BTreeSet<u32>,
+    pub reasons: BTreeMap<u32, Vec<String>>,
+}
+
+impl CompatibilityReport {
+    fn protect(&mut self, string_idx: u32, reason: impl Into<String>) {
+        self.protected_string_indices.insert(string_idx);
+        self.reasons
+            .entry(string_idx)
+            .or_default()
+            .push(reason.into());
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CompatibilityAnalyzer;
+
+impl CompatibilityAnalyzer {
+    pub fn analyze(dex: &DexFile) -> Result<CompatibilityReport> {
+        let mut report = CompatibilityReport::default();
+        let runtime_strings = runtime_string_indices(dex);
+
+        report.reflection_detected = runtime_strings.iter().any(|index| {
+            dex.string(*index)
+                .is_some_and(is_reflection_indicator)
+        });
+
+        for data in dex.class_data.values() {
+            for encoded in data.methods() {
+                if encoded.access_flags & ACC_NATIVE == 0 {
+                    continue;
+                }
+                report.native_methods.insert(encoded.method_idx);
+                let method = dex
+                    .methods
+                    .get(encoded.method_idx as usize)
+                    .ok_or(DexError::InvalidIndex {
+                        kind: "method",
+                        index: encoded.method_idx,
+                    })?;
+                report.protect(method.name_idx, "JNI/native method name");
+                let class_type = dex
+                    .types
+                    .get(method.class_idx as usize)
+                    .ok_or(DexError::InvalidIndex {
+                        kind: "type",
+                        index: u32::from(method.class_idx),
+                    })?;
+                report.protect(class_type.descriptor_idx, "JNI/native declaring class");
+            }
+        }
+
+        if report.reflection_detected {
+            let runtime_values = runtime_strings
+                .iter()
+                .filter_map(|index| dex.string(*index).map(|value| (*index, value)))
+                .collect::<Vec<_>>();
+
+            for class in &dex.classes {
+                let type_id = &dex.types[class.class_idx as usize];
+                let descriptor = dex.string(type_id.descriptor_idx).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "string",
+                        index: type_id.descriptor_idx,
+                    },
+                )?;
+                let dotted = descriptor_to_dotted(descriptor);
+                if runtime_values
+                    .iter()
+                    .any(|(_, value)| *value == dotted || *value == descriptor)
+                {
+                    report.protect(type_id.descriptor_idx, "reflection-visible class literal");
+                }
+            }
+
+            for method in &dex.methods {
+                if runtime_strings.contains(&method.name_idx) {
+                    report.protect(method.name_idx, "reflection-visible method literal");
+                }
+            }
+            for field in &dex.fields {
+                if runtime_strings.contains(&field.name_idx) {
+                    report.protect(field.name_idx, "reflection-visible field literal");
+                }
+            }
+        }
+
+        Ok(report)
+    }
+}
+
+fn runtime_string_indices(dex: &DexFile) -> BTreeSet<u32> {
+    dex.code_items
+        .values()
+        .flat_map(|code| code.instructions.iter())
+        .filter_map(|instruction| match instruction.reference {
+            Some((ReferenceKind::String, index)) => Some(index),
+            _ => None,
+        })
+        .collect()
+}
+
+fn is_reflection_indicator(value: &str) -> bool {
+    matches!(
+        value,
+        "forName"
+            | "getMethod"
+            | "getDeclaredMethod"
+            | "getField"
+            | "getDeclaredField"
+            | "getConstructor"
+            | "getDeclaredConstructor"
+            | "java.lang.Class"
+            | "java.lang.reflect.Method"
+            | "java.lang.reflect.Field"
+            | "java/lang/reflect/Method"
+            | "java/lang/reflect/Field"
+    )
+}
+
+fn descriptor_to_dotted(descriptor: &str) -> String {
+    descriptor
+        .strip_prefix('L')
+        .and_then(|value| value.strip_suffix(';'))
+        .unwrap_or(descriptor)
+        .replace('/', ".")
+}
