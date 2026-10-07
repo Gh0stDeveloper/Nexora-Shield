@@ -15,6 +15,7 @@ pub enum RegressionCategory {
     BypassPortability,
     Fuzz,
     Performance,
+    RegressionCorpus,
     SecurityScore,
     ComparativeBenchmark,
     ExternalAudit,
