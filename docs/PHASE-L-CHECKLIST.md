@@ -79,9 +79,55 @@
 - [x] raw secret entry intentionally absent
 - [x] Final secret-reference tests
 
+## L.11 Nexora Shield design system & visual identity
+- [x] Dedicated dark product color system
+- [x] Typography hierarchy
+- [x] Branded surfaces and borders
+- [x] Semantic success/warning/error states
+- [x] Reusable panel/metric/status/empty-state components
+- [x] Consistent product iconography
+- [ ] Final Compose compile gate
+
+## L.12 Dashboard & information architecture
+- [x] Dashboard as default landing screen
+- [x] Workspace/Policy/Operations/Security navigation groups
+- [x] Project readiness summary
+- [x] Protection/profile/module/artifact metrics
+- [x] Contextual quick actions
+- [ ] Final navigation compile gate
+
+## L.13 End-user workflow UX
+- [x] Consistent page hierarchy
+- [x] Contextual primary/secondary actions
+- [x] Guided empty states
+- [x] Structured project/report/policy panels
+- [x] Dedicated command/retrace console surface
+- [x] Selectable hashes, paths and output
+- [ ] Final workflow UI gate
+
+## L.14 Responsive desktop & accessibility
+- [x] Minimum viewport policy
+- [x] Compact navigation breakpoint
+- [x] Compact content breakpoint
+- [x] Centralized UX policy
+- [x] UX policy unit tests
+- [x] Text/icon status in addition to color
+- [x] Accessible navigation descriptions
+- [ ] Final accessibility/responsive compile gate
+
+## L.15 Final polish & distribution presentation
+- [x] Branded application shell
+- [x] Native task-specific file dialogs
+- [x] Consistent Windows/macOS/Linux distribution metadata
+- [x] No regression to secret handling boundaries
+- [x] No regression to direct argument-vector execution
+- [ ] Final Studio test gate
+- [ ] Final Phase K regression gate
+- [ ] Final repository CI gate
+
 ## Closure state
 
-Phase L is **COMPLETED**. L.1–L.10 are implemented and their acceptance gates passed on the validated implementation head.
+Phase L core L.1–L.10 is **COMPLETED**. UX polish L.11–L.15 is **IN VALIDATION** until its final Compose, Studio-test and regression gates pass.
 
 Validated by GitHub Actions:
 - Phase L run #20 (`37591941642`): **success**
