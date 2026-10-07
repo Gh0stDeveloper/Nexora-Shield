@@ -55,7 +55,7 @@ pub fn unsupported_dex() -> DexFile {
     )
 }
 
-fn instruction(offset: u32, opcode: u8, width: u16, branch_targets: Vec<u32>) -> Instruction {
+fn instruction(offset: u32, opcode: u8, width: u32, branch_targets: Vec<u32>) -> Instruction {
     Instruction {
         offset,
         opcode,
@@ -140,20 +140,16 @@ fn fixture_header() -> DexHeader {
 }
 
 fn fixture_strings() -> Vec<DexString> {
-    [
-        ("I", 1_usize, 1_u32),
-        ("LTest;", 6, 6),
-        ("add", 3, 3),
-    ]
-    .into_iter()
-    .map(|(value, byte_len, utf16_len)| DexString {
-        value: value.to_owned(),
-        data_offset: 0,
-        data_start: 0,
-        byte_len,
-        utf16_len,
-    })
-    .collect()
+    [("I", 1_u32, 1_u32), ("LTest;", 6, 6), ("add", 3, 3)]
+        .into_iter()
+        .map(|(value, byte_len, utf16_len)| DexString {
+            value: value.to_owned(),
+            data_offset: 0,
+            data_start: 0,
+            byte_len,
+            utf16_len,
+        })
+        .collect()
 }
 
 fn fixture_class() -> ClassDef {
