@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feat/phase-l-shield-studio
+      - feat/phase-l-shield-studio\n      - feat/phase-l-uiux-polish
   pull_request:
     branches:
       - main
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   studio-tests:
-    name: L.1-L.10 Studio services
+    name: L.1-L.15 Studio services and UX policy
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -41,7 +41,7 @@ jobs:
         run: gradle -p studio desktopTest --no-daemon --stacktrace
 
   studio-compile:
-    name: L.1 Compose desktop compile
+    name: L.1-L.15 Compose desktop compile
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
