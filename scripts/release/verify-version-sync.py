@@ -16,7 +16,7 @@ def capture(path: Path, pattern: str, label: str) -> str:
 
 
 def main() -> int:
-    expected = sys.argv[1] if len(sys.argv) == 2 else "1.0.0-rc.1"
+    expected = sys.argv[1] if len(sys.argv) == 2 else "1.0.0"
     cargo = capture(
         ROOT / "Cargo.toml",
         r'(?m)^version\s*=\s*"([^"]+)"',
