@@ -181,7 +181,6 @@ impl AttestationEvidenceVerifier for SampleHmacEvidenceAuthenticator {
         mac.verify_slice(&evidence.token)
             .map_err(|_| AttestationError::EvidenceRejected("sample token MAC mismatch".into()))?;
 
-
         Ok(AttestationVerification {
             provider: self.provider.clone(),
             verdict: AttestationVerdict::Verified,

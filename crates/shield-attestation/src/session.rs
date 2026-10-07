@@ -70,6 +70,14 @@ pub struct ChallengeDeriver {
     counter: u64,
 }
 
+struct ChallengeDigestContext<'a> {
+    application_id: &'a str,
+    build_id: &'a str,
+    purpose: &'a str,
+    now_unix_ms: u64,
+    counter: u64,
+}
+
 impl ChallengeDeriver {
     #[must_use]
     pub const fn new(key: [u8; 32], server_instance_id: [u8; 16]) -> Self {
@@ -104,13 +112,16 @@ impl ChallengeDeriver {
             .checked_add(1)
             .ok_or_else(|| AttestationError::Authentication("challenge counter overflow".into()))?;
 
-        let session_digest = self.derive_digest(
-            b"nexora-shield/attestation-session/v1",
+        let digest_context = ChallengeDigestContext {
             application_id,
             build_id,
             purpose,
             now_unix_ms,
-            self.counter,
+            counter: self.counter,
+        };
+        let session_digest = self.derive_digest(
+            b"nexora-shield/attestation-session/v1",
+            &digest_context,
             &[],
         )?;
         let mut session_bytes = [0_u8; 16];
@@ -119,11 +130,7 @@ impl ChallengeDeriver {
 
         let nonce_digest = self.derive_digest(
             b"nexora-shield/attestation-nonce/v1",
-            application_id,
-            build_id,
-            purpose,
-            now_unix_ms,
-            self.counter,
+            &digest_context,
             session_id.as_bytes(),
         )?;
 
@@ -141,22 +148,18 @@ impl ChallengeDeriver {
     fn derive_digest(
         &self,
         domain: &[u8],
-        application_id: &str,
-        build_id: &str,
-        purpose: &str,
-        now_unix_ms: u64,
-        counter: u64,
+        context: &ChallengeDigestContext<'_>,
         extra: &[u8],
     ) -> Result<[u8; 32]> {
         let mut mac = HmacSha256::new_from_slice(&self.key)
             .map_err(|error| AttestationError::Authentication(error.to_string()))?;
         update_component(&mut mac, domain);
         update_component(&mut mac, &self.server_instance_id);
-        update_component(&mut mac, application_id.as_bytes());
-        update_component(&mut mac, build_id.as_bytes());
-        update_component(&mut mac, purpose.as_bytes());
-        update_component(&mut mac, &now_unix_ms.to_le_bytes());
-        update_component(&mut mac, &counter.to_le_bytes());
+        update_component(&mut mac, context.application_id.as_bytes());
+        update_component(&mut mac, context.build_id.as_bytes());
+        update_component(&mut mac, context.purpose.as_bytes());
+        update_component(&mut mac, &context.now_unix_ms.to_le_bytes());
+        update_component(&mut mac, &context.counter.to_le_bytes());
         update_component(&mut mac, extra);
         Ok(mac.finalize().into_bytes().into())
     }

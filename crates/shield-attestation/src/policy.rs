@@ -248,10 +248,6 @@ impl VerifiedRemotePolicy {
                 FeatureDecisionReason::AttestationRejected,
                 self.payload.sequence,
             )),
-            AttestationVerdict::Verified => Ok(FeatureEvaluation::allow(
-                FeatureDecisionReason::PolicySatisfied,
-                self.payload.sequence,
-            )),
             AttestationVerdict::Unavailable if feature_policy.require_verified_attestation => {
                 if context.online {
                     Ok(FeatureEvaluation {
@@ -264,10 +260,12 @@ impl VerifiedRemotePolicy {
                         .offline_decision(feature_policy, FeatureDecisionReason::OfflineFallback))
                 }
             }
-            AttestationVerdict::Unavailable => Ok(FeatureEvaluation::allow(
-                FeatureDecisionReason::PolicySatisfied,
-                self.payload.sequence,
-            )),
+            AttestationVerdict::Verified | AttestationVerdict::Unavailable => {
+                Ok(FeatureEvaluation::allow(
+                    FeatureDecisionReason::PolicySatisfied,
+                    self.payload.sequence,
+                ))
+            }
         }
     }
 
