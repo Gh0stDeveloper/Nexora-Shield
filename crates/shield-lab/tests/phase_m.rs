@@ -21,7 +21,7 @@ fn m1_static_exposure_harness_detects_synthetic_plaintext() {
         needle: "NX_TEST_SECRET_MARKER".into(),
         maximum_occurrences: 0,
     };
-    let clean = StaticExposureHarness::scan("protected.apk", b"opaque-container", &[rule.clone()])
+    let clean = StaticExposureHarness::scan(\n        "protected.apk",\n        b"opaque-container",\n        std::slice::from_ref(&rule),\n    )
         .expect("valid exposure scan");
     let exposed = StaticExposureHarness::scan(
         "unprotected.apk",
