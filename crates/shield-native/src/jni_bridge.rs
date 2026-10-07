@@ -6,6 +6,7 @@ type JInt = i32;
 type JniEnv = *mut c_void;
 type JClass = *mut c_void;
 
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "system" fn Java_dev_nexora_shield_NativeShield_nativeRuntimeApiVersion(
     _env: JniEnv,
@@ -14,6 +15,7 @@ pub extern "system" fn Java_dev_nexora_shield_NativeShield_nativeRuntimeApiVersi
     i32::try_from(NATIVE_RUNTIME_API_VERSION).unwrap_or(i32::MAX)
 }
 
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "system" fn Java_dev_nexora_shield_NativeShield_nativeAbiCode(
     _env: JniEnv,
