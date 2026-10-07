@@ -18,7 +18,7 @@
 - [x] ABI model
 - [x] Rust target mapping
 - [x] Android build script
-- [ ] Final CI linked-library validation
+- [x] Final CI linked-library validation
 
 ## F.4 x86_64
 - [x] ABI model
@@ -55,21 +55,21 @@
 - [x] Archive-symbol hiding
 - [x] Symbol stripping
 - [x] Build-id disabled for reproducibility
-- [ ] Final ELF CI inspection
+- [x] Final ELF CI inspection
 
 ## F.9 Symbol minimization
 - [x] Explicit required export list
 - [x] Two-entry JNI surface
-- [ ] Final dynamic-symbol CI inspection
+- [x] Final dynamic-symbol CI inspection
 
 ## F.10 Native fuzz/tests
 - [x] Unit/regression tests
 - [x] 4096-case mutation fuzz-smoke
 - [x] 2048-case generated-data stability fuzz-smoke
 - [x] 1024-length region stress
-- [ ] Final Android cross-build gate
-- [ ] Final reproducibility gate
+- [x] Final Android cross-build gate
+- [x] Final reproducibility gate
 
 ## Closure state
 
-Phase F implementation is **IN PROGRESS**. The portable implementation is present, but F.3/F.4/F.8/F.9/F.10 are not closed until actual Android libraries are linked and inspected by CI.
+Phase F is **COMPLETED**. F.1–F.10 are implemented. GitHub Actions run #416 (`37562562437`) passed Rust quality, RustSec, all Phase A–E regressions, Phase F host tests, Phase F Rust 1.81 MSRV, real Android arm64-v8a/x86_64 linking, ELF hardening/export inspection and byte-for-byte rebuild reproducibility.
