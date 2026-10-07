@@ -108,6 +108,55 @@ References delegated to CI, file-descriptor, OS-keychain or external-KMS provide
 
 The UI intentionally contains no raw-secret text field.
 
+## L.11 — Nexora Shield design system & visual identity
+
+Shield Studio uses a dedicated dark product theme instead of raw Material defaults. The design system defines brand colors, typography, elevated/muted surfaces, borders, semantic success/warning/error tones, reusable panels, metric cards, status pills, empty states and a dedicated console surface.
+
+Iconography is consistent and functional. Navigation and primary actions pair icons with explicit text where space allows.
+
+## L.12 — Dashboard & information architecture
+
+Studio opens on a dashboard rather than a raw project form. The dashboard exposes:
+
+- active protection profile;
+- module, selector and artifact counts;
+- release-readiness indicators;
+- current project paths;
+- contextual quick actions.
+
+Navigation is grouped by Workspace, Policy, Operations and Security so users do not need to understand the internal implementation architecture before operating the tool.
+
+## L.13 — End-user workflow UX
+
+Each screen uses a consistent page-header → status → task-panel hierarchy. Primary operations are promoted into contextual action areas; secondary actions remain outlined. Empty states explain what is missing and what the user should do next.
+
+Build and Retrace output are visually isolated in a console surface, while long paths and hashes remain selectable.
+
+## L.14 — Responsive desktop & accessibility
+
+The window has an explicit minimum usable viewport. Navigation collapses to icon-only mode at a tested breakpoint while the content layout uses a separate compact breakpoint.
+
+The UX policy is centralized and unit tested. Navigation icons expose descriptions, headings use semantic heading metadata, status is always conveyed by text/icon in addition to color, and native controls retain keyboard focus behavior.
+
+## L.15 — Final polish & distribution presentation
+
+Native project/file dialogs have task-specific titles and filters. Product branding, window sizing, installer metadata and platform distribution targets remain consistent across Windows MSI, macOS DMG and Debian DEB builds.
+
+The final polish must not weaken any existing Phase L security boundary.
+
+## UX polish acceptance requirement
+
+L.11–L.15 are complete only when:
+
+1. the branded Compose desktop shell compiles;
+2. Studio service tests and UX policy tests pass;
+3. the UI remains usable at the declared minimum viewport;
+4. compact navigation/content breakpoints are deterministic;
+5. success/error/working feedback is semantic and text-backed;
+6. no raw secret-value input is introduced;
+7. Phase K regression remains green;
+8. repository CI remains green.
+
 ## Closure requirement
 
 Phase L is complete only when:
@@ -124,7 +173,7 @@ Phase L is complete only when:
 
 ## Closure status
 
-**COMPLETED**
+**CORE COMPLETED — UX POLISH L.11–L.15 IN VALIDATION**
 
 All Phase L closure requirements were satisfied on the validated implementation head:
 
@@ -137,4 +186,4 @@ All Phase L closure requirements were satisfied on the validated implementation 
 
 Validated implementation head: `7e9d149e72885263b183f71e907d3ef6482a4e4a`.
 
-The next roadmap phase is **Phase M — Security Lab**.
+The next roadmap phase remains **Phase M — Security Lab** after the L.11–L.15 UX polish extension is validated.
