@@ -1,6 +1,6 @@
 use crate::error::{Result, VmError};
 use crate::ir::VmMethod;
-use crate::opcode::OpcodeAllocation;
+use crate::opcode::{OpcodeAllocation, OpcodeStream};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -16,10 +16,12 @@ pub struct VmMetadata {
     pub handler_count: usize,
     pub constant_pool_digest: [u8; 32],
     pub opcode_fingerprint: [u8; 32],
+    pub bytecode_digest: [u8; 32],
 }
 
 impl VmMetadata {
     pub fn from_method(method: &VmMethod, allocation: &OpcodeAllocation) -> Result<Self> {
+        let stream = OpcodeStream::encode(&method.instructions, allocation)?;
         Ok(Self {
             version: 1,
             method_idx: method.method_idx,
@@ -28,6 +30,7 @@ impl VmMetadata {
             handler_count: method.handlers.len(),
             constant_pool_digest: method.constants.digest()?,
             opcode_fingerprint: allocation.fingerprint(),
+            bytecode_digest: stream.digest(),
         })
     }
 }
@@ -65,11 +68,27 @@ impl MetadataSealer {
         serde_json::from_slice(&sealed.payload)
             .map_err(|error| VmError::MetadataEncoding(error.to_string()))
     }
+
+    pub fn verify_program(
+        sealed: &SealedMetadata,
+        key: &[u8],
+        stream: &OpcodeStream,
+        allocation: &OpcodeAllocation,
+    ) -> Result<VmMetadata> {
+        let metadata = Self::verify(sealed, key)?;
+        if metadata.opcode_fingerprint != allocation.fingerprint() {
+            return Err(VmError::OpcodeFingerprintMismatch);
+        }
+        if metadata.bytecode_digest != stream.digest() {
+            return Err(VmError::BytecodeDigestMismatch);
+        }
+        Ok(metadata)
+    }
 }
 
 fn authenticate(payload: &[u8], key: &[u8]) -> Result<[u8; 32]> {
-    let mut mac =
-        HmacSha256::new_from_slice(key).map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
+    let mut mac = HmacSha256::new_from_slice(key)
+        .map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
     mac.update(b"nexora-shield/vm-metadata/v1");
     mac.update(payload);
     Ok(mac.finalize().into_bytes().into())
