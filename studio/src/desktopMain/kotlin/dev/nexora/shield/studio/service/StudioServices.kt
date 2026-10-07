@@ -156,7 +156,7 @@ class CommandRunner(
 class GradleBuildService(
     private val commandRunner: CommandRunner = CommandRunner(),
 ) {
-    suspend fun runTask(projectRoot: Path, task: String): CommandResult {
+    fun commandForTask(projectRoot: Path, task: String): List<String> {
         require(TASK_NAME.matches(task)) {
             "Gradle task contains unsupported characters."
         }
@@ -165,8 +165,11 @@ class GradleBuildService(
             projectRoot.resolve("gradlew.bat").isRegularFile() -> projectRoot.resolve("gradlew.bat").toString()
             else -> "gradle"
         }
-        return commandRunner.run(listOf(wrapper, task, "--no-daemon"), projectRoot)
+        return listOf(wrapper, task, "--no-daemon")
     }
+
+    suspend fun runTask(projectRoot: Path, task: String): CommandResult =
+        commandRunner.run(commandForTask(projectRoot, task), projectRoot)
 
     suspend fun cliVersion(projectRoot: Path, cliExecutable: String): CommandResult =
         commandRunner.run(listOf(cliExecutable, "--version"), projectRoot)
@@ -212,23 +215,28 @@ class ArtifactVerifier(
 class RetraceService(
     private val commandRunner: CommandRunner = CommandRunner(),
 ) {
+    fun commandFor(
+        retraceExecutable: String,
+        mapping: Path,
+        stacktrace: Path,
+    ): List<String> {
+        require(retraceExecutable.isNotBlank()) { "Retrace executable must not be blank." }
+        require(mapping.isRegularFile()) { "mapping.txt does not exist." }
+        require(stacktrace.isRegularFile()) { "Stacktrace file does not exist." }
+        return listOf(
+            retraceExecutable,
+            mapping.toAbsolutePath().normalize().toString(),
+            stacktrace.toAbsolutePath().normalize().toString(),
+        )
+    }
+
     suspend fun retrace(
         projectRoot: Path,
         retraceExecutable: String,
         mapping: Path,
         stacktrace: Path,
-    ): CommandResult {
-        require(mapping.isRegularFile()) { "mapping.txt does not exist." }
-        require(stacktrace.isRegularFile()) { "Stacktrace file does not exist." }
-        return commandRunner.run(
-            listOf(
-                retraceExecutable,
-                mapping.toAbsolutePath().normalize().toString(),
-                stacktrace.toAbsolutePath().normalize().toString(),
-            ),
-            projectRoot,
-        )
-    }
+    ): CommandResult =
+        commandRunner.run(commandFor(retraceExecutable, mapping, stacktrace), projectRoot)
 }
 
 class SecretReferenceInspector {
