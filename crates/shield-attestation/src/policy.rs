@@ -214,10 +214,7 @@ impl VerifiedRemotePolicy {
         &self.payload
     }
 
-    pub fn evaluate(
-        &self,
-        context: &FeatureEvaluationContext,
-    ) -> Result<FeatureEvaluation> {
+    pub fn evaluate(&self, context: &FeatureEvaluationContext) -> Result<FeatureEvaluation> {
         validate_identifier(&context.build_id, "build_id")?;
         validate_identifier(&context.feature, "feature")?;
 
@@ -263,10 +260,8 @@ impl VerifiedRemotePolicy {
                         policy_sequence: self.payload.sequence,
                     })
                 } else {
-                    Ok(self.offline_decision(
-                        feature_policy,
-                        FeatureDecisionReason::OfflineFallback,
-                    ))
+                    Ok(self
+                        .offline_decision(feature_policy, FeatureDecisionReason::OfflineFallback))
                 }
             }
             AttestationVerdict::Unavailable => Ok(FeatureEvaluation::allow(
