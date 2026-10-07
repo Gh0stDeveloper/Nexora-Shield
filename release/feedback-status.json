@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "externalAssessments": 1,
+  "humanReviewers": 0,
+  "acceptedFeedbackItems": 0,
+  "blockingFindingsOpen": 0,
+  "assessmentProviders": [
+    "github-codeql"
+  ],
+  "assessmentEvidence": [
+    {
+      "provider": "github-codeql",
+      "workflow": "Phase N",
+      "runNumber": 54,
+      "runId": 37686651703,
+      "headSha": "d101cb457556ca077020ab1932f6632d8d55d0a1",
+      "job": "N.13 independent external assessment",
+      "conclusion": "success"
+    }
+  ]
+}

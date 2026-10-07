@@ -1,0 +1,46 @@
+name: Nexora Shield 1.0 RC feedback
+description: Report compatibility, security, performance, or usability feedback for the 1.0 release candidate.
+title: "[RC Feedback] "
+labels: ["release-candidate", "feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Nexora Shield 1.0 RC. Do not include secrets, keystores, private mappings, customer data, or production tokens.
+  - type: input
+    id: version
+    attributes:
+      label: RC version
+      placeholder: v1.0.0-rc.1
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Gradle Plugin
+        - Shield Studio
+        - APK/AAB/AAR/APKS
+        - RASP / runtime
+        - Compatibility
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Android/AGP/Gradle/JDK versions, artifact type, and relevant non-secret configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback
+      description: What happened, what you expected, and reproducible steps.
+    validations:
+      required: true

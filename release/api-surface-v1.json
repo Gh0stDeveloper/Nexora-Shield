@@ -1,0 +1,45 @@
+{
+  "contractVersion": 1,
+  "configSchema": 1,
+  "minimumAndroidSdk": 24,
+  "gradlePluginId": "dev.nexora.shield",
+  "cliCommands": [
+    "protect",
+    "inspect",
+    "verify",
+    "profiles",
+    "aab-inspect",
+    "aab-verify",
+    "aar-inspect",
+    "aar-verify",
+    "apks-inspect",
+    "apks-verify",
+    "bundletool-validate",
+    "bundletool-build-apks",
+    "phase-k-help",
+    "dex-inspect",
+    "dex-roundtrip",
+    "dex-rewrite",
+    "dex-multidex-verify",
+    "data-protect",
+    "data-unprotect",
+    "data-inspect",
+    "data-benchmark",
+    "data-help",
+    "integrity-create",
+    "integrity-verify",
+    "integrity-inspect",
+    "integrity-help"
+  ],
+  "protectionProfiles": [
+    "standard",
+    "hardened",
+    "maximum"
+  ],
+  "artifactTypes": [
+    "apk",
+    "aab",
+    "aar",
+    "apks"
+  ]
+}

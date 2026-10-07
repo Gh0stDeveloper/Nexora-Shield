@@ -1,0 +1,1138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Gh0stDeveloper/Nexora-Shield/schemas/nexora-shield.schema.json",
+  "title": "Nexora Shield configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "application",
+    "profile"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "minSdk"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3,
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+        },
+        "minSdk": {
+          "type": "integer",
+          "minimum": 24
+        }
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "hardened",
+        "maximum"
+      ]
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diversity": {
+          "type": "boolean"
+        },
+        "reproducible": {
+          "type": "boolean"
+        },
+        "seedRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diversityMode": {
+          "type": "string",
+          "enum": [
+            "unique_build",
+            "reproducible_private"
+          ]
+        },
+        "buildNonceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reproductionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "renameDiversity": {
+          "type": "boolean"
+        },
+        "passVariants": {
+          "type": "boolean"
+        },
+        "cfgVariants": {
+          "type": "boolean"
+        },
+        "integrityTopologyVariants": {
+          "type": "boolean"
+        },
+        "stringPartitions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          }
+        },
+        "vmMapVariants": {
+          "type": "boolean"
+        },
+        "nativeGeneratedConstants": {
+          "type": "boolean"
+        },
+        "maxCrossBuildTransferBasisPoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "selectors": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/selector"
+      }
+    },
+    "dex": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rename": {
+          "type": "boolean"
+        },
+        "metadataReduction": {
+          "type": "boolean"
+        },
+        "controlFlow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "all",
+                "sensitive",
+                "critical"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "crypto": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "algorithm": {
+          "type": "string",
+          "const": "xchacha20poly1305-hkdf-sha256-v1"
+        },
+        "rootKeyRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reference to external secret material. Raw key material must not be stored in this configuration."
+        },
+        "stringThreshold": {
+          "type": "string",
+          "enum": [
+            "internal",
+            "sensitive",
+            "critical"
+          ]
+        },
+        "forceProtect": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "forcePublic": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "disabled",
+                "bounded"
+              ]
+            },
+            "maxEntries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxBytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ttlSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "bounded"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "required": [
+                  "maxEntries",
+                  "maxBytes",
+                  "ttlSeconds"
+                ]
+              }
+            }
+          ]
+        },
+        "exposureMaxOverheadPercent": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dataProtection": {
+          "type": "boolean"
+        },
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "maxResourceBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "allowAssets": {
+          "type": "boolean"
+        },
+        "allowResRaw": {
+          "type": "boolean"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "certificatePolicy": {
+          "type": "string",
+          "enum": [
+            "exact_current",
+            "current_or_lineage"
+          ]
+        },
+        "allowedSignerSha256": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allowedLineageSha256": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "versionCode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dexChunkBytes": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "distributedChecks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "redundancy"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "redundancy": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "seedRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "resourcePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "nativePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "warning": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            },
+            "high": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            },
+            "critical": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            }
+          }
+        },
+        "playAppSigning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "deliverySignerSha256"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "uploadCertificateSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{64}$"
+            },
+            "deliverySignerSha256": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{64}$"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "deliveryLineageSha256": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{64}$"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "rasp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "enforce",
+            "report_only"
+          ]
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "elevated",
+            "high",
+            "critical"
+          ],
+          "properties": {
+            "elevated": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "critical": {
+              "type": "integer",
+              "minimum": 3
+            }
+          }
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clean": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            },
+            "observed": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            },
+            "elevated": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            },
+            "high": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            },
+            "critical": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "report",
+                "require_reverification",
+                "deny_sensitive_operation"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "native": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "apiLevel": {
+          "type": "integer",
+          "minimum": 24
+        },
+        "abis": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "arm64-v8a",
+              "x86_64",
+              "armeabi-v7a",
+              "x86"
+            ]
+          }
+        },
+        "allow32Bit": {
+          "type": "boolean"
+        },
+        "generatedData": {
+          "type": "boolean"
+        },
+        "hardening": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pic": {
+              "type": "boolean"
+            },
+            "relro": {
+              "type": "boolean"
+            },
+            "bindNow": {
+              "type": "boolean"
+            },
+            "gcSections": {
+              "type": "boolean"
+            },
+            "stripSymbols": {
+              "type": "boolean"
+            },
+            "hideArchiveSymbols": {
+              "type": "boolean"
+            },
+            "disableBuildId": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "vm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "config_only",
+            "annotation_only",
+            "config_or_annotation",
+            "config_and_annotation"
+          ]
+        },
+        "annotationDescriptor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "classPattern",
+              "methodPattern"
+            ],
+            "properties": {
+              "classPattern": {
+                "type": "string",
+                "minLength": 1
+              },
+              "methodPattern": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "eligibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxRegisters": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "maxInstructions": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "allowCalls": {
+              "type": "boolean"
+            },
+            "allowFields": {
+              "type": "boolean"
+            },
+            "allowExceptions": {
+              "type": "boolean"
+            }
+          }
+        },
+        "opcodeDiversification": {
+          "type": "boolean"
+        },
+        "metadataSealing": {
+          "type": "boolean"
+        },
+        "maxRelativeCostBasisPoints": {
+          "type": "integer",
+          "minimum": 10000
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "play_integrity",
+            "custom"
+          ]
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challengeTtlMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signatureAlgorithm",
+            "keyId",
+            "minSequence"
+          ],
+          "properties": {
+            "signatureAlgorithm": {
+              "type": "string",
+              "enum": [
+                "ed25519",
+                "es256"
+              ]
+            },
+            "keyId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "minSequence": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "offline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maxPolicyStalenessMs",
+            "defaultAction"
+          ],
+          "properties": {
+            "maxPolicyStalenessMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2592000000
+            },
+            "defaultAction": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "degrade",
+                "deny"
+              ]
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sendNormalizedLocalRisk",
+            "retainRawAttestationToken",
+            "includeStableDeviceIdentifiers"
+          ],
+          "properties": {
+            "sendNormalizedLocalRisk": {
+              "type": "boolean"
+            },
+            "retainRawAttestationToken": {
+              "const": false
+            },
+            "includeStableDeviceIdentifiers": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apkGrowthPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "startupMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "startupMsP50": {
+          "type": "number",
+          "minimum": 0
+        },
+        "startupMsP95": {
+          "type": "number",
+          "minimum": 0
+        },
+        "memoryMb": {
+          "type": "number",
+          "minimum": 0
+        },
+        "vmMethods": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "buildMinutes": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "budgetsPolicy": {
+      "type": "string",
+      "enum": [
+        "fail",
+        "warn",
+        "adaptive"
+      ]
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reflection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "autoDetect": {
+              "type": "boolean"
+            }
+          }
+        },
+        "serialization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "keepModels": {
+              "type": "boolean"
+            }
+          }
+        },
+        "jni": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "autoDetect": {
+              "type": "boolean"
+            }
+          }
+        },
+        "compose": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "reports": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "private": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "path"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "external"
+          ]
+        },
+        "keystoreRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aliasRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "storePasswordRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keyPasswordRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "env",
+            "file",
+            "file_descriptor",
+            "ci",
+            "os_keychain",
+            "external_kms"
+          ]
+        },
+        "signingKeyRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "buildSeedRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "buildNonceRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "gradle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "releaseOnly": {
+          "type": "boolean"
+        },
+        "variants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "hardened",
+            "maximum"
+          ]
+        },
+        "cliExecutable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowUnsigned": {
+          "type": "boolean"
+        },
+        "align": {
+          "type": "boolean"
+        },
+        "minSdk": {
+          "type": "integer",
+          "minimum": 24
+        },
+        "publicReports": {
+          "type": "boolean"
+        },
+        "privateReports": {
+          "type": "boolean"
+        },
+        "signing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "keystore": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alias": {
+              "type": "string",
+              "minLength": 1
+            },
+            "storePasswordRef": {
+              "type": "string",
+              "pattern": "^(env|file):.+$"
+            },
+            "keyPasswordRef": {
+              "type": "string",
+              "pattern": "^(env|file):.+$"
+            }
+          }
+        },
+        "mapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "preserve": {
+              "type": "boolean"
+            },
+            "retraceExecutable": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "buildCache": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "keyVersion": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "validateBundle": {
+          "type": "boolean"
+        },
+        "bundletoolJar": {
+          "type": "string",
+          "minLength": 1
+        },
+        "javaExecutable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validateAar": {
+          "type": "boolean"
+        },
+        "requireConsumerRules": {
+          "type": "boolean"
+        }
+      }
+    },
+    "packaging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aab": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "validateStructure": {
+              "type": "boolean"
+            },
+            "bundletoolValidation": {
+              "type": "boolean"
+            },
+            "requireBaseModule": {
+              "type": "boolean"
+            },
+            "validateDynamicFeatures": {
+              "type": "boolean"
+            },
+            "validateBaselineProfiles": {
+              "type": "boolean"
+            }
+          }
+        },
+        "splits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "localTesting": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "default",
+                "universal"
+              ]
+            },
+            "validateApkSet": {
+              "type": "boolean"
+            }
+          }
+        },
+        "aar": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "requireConsumerRules": {
+              "type": "boolean"
+            },
+            "preserveResourceNamespace": {
+              "type": "boolean"
+            },
+            "validateBaselineProfiles": {
+              "type": "boolean"
+            },
+            "validatePublication": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

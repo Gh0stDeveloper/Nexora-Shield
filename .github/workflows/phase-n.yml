@@ -1,0 +1,501 @@
+name: Phase N
+
+on:
+  push:
+    branches:
+      - main
+      - feat/phase-n-production-hardening
+  pull_request:
+    branches:
+      - main
+      - feat/phase-m-security-lab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-n-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-contracts:
+    name: N.1-N.5 release contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test release contracts
+        run: cargo test --locked -p nexora-shield-release --all-targets
+
+      - name: Clippy release contracts
+        run: cargo clippy --locked -p nexora-shield-release --all-targets -- -D warnings
+
+      - name: Validate API freeze
+        run: |
+          cargo run --locked --quiet -p nexora-shield-release -- api-validate release/api-surface-v1.json
+          python scripts/release/verify-api-freeze.py
+
+      - name: Validate schema lock and migration tooling
+        run: |
+          python scripts/release/verify-schema-lock.py
+          printf '%s' '{"applicationId":"dev.nexora.legacy","minSdk":24,"protectionProfile":"hardened","dex":{"rename":true}}' > build-legacy.json
+          cargo run --locked --quiet -p nexora-shield-release -- config-migrate-json build-legacy.json build-migrated.json
+          python -m json.tool build-migrated.json >/dev/null
+          grep -q '"schema": 1' build-migrated.json
+          grep -q '"application"' build-migrated.json
+          grep -q '"dex"' build-migrated.json
+
+      - name: Validate documentation supply chain and release workflow
+        run: |
+          python scripts/release/verify-docs.py
+          python scripts/release/verify-supply-chain.py
+          python scripts/release/verify-release-workflow.py
+
+      - name: Validate version synchronization
+        run: python scripts/release/verify-version-sync.py 1.0.0
+
+  sbom-provenance:
+    name: N.6 SBOM and provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate locked Cargo metadata and CycloneDX SBOM
+        run: |
+          mkdir -p build/phase-n
+          cargo metadata --locked --format-version 1 > build/phase-n/cargo-metadata.json
+          python scripts/release/generate-sbom.py build/phase-n/cargo-metadata.json build/phase-n/nexora-shield.cdx.json
+          python -m json.tool build/phase-n/nexora-shield.cdx.json >/dev/null
+          grep -q '"bomFormat": "CycloneDX"' build/phase-n/nexora-shield.cdx.json
+          grep -q '"specVersion": "1.5"' build/phase-n/nexora-shield.cdx.json
+
+      - name: Build release CLI and generate provenance
+        run: |
+          cargo build --locked --release -p nexora-shield
+          python scripts/release/generate-provenance.py build/phase-n/provenance.json target/release/nexora-shield
+          python -m json.tool build/phase-n/provenance.json >/dev/null
+          cargo run --locked --quiet -p nexora-shield-release -- artifact-digest target/release/nexora-shield > build/phase-n/digests.json
+          python -m json.tool build/phase-n/digests.json >/dev/null
+
+  migration-studio-retrace:
+    name: N.3 N.8 Studio migration and retrace
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Test Shield Studio migration
+        run: gradle -p studio desktopTest --no-daemon --stacktrace
+
+      - name: Test Gradle Plugin retrace and validate plugin
+        run: gradle -p gradle-plugin clean test validatePlugins --no-daemon --stacktrace
+
+  reviews:
+    name: N.9-N.11 security performance compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate compatibility contract
+        run: cargo run --locked --quiet -p nexora-shield-release -- compatibility-validate release/compatibility-matrix.json
+
+      - name: Validate stable review metadata
+        run: python scripts/release/verify-release-metadata.py stable
+
+      - name: Validate recorded external assessment
+        run: cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json
+
+      - name: Run Phase M performance regression
+        run: cargo test --locked -p nexora-shield-lab --test phase_m m8_performance_farm_enforces_runtime_and_size_budgets -- --exact
+
+  release-msrv:
+    name: N.1-N.14 Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test release crate on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-release --all-targets
+
+  inherited-regressions:
+    name: Phase M K L inherited regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Phase M Security Lab
+        run: cargo test --locked -p nexora-shield-lab --all-targets
+
+      - name: Phase K package models
+        run: cargo test --locked -p nexora-shield-package --test phase_k
+
+      - name: Phase L Studio compile
+        run: gradle -p studio compileKotlinDesktop --no-daemon --stacktrace
+
+  android-stable-performance:
+    name: N.10 Android representative performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Build Nexora Shield CLI
+        run: cargo build --locked --release -p nexora-shield
+
+      - name: Build matched baseline release APK
+        run: |
+          mkdir -p build/phase-n/android-perf
+          gradle -p samples/gradle-plugin/basic-app clean assembleRelease \
+            -PnexoraShieldEnabled=false \
+            --no-daemon --stacktrace
+          BASELINE="$(find samples/gradle-plugin/basic-app/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          test -f "$BASELINE"
+          cp "$BASELINE" build/phase-n/android-perf/baseline-unsigned.apk
+
+      - name: Build matched protected release APK
+        env:
+          NEXORA_SHIELD_CLI: ${{ github.workspace }}/target/release/nexora-shield
+        run: |
+          gradle -p samples/gradle-plugin/basic-app clean assembleRelease \
+            -PnexoraShieldEnabled=true \
+            --no-daemon --stacktrace
+          PROTECTED="$(find samples/gradle-plugin/basic-app/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          REPORT="$(find samples/gradle-plugin/basic-app/app/build/reports/nexora-shield/release -type f -name '*.json' ! -name 'variant-summary.json' | head -n 1)"
+          test -f "$PROTECTED"
+          test -f "$REPORT"
+          cp "$PROTECTED" build/phase-n/android-perf/protected-unsigned.apk
+          cp "$REPORT" build/phase-n/android-perf/protected-public-report.json
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          apk = Path("build/phase-n/android-perf/protected-unsigned.apk")
+          report = json.loads(
+              Path("build/phase-n/android-perf/protected-public-report.json").read_text()
+          )
+          digest = hashlib.sha256(apk.read_bytes()).hexdigest()
+          if digest != report["output_sha256"]:
+              raise SystemExit(
+                  "protected APK does not match Nexora Shield public report output_sha256"
+              )
+          if report["input_sha256"] == report["output_sha256"]:
+              raise SystemExit(
+                  "Nexora Shield protected output is byte-identical to its input"
+              )
+          print(
+              "Protected artifact identity: OK | "
+              f"input={report['input_sha256'][:12]} output={report['output_sha256'][:12]}"
+          )
+          PY
+
+      - name: Create common benchmark signing key
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore build/phase-n/android-perf/perf.p12 \
+            -storetype PKCS12 \
+            -storepass phase-n-perf \
+            -keypass phase-n-perf \
+            -alias perf \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 365 \
+            -dname "CN=Nexora Shield Phase N Performance, O=CI, C=MX"
+
+      - name: Discover Android SDK tools
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          test -d "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          echo "SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+
+      - name: Sign both benchmark APKs identically
+        run: |
+          for NAME in baseline protected; do
+            cp "build/phase-n/android-perf/${NAME}-unsigned.apk" "build/phase-n/android-perf/${NAME}.apk"
+            "$APKSIGNER" sign \
+              --min-sdk-version 24 \
+              --ks build/phase-n/android-perf/perf.p12 \
+              --ks-key-alias perf \
+              --ks-pass pass:phase-n-perf \
+              --key-pass pass:phase-n-perf \
+              "build/phase-n/android-perf/${NAME}.apk"
+            "$APKSIGNER" verify --min-sdk-version 24 "build/phase-n/android-perf/${NAME}.apk"
+          done
+
+      - name: Provision representative Android virtual device
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          AVDMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
+          ADB="$SDK_ROOT/platform-tools/adb"
+          PERF_DIR="build/phase-n/android-perf"
+          ANDROID_AVD_HOME="$HOME/.android/avd"
+          export ANDROID_AVD_HOME
+          mkdir -p "$PERF_DIR" "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+          if [[ ! -x "$EMULATOR" ]]; then
+            echo "Android emulator is not preinstalled; installing with a bounded timeout."
+            timeout 300 "$SDKMANAGER" "emulator"
+          fi
+          test -x "$EMULATOR"
+
+          if [[ ! -e /dev/kvm ]]; then
+            echo "/dev/kvm is unavailable; representative Android benchmark requires hardware acceleration." >&2
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          "$EMULATOR" -accel-check
+
+          IMAGE_DIR="$(find "$SDK_ROOT/system-images" -type f -name source.properties -path '*/x86_64/source.properties' -print 2>/dev/null | grep -E '/(aosp_atd|google_apis)/x86_64/source\.properties$' | sort -V | tail -n 1 | xargs -r dirname || true)"
+
+          if [[ -z "$IMAGE_DIR" ]]; then
+            IMAGE_PACKAGE="system-images;android-35;aosp_atd;x86_64"
+            echo "No suitable preinstalled x86_64 image found; installing compact ATD image: $IMAGE_PACKAGE"
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            timeout 600 "$SDKMANAGER" "$IMAGE_PACKAGE"
+            IMAGE_DIR="$SDK_ROOT/system-images/android-35/aosp_atd/x86_64"
+          else
+            IMAGE_PACKAGE="$(grep '^Pkg.Path=' "$IMAGE_DIR/source.properties" | head -n 1 | cut -d= -f2- | tr -d '\r')"
+            if [[ -z "$IMAGE_PACKAGE" ]]; then
+              RELATIVE="$(realpath --relative-to="$SDK_ROOT/system-images" "$IMAGE_DIR")"
+              IMAGE_PACKAGE="system-images;${RELATIVE//\//;}"
+            fi
+            echo "Using preinstalled Android image: $IMAGE_PACKAGE"
+          fi
+
+          test -d "$IMAGE_DIR"
+          echo no | "$AVDMANAGER" create avd --force --name nexora_phase_n --package "$IMAGE_PACKAGE" --device "pixel_6" --path "$ANDROID_AVD_HOME/nexora_phase_n.avd"
+
+          echo "Registered AVDs:"
+          "$EMULATOR" -list-avds | tee "$PERF_DIR/avd-list.txt"
+          grep -Fxq "nexora_phase_n" "$PERF_DIR/avd-list.txt"
+          test -f "$ANDROID_AVD_HOME/nexora_phase_n.ini"
+          test -d "$ANDROID_AVD_HOME/nexora_phase_n.avd"
+
+          "$ADB" kill-server || true
+          "$ADB" start-server
+
+          nohup "$EMULATOR" -avd nexora_phase_n -no-window -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -gpu swiftshader_indirect -accel on -cores 2 -memory 2048 -camera-back none -camera-front none -netfast > "$PERF_DIR/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > "$PERF_DIR/emulator.pid"
+
+          READY=0
+          for i in {1..120}; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before boot completed." >&2
+              tail -n 250 "$PERF_DIR/emulator.log" >&2 || true
+              exit 1
+            fi
+
+            STATE="$("$ADB" get-state 2>/dev/null || true)"
+            BOOT="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [[ "$STATE" == "device" && "$BOOT" == "1" ]]; then
+              READY=1
+              break
+            fi
+
+            if (( i % 15 == 0 )); then
+              echo "Waiting for Android boot: attempt=$i state=${STATE:-none} boot=${BOOT:-0}"
+              "$ADB" devices -l || true
+            fi
+            sleep 2
+          done
+
+          if [[ "$READY" != "1" ]]; then
+            echo "Android emulator did not become ready within 240 seconds." >&2
+            "$ADB" devices -l >&2 || true
+            tail -n 250 "$PERF_DIR/emulator.log" >&2 || true
+            exit 1
+          fi
+
+          echo "Android emulator booted successfully."
+          "$ADB" shell getprop ro.build.fingerprint
+          "$ADB" shell getprop ro.product.cpu.abi
+          "$ADB" shell settings put global window_animation_scale 0
+          "$ADB" shell settings put global transition_animation_scale 0
+          "$ADB" shell settings put global animator_duration_scale 0
+      - name: Measure baseline and protected startup memory and size
+        run: |
+          ADB="$SDK_ROOT/platform-tools/adb"
+          python scripts/release/android-performance.py measure \
+            --adb "$ADB" \
+            --apk build/phase-n/android-perf/baseline.apk \
+            --package dev.nexora.shield.sample \
+            --activity .MainActivity \
+            --label baseline \
+            --warmups 5 \
+            --runs 20 \
+            --output build/phase-n/android-perf/baseline.json
+          python scripts/release/android-performance.py measure \
+            --adb "$ADB" \
+            --apk build/phase-n/android-perf/protected.apk \
+            --package dev.nexora.shield.sample \
+            --activity .MainActivity \
+            --label protected \
+            --warmups 5 \
+            --runs 20 \
+            --output build/phase-n/android-perf/protected.json
+          python scripts/release/android-performance.py compare \
+            --baseline build/phase-n/android-perf/baseline.json \
+            --protected build/phase-n/android-perf/protected.json \
+            --output build/phase-n/android-perf/comparison.json \
+            --max-startup-percent 100 \
+            --max-startup-delta-ms 250 \
+            --max-memory-percent 75 \
+            --max-size-percent 100
+
+      - name: Upload Android performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-n-android-performance
+          path: |
+            build/phase-n/android-perf/baseline.json
+            build/phase-n/android-perf/protected.json
+            build/phase-n/android-perf/comparison.json
+            build/phase-n/android-perf/protected-public-report.json
+            build/phase-n/android-perf/emulator.log
+            build/phase-n/android-perf/avd-list.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  external-assessment:
+    name: N.13 independent external assessment
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Analyze JVM surfaces
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
+
+
+  stable-qualification:
+    name: N.14 1.0 stable qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - release-contracts
+      - sbom-provenance
+      - migration-studio-retrace
+      - reviews
+      - release-msrv
+      - inherited-regressions
+      - android-stable-performance
+      - external-assessment
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate qualification policy
+        run: cargo run --locked --quiet -p nexora-shield-release -- qualification-validate release/qualification-policy.json
+
+      - name: Validate stable release metadata
+        run: python scripts/release/verify-release-metadata.py stable
+
+      - name: Validate external assessment gate
+        run: cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json
+
+      - name: Validate exact 1.0.0 stable version
+        run: |
+          python scripts/release/verify-version-sync.py 1.0.0
+          cargo run --locked --quiet -p nexora-shield-release -- version-check 1.0.0 stable
+

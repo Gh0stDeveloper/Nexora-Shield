@@ -342,8 +342,24 @@ Estado actual: **COMPLETADA**. M.1–M.12 están implementadas y validadas en `n
 ### N.10 Performance review
 ### N.11 Compatibility review
 ### N.12 1.0 release candidate
-### N.13 External feedback
+### N.13 External assessment and feedback
 ### N.14 1.0 stable
+
+Estado actual: **COMPLETADA — N.1–N.14**.
+
+Head estable validado: `ce92ea791dc860a505658a67be1b9250105a834a`.
+
+Evidencia final:
+- Phase N #86 (`37691051042`): **success**, 9/9 jobs.
+- N.14 stable qualification: **success**.
+- N.10 Android performance: **success**.
+- N.13 CodeQL: **success**.
+- Rust 1.81 MSRV: **success**.
+- Phase M #86 / Phase L #92 / Phase K #107: **success**.
+- CI #1156: **success**.
+- Fallos: **0**.
+
+La fuente queda finalizada en `1.0.0`. El tag/release `v1.0.0` se publica posteriormente desde el commit validado de `main`, nunca desde una rama de feature.
 
 ---
 

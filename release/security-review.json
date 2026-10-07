@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "reviewStage": "1.0-stable",
+  "criticalFindingsOpen": 0,
+  "highFindingsOpen": 0,
+  "blockingFindingsOpen": 0,
+  "evidence": [
+    "Phase M Security Lab",
+    "RustSec audit",
+    "Phase D anti-tamper E2E",
+    "Phase E RASP regression",
+    "Phase H cross-build portability"
+  ],
+  "note": "Internal production security review is clear for stable. Independent external assessment is tracked separately in release/feedback-status.json and is satisfied for the 1.0 line."
+}

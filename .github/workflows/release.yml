@@ -1,0 +1,163 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v1.0.0-rc.*"
+      - "v1.0.0"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Qualify release tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve release channel
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF_NAME" == v1.0.0-rc.* ]]; then
+            CHANNEL=rc
+          elif [[ "$GITHUB_REF_NAME" == v1.0.0 ]]; then
+            CHANNEL=stable
+          else
+            echo "unsupported release tag: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          echo "NEXORA_RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "NEXORA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
+
+      - name: Validate release contracts
+        run: |
+          python scripts/release/verify-version-sync.py "$NEXORA_RELEASE_VERSION"
+          python scripts/release/verify-api-freeze.py
+          python scripts/release/verify-schema-lock.py
+          python scripts/release/verify-docs.py
+          python scripts/release/verify-supply-chain.py
+          python scripts/release/verify-release-metadata.py "$NEXORA_RELEASE_CHANNEL"
+          cargo run --locked --quiet -p nexora-shield-release -- version-check "$NEXORA_RELEASE_VERSION" "$NEXORA_RELEASE_CHANNEL"
+          cargo run --locked --quiet -p nexora-shield-release -- qualification-validate release/qualification-policy.json
+
+      - name: Validate stable-only external feedback
+        if: env.NEXORA_RELEASE_CHANNEL == 'stable'
+        run: cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json
+
+  build:
+    name: Build ${{ matrix.os }}
+    needs: qualify
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Build CLI
+        run: cargo build --locked --release -p nexora-shield
+
+      - name: Build Shield Studio native distribution
+        run: gradle -p studio packageDistributionForCurrentOS --no-daemon --stacktrace
+
+      - name: Stage release artifacts
+        run: python scripts/release/stage-release.py "${{ runner.os }}"
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          path: build/release/stage/*/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Attest and publish
+    needs:
+      - qualify
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums SBOM and local provenance
+        shell: bash
+        run: |
+          mkdir -p release-metadata
+          python scripts/release/write-checksums.py dist release-metadata/SHA256SUMS
+          mapfile -t FILES < <(find dist -type f -print | sort)
+          test "${#FILES[@]}" -gt 0
+          python scripts/release/generate-provenance.py release-metadata/provenance.intoto.json "${FILES[@]}"
+          cargo metadata --locked --format-version 1 > release-metadata/cargo-metadata.json
+          python scripts/release/generate-sbom.py release-metadata/cargo-metadata.json release-metadata/nexora-shield.cdx.json
+          rm release-metadata/cargo-metadata.json
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/*
+            release-metadata/SHA256SUMS
+            release-metadata/provenance.intoto.json
+            release-metadata/nexora-shield.cdx.json
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          PRERELEASE=()
+          if [[ "$GITHUB_REF_NAME" == *"-rc."* ]]; then
+            PRERELEASE=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME"             dist/*             release-metadata/SHA256SUMS             release-metadata/provenance.intoto.json             release-metadata/nexora-shield.cdx.json             --title "Nexora Shield $GITHUB_REF_NAME"             --generate-notes             "${PRERELEASE[@]}"
