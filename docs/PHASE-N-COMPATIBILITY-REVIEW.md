@@ -9,7 +9,7 @@ The machine-readable compatibility contract is `../release/compatibility-matrix.
 | Rust | MSRV 1.81 |
 | Android | minSdk 24+ |
 | JDK | 17 |
-| Gradle | 9.6.0 |
+| Gradle | 9.7.0 |
 | Android Gradle Plugin | 9.4.1 |
 | Native ABIs | arm64-v8a, x86_64 |
 | Android artifacts | APK, AAB, AAR, APKS |
