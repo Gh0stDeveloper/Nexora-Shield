@@ -155,6 +155,8 @@ Estado actual: **COMPLETADA**. Las subfases D.1–D.10 están implementadas. Git
 Criterio:
 - correlación estable, políticas auditables y baja tasa de falsos positivos.
 
+Estado actual: **EN PROGRESO**. El bloque inicial E.1–E.4 está implementado en `nexora-shield-rasp` con API tipada de señales, evidencia de depuración, instrumentación y hook/inyección, además de pruebas de deduplicación y casos limpios. E.5–E.12 permanecen explícitamente pendientes y la fase no se considera cerrada.
+
 ---
 
 ## Fase F — Native Shield
