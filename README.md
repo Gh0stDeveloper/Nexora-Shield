@@ -27,11 +27,11 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 
 Its goal is not to claim that protected software is "unbreakable". Software executing on an attacker-controlled device can ultimately be inspected. The objective is to make analysis and modification substantially more expensive, reduce reusable bypasses, detect defined integrity violations, and keep defensive behavior measurable through repeatable tests.
 
-The current **1.0 release candidate line** covers the protection platform through **Phase M — Security Lab**. Phase N is the production-hardening and release-qualification stage.
+The protection platform through **Phase M — Security Lab** is complete. Phase N has completed RC qualification and is in the final **1.0.0 stable qualification** stage.
 
 | Area | Current state |
 | --- | --- |
-| Workspace version | **1.0.0-rc.1** |
+| Workspace version | **1.0.0** |
 | Rust MSRV | **1.81** |
 | Foundation | Completed |
 | APK packaging pipeline | Completed |
@@ -48,7 +48,7 @@ The current **1.0 release candidate line** covers the protection platform throug
 | Shield Studio | Completed |
 | Security Lab | Completed |
 | Production hardening | **1.0 RC qualification** |
-| Stable 1.0 | Blocked pending external RC feedback + device performance evidence |
+| Stable 1.0 | Final N.14 qualification/publication in progress; N.10 performance and N.13 external assessment are satisfied |
 
 ## Implemented Protection Layers
 
