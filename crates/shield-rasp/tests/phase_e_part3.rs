@@ -76,11 +76,13 @@ fn default_policy_is_monotonic_and_non_destructive() -> Result<(), PolicyError> 
 
 #[test]
 fn invalid_threshold_order_is_rejected() {
-    let mut spec = PolicySpec::default();
-    spec.thresholds = RiskThresholds {
-        elevated: 50,
-        high: 40,
-        critical: 80,
+    let spec = PolicySpec {
+        thresholds: RiskThresholds {
+            elevated: 50,
+            high: 40,
+            critical: 80,
+        },
+        ..PolicySpec::default()
     };
 
     assert_eq!(
