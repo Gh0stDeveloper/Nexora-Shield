@@ -134,7 +134,7 @@ This distinction prevents CI-host timings from being presented as Android runtim
 - Rust MSRV 1.81;
 - Android minSdk 24;
 - JDK 17;
-- Gradle 9.6.0;
+- Gradle 9.7.0;
 - Android Gradle Plugin 9.4.1;
 - arm64-v8a and x86_64 native ABIs;
 - APK, AAB, AAR and APKS;
