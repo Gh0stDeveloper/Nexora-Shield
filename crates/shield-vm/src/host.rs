@@ -53,7 +53,7 @@ impl VmHost for NullHost {
     fn load_field(
         &mut self,
         _object: Option<&VmValue>,
-        field: u32,
+        _field: u32,
         _constants: &ConstantPool,
     ) -> std::result::Result<VmValue, VmException> {
         Err(host_exception())
