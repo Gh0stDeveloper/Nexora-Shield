@@ -1,6 +1,10 @@
 * @Gh0stDeveloper
 
 /.github/ @Gh0stDeveloper
+/.github/workflows/ @Gh0stDeveloper
+/release/ @Gh0stDeveloper
+/schemas/ @Gh0stDeveloper
 /SECURITY.md @Gh0stDeveloper
 /docs/adr/ @Gh0stDeveloper
 /crates/ @Gh0stDeveloper
+/crates/shield-release/ @Gh0stDeveloper
