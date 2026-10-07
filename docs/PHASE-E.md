@@ -6,7 +6,7 @@ Phase E adds a portable Runtime Application Self-Protection evidence layer on to
 
 The design is evidence-first. Platform-specific adapters observe runtime state and submit normalized observations. The portable Rust core converts those observations into deterministic, auditable signals. Response policy and risk correlation are intentionally separate so a single detector cannot become a fragile central kill switch.
 
-## Part 1 scope — E.1 to E.4
+## Implemented scope — E.1 to E.7
 
 ### E.1 — Signal API
 
@@ -54,17 +54,55 @@ A debuggable application flag is informational by itself. Stronger observations 
 
 The portable core does not perform privileged scanning. Android/native collectors are adapters; the core validates and correlates their normalized observations. Native collection/hardening is expanded in Phase F.
 
+### E.5 — Modified-system evidence
+
+`ModifiedSystemEvaluator` consumes normalized platform evidence for:
+
+- unlocked bootloader state;
+- verified-boot state outside the expected green state;
+- permissive SELinux state;
+- writable protected system partitions;
+- root-management artifacts;
+- unexpected privileged-binary artifacts.
+
+Signals are independent. An unlocked bootloader or artifact count is not treated as conclusive compromise by itself.
+
+### E.6 — Emulator evidence
+
+`EmulatorEvaluator` distinguishes weak environmental hints from stronger virtualization evidence:
+
+- generic build profile;
+- emulator-like device profile;
+- QEMU transport evidence;
+- hypervisor artifacts;
+- sparse sensor profile;
+- missing telephony characteristics.
+
+Generic, sensor and telephony hints intentionally remain low-severity/weak evidence. Later risk policy must correlate them instead of blocking legitimate devices on a single heuristic.
+
+### E.7 — Integrity evidence fusion
+
+`IntegritySignalFusion` converts Phase D `IntegrityVerdict` failures into the common RASP signal model.
+
+Properties:
+
+- clean integrity verdicts emit no suspicious RASP signal;
+- each integrity failure remains independently addressable;
+- missing evidence is strong rather than falsely represented as an observed digest mismatch;
+- cryptographic/content mismatches are represented as definitive evidence;
+- failure category and node label are retained for audit;
+- expected and observed digest material is not copied into RASP signal details.
+
+This keeps Phase D as the source of truth for integrity while allowing E.8 Risk Engine to correlate integrity failures with runtime evidence.
+
 ## Security boundary
 
 RASP signals are evidence, not proof that client-side software is impossible to bypass. The system raises attack cost through multiple independent signals, later risk fusion, policy compilation and per-build diversity.
 
 ## Remaining Phase E work
 
-E.5–E.12 remain open after this part:
+E.8–E.12 remain open:
 
-- modified-system evidence;
-- emulator evidence;
-- integrity evidence fusion;
 - risk engine;
 - policy compiler;
 - responses;
