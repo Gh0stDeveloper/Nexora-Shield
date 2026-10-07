@@ -103,15 +103,11 @@ impl Interpreter {
                     let left_value = registers[usize::from(left.0)].as_int()?;
                     let right_value = registers[usize::from(right.0)].as_int()?;
                     if right_value == 0 {
-                        pc = dispatch_exception(
-                            method,
-                            &mut registers,
-                            pc,
-                            VmException {
-                                type_name: Some("Ljava/lang/ArithmeticException;".to_owned()),
-                                value: VmValue::Null,
-                            },
-                        )?;
+                        let exception = host.create_exception(
+                            "Ljava/lang/ArithmeticException;",
+                            &method.constants,
+                        );
+                        pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                     } else {
                         let value = if left_value == i32::MIN && right_value == -1 {
                             0
@@ -196,7 +192,7 @@ impl Interpreter {
                             pc += 1;
                         }
                         Err(exception) => {
-                            pc = dispatch_exception(method, &mut registers, pc, exception)?;
+                            pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                         }
                     }
                 }
@@ -206,7 +202,7 @@ impl Interpreter {
                         type_name: host.exception_type(&value, &method.constants),
                         value,
                     };
-                    pc = dispatch_exception(method, &mut registers, pc, exception)?;
+                    pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                 }
                 VmInstruction::Return { src } => {
                     return Ok(ExecutionResult {
