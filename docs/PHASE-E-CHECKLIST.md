@@ -111,4 +111,4 @@
 
 ## Closure state
 
-Phase E implementation is **COMPLETE, PENDING FINAL CI CLOSURE**. E.1–E.12 are implemented. E.1–E.7 were closed by CI #304. The phase is marked DONE only after the complete E.1–E.12 acceptance matrix, Rust quality, RustSec, MSRV and A–D regression gates are green on the final head.
+Phase E is **COMPLETED**. E.1–E.12 are implemented. GitHub Actions run #349 (`37559492616`) passed the complete acceptance matrix: Rust quality, RustSec, Phase A–D regressions, Phase E RASP E.1–E.12 and Rust 1.81 MSRV validation.
