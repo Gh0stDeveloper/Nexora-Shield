@@ -60,3 +60,16 @@ The workflow:
 ## Rollback
 
 A compromised or materially broken release must not be silently replaced. Publish a new version and clearly mark/revoke the affected release. Build/release evidence remains immutable.
+
+
+## Final 1.0 qualification evidence
+
+The stable source line was validated before merge at:
+
+- head: `ce92ea791dc860a505658a67be1b9250105a834a`;
+- Phase N #86 (`37691051042`): 9/9 jobs successful;
+- CI #1156: successful;
+- Phase M #86, Phase L #92 and Phase K #107: successful;
+- zero failed jobs.
+
+After this head is merged, the `v1.0.0` tag must be created from the resulting validated `main` commit. The tag triggers the attested release workflow; it must not be created from the feature branch.
