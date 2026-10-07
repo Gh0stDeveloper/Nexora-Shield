@@ -28,6 +28,22 @@ pub trait VmHost {
     fn exception_type(&self, _value: &VmValue, _constants: &ConstantPool) -> Option<String> {
         None
     }
+
+    fn create_exception(&mut self, type_name: &str, _constants: &ConstantPool) -> VmException {
+        VmException {
+            type_name: Some(type_name.to_owned()),
+            value: VmValue::Null,
+        }
+    }
+
+    fn exception_matches(
+        &self,
+        expected: &str,
+        actual: Option<&str>,
+        _constants: &ConstantPool,
+    ) -> bool {
+        actual == Some(expected)
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
