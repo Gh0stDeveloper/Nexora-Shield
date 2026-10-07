@@ -342,12 +342,10 @@ Estado actual: **COMPLETADA**. M.1–M.12 están implementadas y validadas en `n
 ### N.10 Performance review
 ### N.11 Compatibility review
 ### N.12 1.0 release candidate
-### N.13 External feedback
+### N.13 External assessment and feedback
 ### N.14 1.0 stable
 
-Estado actual: **N.1–N.12 IMPLEMENTADAS / EN VALIDACIÓN**. La rama `feat/phase-n-production-hardening` incorpora freeze de API/schema, migraciones, documentación, supply-chain policy, SBOM/provenance, pipeline de release con attestations, retrace contract tests y revisiones de seguridad/rendimiento/compatibilidad. La línea de versión es `1.0.0-rc.1`.
-
-**N.13 y N.14 permanecen deliberadamente abiertas**: stable `v1.0.0` exige feedback externo real y mediciones representativas de rendimiento Android; esos requisitos no se sustituyen por CI interno.
+Estado actual: **N.1–N.13 COMPLETADAS / N.14 EN VALIDACIÓN FINAL**. Phase N #54 (run `37686651703`) pasó 9/9 jobs sobre el head RC validado `d101cb457556ca077020ab1932f6632d8d55d0a1`, incluyendo N.10 Android performance, N.13 CodeQL, SBOM/provenance, Rust 1.81 y regresiones M/K/L. La fuente está promovida a `1.0.0` y el gate final N.14 exige metadata stable, evaluación externa, rendimiento representativo y versión sincronizada antes de publicar `v1.0.0`.
 
 ---
 
