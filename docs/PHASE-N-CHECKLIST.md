@@ -1,5 +1,7 @@
 # Phase N — Production Hardening checklist
 
+> **Historical closure record:** all Phase N items below remain completed in the Phase N scope. A later production-readiness audit opened Phase O and now blocks public stable `v1.0.0` publication until O.0–O.15 release-required gates close.
+
 ## N.1 API freeze candidate
 - [x] Machine-readable API contract
 - [x] Stable CLI command inventory
@@ -126,4 +128,4 @@ Final validation evidence:
 - CI #1156: **success**.
 - Failed jobs: **0**.
 
-The source contract is finalized at `1.0.0`. Creating the `v1.0.0` tag and GitHub Release is a post-merge distribution action and must originate from the validated `main` commit.
+The source contract reached `1.0.0` under Phase N. **Do not create the stable tag from Phase N evidence alone.** Phase O is now the authoritative final release gate; `v1.0.0` remains blocked until O.14 approves the exact final `main` commit and O.15 is ready.
