@@ -108,7 +108,7 @@
 - [x] Stable requires representative device measurements
 - [x] Stable requires exact 1.0.0 source version
 - [x] Final N.14 stable qualification CI gate
-- [x] Stable release pipeline ready for v1.0.0 publication from validated main
+- [x] Phase N-era stable release pipeline qualification passed — superseded by Phase O final production gate
 
 ## Closure state
 
