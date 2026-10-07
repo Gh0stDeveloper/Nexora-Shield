@@ -57,7 +57,13 @@ abstract class NexoraShieldRetraceTask : DefaultTask() {
 
         Files.newOutputStream(output.toPath()).use { stdout ->
             execOperations.exec {
-                commandLine(resolveRetraceExecutable(), mapping.absolutePath, trace.absolutePath)
+                commandLine(
+                    RetraceCommandBuilder.build(
+                        resolveRetraceExecutable(),
+                        mapping,
+                        trace,
+                    ),
+                )
                 standardOutput = stdout
             }
         }
