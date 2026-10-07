@@ -66,16 +66,66 @@ class StudioServicesTest {
     }
 
     @Test
-    fun artifactVerificationRoutesByExtension() {
+    fun artifactVerificationRoutesEverySupportedFormat() {
         val root = createTempDirectory("nexora-verifier")
+        val verifier = ArtifactVerifier()
+        val apk = root.resolve("app.apk")
         val aab = root.resolve("app.aab")
-        Files.write(aab, byteArrayOf(1))
-        val command = ArtifactVerifier().commandFor(aab, "nexora-shield")
-        assertEquals(listOf("nexora-shield", "aab-verify", aab.toAbsolutePath().normalize().toString()), command)
+        val aar = root.resolve("library.aar")
+        val apks = root.resolve("bundle.apks")
+        listOf(apk, aab, aar, apks).forEach { Files.write(it, byteArrayOf(1)) }
+
+        assertEquals(
+            listOf("nexora-shield", "verify", apk.toAbsolutePath().normalize().toString(), "--signature"),
+            verifier.commandFor(apk, "nexora-shield"),
+        )
+        assertEquals(
+            listOf("nexora-shield", "aab-verify", aab.toAbsolutePath().normalize().toString()),
+            verifier.commandFor(aab, "nexora-shield"),
+        )
+        assertEquals(
+            listOf("nexora-shield", "aar-verify", aar.toAbsolutePath().normalize().toString()),
+            verifier.commandFor(aar, "nexora-shield"),
+        )
+        assertEquals(
+            listOf("nexora-shield", "apks-verify", apks.toAbsolutePath().normalize().toString()),
+            verifier.commandFor(apks, "nexora-shield"),
+        )
 
         val unknown = root.resolve("artifact.zip")
         Files.write(unknown, byteArrayOf(1))
-        assertTrue(runCatching { ArtifactVerifier().commandFor(unknown, "nexora-shield") }.isFailure)
+        assertTrue(runCatching { verifier.commandFor(unknown, "nexora-shield") }.isFailure)
+    }
+
+    @Test
+    fun gradleTaskRoutingRejectsShellMetacharacters() {
+        val root = createTempDirectory("nexora-gradle")
+        val service = GradleBuildService()
+        assertEquals(
+            listOf("gradle", ":app:assembleRelease", "--no-daemon"),
+            service.commandForTask(root, ":app:assembleRelease"),
+        )
+        assertTrue(
+            runCatching { service.commandForTask(root, "assembleRelease;rm") }.isFailure,
+        )
+    }
+
+    @Test
+    fun retraceRoutingUsesExplicitArgumentVector() {
+        val root = createTempDirectory("nexora-retrace")
+        val mapping = root.resolve("mapping.txt")
+        val stacktrace = root.resolve("crash.log")
+        mapping.writeText("a -> b:")
+        stacktrace.writeText("java.lang.IllegalStateException")
+
+        assertEquals(
+            listOf(
+                "retrace",
+                mapping.toAbsolutePath().normalize().toString(),
+                stacktrace.toAbsolutePath().normalize().toString(),
+            ),
+            RetraceService().commandFor("retrace", mapping, stacktrace),
+        )
     }
 
     @Test
