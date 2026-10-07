@@ -822,3 +822,57 @@ jobs:
 
           cmp build/phase-f/reference/arm64.so build/phase-f/second/arm64-v8a/libnexora_shield_native.so
           cmp build/phase-f/reference/x86_64.so build/phase-f/second/x86_64/libnexora_shield_native.so
+
+
+  phase-g-vm:
+    name: Phase G VM Shield G.1-G.14
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test VM Shield
+        run: cargo test --locked -p nexora-shield-vm --all-targets
+
+      - name: Clippy VM Shield
+        run: cargo clippy --locked -p nexora-shield-vm --all-targets -- -D warnings
+
+  phase-g-vm-msrv:
+    name: Phase G VM Shield Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test VM Shield on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-vm --all-targets
+
+  phase-g-vm-differential-security:
+    name: Phase G differential + security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Differential semantics
+        run: cargo test --locked -p nexora-shield-vm --test differential
+
+      - name: VM security benchmark
+        run: cargo test --locked -p nexora-shield-vm --test security
