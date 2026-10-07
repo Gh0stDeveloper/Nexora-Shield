@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-pub const PRODUCTION_LINKER_ARGS: [&str; 3] = [
+pub const PRODUCTION_LINKER_ARGS: [&str; 4] = [
     "-Wl,-z,relro,-z,now",
     "-Wl,--gc-sections",
     "-Wl,--exclude-libs,ALL",
+    "-Wl,--build-id=none",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -14,6 +15,7 @@ pub struct HardeningProfile {
     pub garbage_collect_sections: bool,
     pub strip_symbols: bool,
     pub hide_archive_symbols: bool,
+    pub build_id_disabled: bool,
 }
 
 impl Default for HardeningProfile {
@@ -32,6 +34,7 @@ impl HardeningProfile {
             garbage_collect_sections: true,
             strip_symbols: true,
             hide_archive_symbols: true,
+            build_id_disabled: true,
         }
     }
 
@@ -43,5 +46,6 @@ impl HardeningProfile {
             && self.garbage_collect_sections
             && self.strip_symbols
             && self.hide_archive_symbols
+            && self.build_id_disabled
     }
 }
