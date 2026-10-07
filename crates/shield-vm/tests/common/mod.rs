@@ -1,6 +1,8 @@
+#![allow(dead_code)]
+
 use nexora_shield_dex::{
     ClassData, ClassDef, CodeItem, DexFile, DexHeader, DexString, EncodedMethod, Instruction,
-    MethodId, ProtoId, TypeId, NO_INDEX, ACC_STATIC, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE,
+    MethodId, ProtoId, TypeId, ACC_STATIC, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE, NO_INDEX,
 };
 use std::collections::BTreeMap;
 
@@ -171,10 +173,7 @@ fn dex_with_code(
             data_off: 0,
         },
         strings,
-        types: vec![
-            TypeId { descriptor_idx: 0 },
-            TypeId { descriptor_idx: 1 },
-        ],
+        types: vec![TypeId { descriptor_idx: 0 }, TypeId { descriptor_idx: 1 }],
         protos: vec![ProtoId {
             shorty_idx: 0,
             return_type_idx: 0,
