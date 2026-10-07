@@ -3,7 +3,7 @@
 use nexora_shield_diversity::{BuildDiversitySignature, DiversitySurface};
 use nexora_shield_lab::{
     AuditEvidenceClass, AuditEvidenceItem, AuditPreparation, AuditReadinessInput,
-    ComparativeBenchmarkMethodology, ExposureRule, FuzzFarm, ModifiedEnvironmentCase,
+    AuditRequirement, BenchmarkControl, ComparativeBenchmarkMethodology, ExposureRule, FuzzFarm, ModifiedEnvironmentCase,
     ModifiedEnvironmentLab, PerformanceBudget, PerformanceFarm, PerformanceSample, PortabilityLab,
     RegressionCorpus, RuntimeInstrumentationCase, RuntimeInstrumentationLab, SecurityControlResult,
     SecurityScore, StaticExposureHarness, TamperKind, TamperLab, TamperObservation,
@@ -12,7 +12,7 @@ use nexora_shield_rasp::{
     CompiledPolicy, EmulatorObservation, HookInjectionObservation, InstrumentationObservation,
     ModifiedSystemObservation, PolicySpec, RaspResponse, RiskLevel,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
 fn m1_static_exposure_harness_detects_synthetic_plaintext() {
@@ -215,18 +215,21 @@ fn m11_comparative_benchmark_methodology_is_strict_by_default() {
     let methodology = ComparativeBenchmarkMethodology::default();
     methodology.validate().expect("strict methodology");
     assert!(methodology.measured_runs >= 10);
-    assert!(methodology.retain_raw_samples);
+    assert!(methodology.controls.contains(&BenchmarkControl::RetainRawSamples));
 }
 
 #[test]
 fn m12_external_audit_preparation_rejects_unredacted_confidential_evidence() {
+    let requirements_present = BTreeSet::from([
+        AuditRequirement::ThreatModel,
+        AuditRequirement::SecurityPolicy,
+        AuditRequirement::PhaseChecklists,
+        AuditRequirement::RegressionCorpus,
+        AuditRequirement::BenchmarkMethodology,
+        AuditRequirement::CiEvidence,
+    ]);
     let safe = AuditPreparation::evaluate(&AuditReadinessInput {
-        threat_model_present: true,
-        security_policy_present: true,
-        phase_checklists_present: true,
-        regression_corpus_present: true,
-        benchmark_methodology_present: true,
-        ci_evidence_present: true,
+        requirements_present: requirements_present.clone(),
         evidence: vec![AuditEvidenceItem {
             id: "public-report".into(),
             relative_path: "reports/security-lab.json".into(),
@@ -238,12 +241,7 @@ fn m12_external_audit_preparation_rejects_unredacted_confidential_evidence() {
     assert!(safe.ready);
 
     let unsafe_report = AuditPreparation::evaluate(&AuditReadinessInput {
-        threat_model_present: true,
-        security_policy_present: true,
-        phase_checklists_present: true,
-        regression_corpus_present: true,
-        benchmark_methodology_present: true,
-        ci_evidence_present: true,
+        requirements_present,
         evidence: vec![AuditEvidenceItem {
             id: "private-manifest".into(),
             relative_path: "private/manifest.json".into(),
