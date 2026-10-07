@@ -2,6 +2,7 @@ use crate::constant_pool::VmConstant;
 use crate::error::{Result, VmError};
 use crate::host::VmHost;
 use crate::ir::{BranchCondition, VmException, VmInstruction, VmMethod, VmRegister};
+use crate::opcode::{OpcodeAllocation, OpcodeStream};
 use crate::value::VmValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,6 +221,19 @@ impl Interpreter {
         }
 
         Err(VmError::MissingReturn)
+    }
+
+    pub fn execute_stream<H: VmHost>(
+        method: &VmMethod,
+        stream: &OpcodeStream,
+        allocation: &OpcodeAllocation,
+        args: &[VmValue],
+        host: &mut H,
+        config: ExecutionConfig,
+    ) -> Result<ExecutionResult> {
+        let mut decoded = method.clone();
+        decoded.instructions = stream.decode(allocation)?;
+        Self::execute(&decoded, args, host, config)
     }
 }
 
