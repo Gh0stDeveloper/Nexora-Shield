@@ -222,6 +222,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexora-shield-vm"
+version = "0.1.0"
+dependencies = [
+ "hmac",
+ "nexora-shield-dex",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "nexora-shield-package"
 version = "0.1.0"
 
