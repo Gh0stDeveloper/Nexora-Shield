@@ -4,7 +4,8 @@ use common::{add_dex, orphan_move_result_dex, unsupported_dex};
 use nexora_shield_vm::{
     BranchCondition, ConstantPool, DexLowerer, EligibilityAnalyzer, EligibilityPolicy,
     ExecutionConfig, Interpreter, MetadataSealer, NullHost, OpcodeAllocation, OpcodeStream,
-    PerformanceEstimator, SelectionPlanner, VmConstant, VmError, VmException, VmExceptionHandler,
+    PerformanceEstimator, SealedExecution, SelectionPlanner, VmConstant, VmError, VmException,
+    VmExceptionHandler,
     VmHost, VmInstruction, VmMethod, VmRegister, VmSelectionConfig, VmSelectionMode, VmSelector,
     VmValue,
 };
