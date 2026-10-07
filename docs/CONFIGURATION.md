@@ -347,7 +347,7 @@ build:
   maxCrossBuildTransferBasisPoints: 3000
 ~~~
 
-El proveedor de secretos debe entregar una seed privada y un nonce nuevo para cada build normal.
+El proveedor de secretos debe entregar una seed privada de al menos 32 bytes y un nonce nuevo para cada build normal.
 
 Modo reproducible privado:
 
