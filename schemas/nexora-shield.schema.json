@@ -224,7 +224,50 @@
     },
     "rasp": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": {
+          "type": "string",
+          "enum": ["enforce", "report_only"]
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["elevated", "high", "critical"],
+          "properties": {
+            "elevated": { "type": "integer", "minimum": 1 },
+            "high": { "type": "integer", "minimum": 2 },
+            "critical": { "type": "integer", "minimum": 3 }
+          }
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clean": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            },
+            "observed": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            },
+            "elevated": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            },
+            "high": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            },
+            "critical": {
+              "type": "string",
+              "enum": ["continue", "report", "require_reverification", "deny_sensitive_operation"]
+            }
+          }
+        }
+      }
     },
     "native": {
       "type": "object",

@@ -655,3 +655,39 @@ jobs:
       - name: Check CLI on declared MSRV
         run: cargo +1.81.0 check --locked -p nexora-shield
 
+
+
+  phase-e-rasp-e1-e12:
+    name: Phase E RASP E.1-E.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test RASP evidence crate
+        run: cargo test --locked -p nexora-shield-rasp --all-targets
+
+      - name: Clippy RASP evidence crate
+        run: cargo clippy --locked -p nexora-shield-rasp --all-targets -- -D warnings
+
+  phase-e-rasp-e1-e12-msrv:
+    name: Phase E RASP E.1-E.12 Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test RASP evidence crate on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-rasp --all-targets

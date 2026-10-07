@@ -205,6 +205,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexora-shield-rasp"
+version = "0.1.0"
+dependencies = [
+ "nexora-shield-integrity",
+ "serde",
+]
+
+[[package]]
 name = "nexora-shield-package"
 version = "0.1.0"
 
