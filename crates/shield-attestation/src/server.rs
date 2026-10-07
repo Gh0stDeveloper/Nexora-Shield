@@ -169,7 +169,6 @@ impl AttestationEvidenceVerifier for SampleHmacEvidenceAuthenticator {
             return Err(AttestationError::InvalidProvider);
         }
 
-        let expected = self.token_for(challenge)?;
         let mut mac = HmacSha256::new_from_slice(&self.key)
             .map_err(|error| AttestationError::Authentication(error.to_string()))?;
         append_component(&mut mac, b"nexora-shield/sample-attestation-token/v1");
@@ -183,11 +182,6 @@ impl AttestationEvidenceVerifier for SampleHmacEvidenceAuthenticator {
         mac.verify_slice(&evidence.token)
             .map_err(|_| AttestationError::EvidenceRejected("sample token MAC mismatch".into()))?;
 
-        if expected.len() != evidence.token.len() {
-            return Err(AttestationError::EvidenceRejected(
-                "sample token length mismatch".into(),
-            ));
-        }
 
         Ok(AttestationVerification {
             provider: self.provider.clone(),
