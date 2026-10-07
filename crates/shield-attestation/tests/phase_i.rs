@@ -199,8 +199,8 @@ fn i4_server_sample_verifies_and_consumes_rejected_attempts(
 fn i5_signed_policy_rejects_tamper_and_sequence_rollback() -> Result<(), Box<dyn std::error::Error>>
 {
     let (envelope, verifier) = signed_policy(base_policy())?;
-    let verified = envelope.verify(&verifier, "dev.nexora.sample", 40, NOW)?;
-    assert_eq!(verified.payload().sequence, 42);
+    let accepted_policy = envelope.verify(&verifier, "dev.nexora.sample", 40, NOW)?;
+    assert_eq!(accepted_policy.payload().sequence, 42);
 
     assert!(matches!(
         envelope.verify(&verifier, "dev.nexora.sample", 43, NOW),
