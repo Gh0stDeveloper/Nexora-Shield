@@ -74,7 +74,6 @@ pub struct AbiPolicy {
     additional: BTreeSet<Abi>,
 }
 
-
 impl AbiPolicy {
     #[must_use]
     pub fn with_additional(allow_32_bit: bool, additional: impl IntoIterator<Item = Abi>) -> Self {
