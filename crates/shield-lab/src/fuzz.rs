@@ -67,11 +67,7 @@ fn mutate(seed: &[u8], index: usize) -> Vec<u8> {
             output.truncate(new_len);
         }
         2 => {
-            output.extend_from_slice(&[
-                0x4E,
-                0x58,
-                u8::try_from(index & 0xFF).unwrap_or(0xFF),
-            ]);
+            output.extend_from_slice(&[0x4E, 0x58, u8::try_from(index & 0xFF).unwrap_or(0xFF)]);
         }
         _ => {
             if output.len() > 1 {
