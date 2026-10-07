@@ -1,7 +1,7 @@
 use crate::error::{DiversityError, Result};
 use crate::seed::{DiversityDomain, SeedDeriver};
 use nexora_shield_integrity::{
-    IntegrityEdge, IntegrityGraph, IntegrityNodeKind, Sha256Digest,
+    IntegrityEdge, IntegrityGraph, IntegrityNode, IntegrityNodeKind, Sha256Digest,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -28,96 +28,10 @@ impl IntegrityTopologyPlan {
             .validate()
             .map_err(|error| DiversityError::Integrity(error.to_string()))?;
 
-        let certificate = graph
-            .nodes
-            .iter()
-            .find(|node| node.kind == IntegrityNodeKind::Certificate)
-            .ok_or(DiversityError::MissingCertificateRoot)?;
-        let package = graph
-            .nodes
-            .iter()
-            .find(|node| node.kind == IntegrityNodeKind::Package)
-            .ok_or(DiversityError::MissingPackageNode)?;
-
-        let mut keyed_remaining = graph
-            .nodes
-            .iter()
-            .filter(|node| node.id != certificate.id && node.id != package.id)
-            .map(|node| {
-                Ok((
-                    seed.derive_u64(
-                        DiversityDomain::IntegrityTopology,
-                        node.label.as_bytes(),
-                    )?,
-                    node.clone(),
-                ))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        keyed_remaining.sort_by(|(left_key, left), (right_key, right)| {
-            left_key.cmp(right_key).then_with(|| left.id.cmp(&right.id))
-        });
-        let remaining = keyed_remaining
-            .into_iter()
-            .map(|(_, node)| node)
-            .collect::<Vec<_>>();
-
-        let variant_selector =
-            seed.derive_u64(DiversityDomain::IntegrityTopology, b"topology-variant")?;
-        let variant = match variant_selector % 3 {
-            0 => IntegrityTopologyVariant::SeededTree,
-            1 => IntegrityTopologyVariant::LayeredFanout,
-            _ => IntegrityTopologyVariant::SeededChain,
-        };
-
-        let mut edges = vec![IntegrityEdge {
-            from: certificate.id,
-            to: package.id,
-        }];
-
-        match variant {
-            IntegrityTopologyVariant::SeededTree => {
-                let mut parents = vec![package.id];
-                for node in &remaining {
-                    let selector = seed.derive_u64(
-                        DiversityDomain::IntegrityTopology,
-                        node.label.as_bytes(),
-                    )?;
-                    let parent = parents[usize::try_from(
-                        selector % u64::try_from(parents.len()).unwrap_or(u64::MAX),
-                    )
-                    .unwrap_or(0)];
-                    edges.push(IntegrityEdge {
-                        from: parent,
-                        to: node.id,
-                    });
-                    parents.push(node.id);
-                }
-            }
-            IntegrityTopologyVariant::LayeredFanout => {
-                for (index, node) in remaining.iter().enumerate() {
-                    let parent = if index < 2 {
-                        package.id
-                    } else {
-                        remaining[(index - 2) / 2].id
-                    };
-                    edges.push(IntegrityEdge {
-                        from: parent,
-                        to: node.id,
-                    });
-                }
-            }
-            IntegrityTopologyVariant::SeededChain => {
-                let mut parent = package.id;
-                for node in &remaining {
-                    edges.push(IntegrityEdge {
-                        from: parent,
-                        to: node.id,
-                    });
-                    parent = node.id;
-                }
-            }
-        }
-
+        let (certificate, package) = root_nodes(graph)?;
+        let remaining = ordered_remaining(seed, graph, certificate.id, package.id)?;
+        let variant = topology_variant(seed)?;
+        let edges = build_edges(seed, variant, certificate.id, package.id, &remaining)?;
         let diversified = graph
             .with_edges(edges.clone())
             .map_err(|error| DiversityError::Integrity(error.to_string()))?;
@@ -133,6 +47,109 @@ impl IntegrityTopologyPlan {
             diversified,
         ))
     }
+}
+
+fn root_nodes(graph: &IntegrityGraph) -> Result<(&IntegrityNode, &IntegrityNode)> {
+    let certificate = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == IntegrityNodeKind::Certificate)
+        .ok_or(DiversityError::MissingCertificateRoot)?;
+    let package = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == IntegrityNodeKind::Package)
+        .ok_or(DiversityError::MissingPackageNode)?;
+    Ok((certificate, package))
+}
+
+fn ordered_remaining(
+    seed: &SeedDeriver,
+    graph: &IntegrityGraph,
+    certificate: Sha256Digest,
+    package: Sha256Digest,
+) -> Result<Vec<IntegrityNode>> {
+    let mut keyed = graph
+        .nodes
+        .iter()
+        .filter(|node| node.id != certificate && node.id != package)
+        .map(|node| {
+            Ok((
+                seed.derive_u64(DiversityDomain::IntegrityTopology, node.label.as_bytes())?,
+                node.clone(),
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    keyed.sort_by(|(left_key, left), (right_key, right)| {
+        left_key.cmp(right_key).then_with(|| left.id.cmp(&right.id))
+    });
+    Ok(keyed.into_iter().map(|(_, node)| node).collect())
+}
+
+fn topology_variant(seed: &SeedDeriver) -> Result<IntegrityTopologyVariant> {
+    let selector = seed.derive_u64(DiversityDomain::IntegrityTopology, b"topology-variant")?;
+    Ok(match selector % 3 {
+        0 => IntegrityTopologyVariant::SeededTree,
+        1 => IntegrityTopologyVariant::LayeredFanout,
+        _ => IntegrityTopologyVariant::SeededChain,
+    })
+}
+
+fn build_edges(
+    seed: &SeedDeriver,
+    variant: IntegrityTopologyVariant,
+    certificate: Sha256Digest,
+    package: Sha256Digest,
+    remaining: &[IntegrityNode],
+) -> Result<Vec<IntegrityEdge>> {
+    let mut edges = vec![IntegrityEdge {
+        from: certificate,
+        to: package,
+    }];
+
+    match variant {
+        IntegrityTopologyVariant::SeededTree => {
+            let mut parents = vec![package];
+            for node in remaining {
+                let selector =
+                    seed.derive_u64(DiversityDomain::IntegrityTopology, node.label.as_bytes())?;
+                let parent_index = usize::try_from(
+                    selector % u64::try_from(parents.len()).unwrap_or(u64::MAX),
+                )
+                .unwrap_or(0);
+                edges.push(IntegrityEdge {
+                    from: parents[parent_index],
+                    to: node.id,
+                });
+                parents.push(node.id);
+            }
+        }
+        IntegrityTopologyVariant::LayeredFanout => {
+            for (index, node) in remaining.iter().enumerate() {
+                let parent = if index < 2 {
+                    package
+                } else {
+                    remaining[(index - 2) / 2].id
+                };
+                edges.push(IntegrityEdge {
+                    from: parent,
+                    to: node.id,
+                });
+            }
+        }
+        IntegrityTopologyVariant::SeededChain => {
+            let mut parent = package;
+            for node in remaining {
+                edges.push(IntegrityEdge {
+                    from: parent,
+                    to: node.id,
+                });
+                parent = node.id;
+            }
+        }
+    }
+
+    Ok(edges)
 }
 
 fn topology_fingerprint(
