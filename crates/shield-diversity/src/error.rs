@@ -12,6 +12,7 @@ pub enum DiversityError {
     MissingCertificateRoot,
     MissingPackageNode,
     Integrity(String),
+    Cfg(String),
     Vm(String),
     Native(String),
     Encoding(String),
@@ -34,6 +35,7 @@ impl fmt::Display for DiversityError {
                 formatter.write_str("integrity graph has no package node")
             }
             Self::Integrity(message) => write!(formatter, "integrity diversification failed: {message}"),
+            Self::Cfg(message) => write!(formatter, "CFG diversification failed: {message}"),
             Self::Vm(message) => write!(formatter, "VM diversification failed: {message}"),
             Self::Native(message) => write!(formatter, "native diversification failed: {message}"),
             Self::Encoding(message) => write!(formatter, "diversity encoding failed: {message}"),
