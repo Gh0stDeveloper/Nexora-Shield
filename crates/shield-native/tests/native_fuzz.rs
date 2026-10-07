@@ -20,9 +20,7 @@ fn fuzz_native_region_mutations_never_match_original() -> Result<(), NativeError
         let state_value = next_state(&mut state);
         let length = u64::try_from(mutated.len()).unwrap_or(u64::MAX);
         let index = usize::try_from(state_value % length).unwrap_or(0);
-        let delta = u8::try_from((state_value >> 32) & 0xff)
-            .unwrap_or(1)
-            .max(1);
+        let delta = u8::try_from((state_value >> 32) & 0xff).unwrap_or(1).max(1);
         mutated[index] ^= delta;
         assert!(!region.verify(&mutated).matched);
     }
