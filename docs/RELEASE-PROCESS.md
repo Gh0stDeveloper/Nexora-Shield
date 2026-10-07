@@ -5,42 +5,57 @@
 - Release candidate: `v1.0.0-rc.N`
 - Stable: `v1.0.0`
 
-Stable cannot be used as a shortcut around the RC process.
+Stable cannot bypass RC-equivalent qualification.
 
 ## RC qualification
 
-Before creating an RC tag:
+The 1.0 RC line must satisfy:
 
-1. merge the release candidate code into `main`;
-2. confirm Phase M, Phase L, Phase K and repository CI are green;
-3. confirm Phase N is green;
-4. confirm `scripts/release/verify-version-sync.py 1.0.0-rc.1`;
-5. confirm API/schema locks;
-6. generate SBOM and provenance;
-7. confirm internal security/performance/compatibility reviews;
-8. create `v1.0.0-rc.1`.
+1. Phase M, L, K and repository regressions;
+2. Phase N release contracts;
+3. API/schema locks and migrations;
+4. SBOM/provenance;
+5. retrace validation;
+6. security/performance/compatibility reviews;
+7. independent external assessment.
 
-The release workflow builds platform artifacts, generates checksums and provenance, creates GitHub attestations and publishes the RC as a prerelease.
+For the 1.0 line, Phase N #54 (run `37686651703`) is the retained RC qualification evidence and passed 9/9 jobs.
 
-## External feedback
+Publishing an RC tag is a distribution step. It does not replace qualification, and stable cannot be promoted from code that lacks retained RC-equivalent evidence.
 
-RC users report feedback through the [RC feedback guide](RC-FEEDBACK.md) and GitHub issue form.
+## Human feedback
 
-Accepted external review evidence is recorded in `../release/feedback-status.json`. Do not increment reviewer counts for internal CI or self-review.
+Human feedback is collected through the [external assessment and feedback guide](RC-FEEDBACK.md) and GitHub issue form.
+
+Human findings are supplementary to the required independent assessment. A recorded blocking external finding always blocks stable.
 
 ## Stable qualification
 
 Before `v1.0.0`:
 
-1. at least the configured number of real external reviewers must be recorded;
+1. the configured independent external assessment must be recorded;
 2. blocking external findings must be zero;
-3. representative-device performance measurements must be complete;
+3. N.10 representative Android performance evidence must be complete;
 4. all Phase N stable gates must pass;
-5. versions must be changed exactly to `1.0.0`;
-6. changelog/release notes must reflect the final RC delta;
-7. create the stable tag only from the validated `main` commit.
+5. versions must be exactly `1.0.0`;
+6. changelog/release notes must reflect the stable promotion;
+7. the stable tag must be created only from the validated `main` commit.
 
-The release workflow fails closed if stable prerequisites are not satisfied.
+The release workflow fails closed if any stable prerequisite is missing.
+
+## Stable publication
+
+The `v1.0.0` tag triggers `.github/workflows/release.yml`.
+
+The workflow:
+
+- validates stable metadata and synchronized version;
+- builds CLI + Shield Studio on Linux/macOS/Windows;
+- stages deterministic platform artifacts;
+- generates SHA-256 checksums;
+- generates CycloneDX SBOM and local provenance;
+- emits GitHub build-provenance attestations;
+- publishes the stable GitHub Release.
 
 ## Rollback
 
