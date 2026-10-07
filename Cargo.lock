@@ -234,6 +234,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexora-shield-lab"
+version = "0.1.0"
+dependencies = [
+ "nexora-shield-diversity",
+ "nexora-shield-rasp",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "nexora-shield-native"
 version = "0.1.0"
 dependencies = [
