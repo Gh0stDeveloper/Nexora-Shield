@@ -57,6 +57,8 @@ import dev.nexora.shield.studio.ui.Panel
 import dev.nexora.shield.studio.ui.ShieldColors
 import dev.nexora.shield.studio.ui.ShieldTone
 import dev.nexora.shield.studio.ui.StatusPill
+import dev.nexora.shield.studio.ui.FeedbackLevel
+import dev.nexora.shield.studio.ui.StudioFeedbackPolicy
 import dev.nexora.shield.studio.ui.chooseFile
 import kotlinx.coroutines.launch
 
@@ -877,14 +879,11 @@ private fun StatusBanner(
     message: String,
     busy: Boolean,
 ) {
-    val tone = when {
-        busy -> ShieldTone.Info
-        message.contains("failed", ignoreCase = true) -> ShieldTone.Danger
-        message.contains("success", ignoreCase = true) ||
-            message.contains("saved", ignoreCase = true) ||
-            message.contains("imported", ignoreCase = true) ||
-            message.contains("loaded", ignoreCase = true) -> ShieldTone.Success
-        else -> ShieldTone.Neutral
+    val tone = when (StudioFeedbackPolicy.classify(message, busy)) {
+        FeedbackLevel.Working -> ShieldTone.Info
+        FeedbackLevel.Error -> ShieldTone.Danger
+        FeedbackLevel.Success -> ShieldTone.Success
+        FeedbackLevel.Neutral -> ShieldTone.Neutral
     }
 
     Panel {
