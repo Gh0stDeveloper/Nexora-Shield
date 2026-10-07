@@ -7,8 +7,10 @@ use nexora_shield_rasp::{
 
 #[test]
 fn report_only_mode_never_enforces_a_blocking_response() -> Result<(), PolicyError> {
-    let mut spec = PolicySpec::default();
-    spec.mode = PolicyMode::ReportOnly;
+    let spec = PolicySpec {
+        mode: PolicyMode::ReportOnly,
+        ..PolicySpec::default()
+    };
     let policy = CompiledPolicy::compile(spec)?;
 
     let signals = DebugEvaluator::evaluate(&DebugObservation {
@@ -98,7 +100,7 @@ fn false_positive_matrix_passes_expected_benign_profiles() -> Result<(), PolicyE
     let report = FalsePositiveLab::run(&policy, &cases);
     assert_eq!(report.cases_total, 6);
     assert_eq!(report.cases_passed, 6);
-    assert!(report.failures.is_empty());
+    assert_eq!(report.failures.len(), 0);
     Ok(())
 }
 
