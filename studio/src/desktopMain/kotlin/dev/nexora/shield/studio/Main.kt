@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.nexora.shield.studio.ui.NexoraShieldTheme
+import dev.nexora.shield.studio.ui.StudioLayoutPolicy
 import java.awt.Dimension
 
 fun main() = application {
@@ -15,7 +16,7 @@ fun main() = application {
         state = rememberWindowState(width = 1440.dp, height = 900.dp),
     ) {
         LaunchedEffect(Unit) {
-            window.minimumSize = Dimension(980, 680)
+            window.minimumSize = Dimension(\n                StudioLayoutPolicy.minimumWindowWidthPx,\n                StudioLayoutPolicy.minimumWindowHeightPx,\n            )
         }
         NexoraShieldTheme {
             StudioApp()
