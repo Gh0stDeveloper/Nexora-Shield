@@ -245,6 +245,7 @@ impl VmHost for MemoryHost {
         &mut self,
         _object: Option<&VmValue>,
         field: u32,
+        _constants: &ConstantPool,
     ) -> std::result::Result<VmValue, VmException> {
         Ok(self.fields.get(&field).cloned().unwrap_or(VmValue::Null))
     }
@@ -254,6 +255,7 @@ impl VmHost for MemoryHost {
         _object: Option<&VmValue>,
         field: u32,
         value: &VmValue,
+        _constants: &ConstantPool,
     ) -> std::result::Result<(), VmException> {
         self.fields.insert(field, value.clone());
         Ok(())
@@ -263,6 +265,7 @@ impl VmHost for MemoryHost {
         &mut self,
         method: u32,
         args: &[VmValue],
+        _constants: &ConstantPool,
     ) -> std::result::Result<VmValue, VmException> {
         if method == 7 {
             let value = args
