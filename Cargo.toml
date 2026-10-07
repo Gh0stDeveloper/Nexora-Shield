@@ -9,6 +9,7 @@ members = [
     "crates/shield-crypto",
     "crates/shield-integrity",
     "crates/shield-lab",
+    "crates/shield-release",
     "crates/shield-native",
     "crates/shield-rasp",
     "crates/shield-vm",
@@ -16,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0-rc.1"
 edition = "2021"
 rust-version = "1.81"
 publish = false
