@@ -53,10 +53,11 @@ jobs:
           grep -q '"application"' build-migrated.json
           grep -q '"dex"' build-migrated.json
 
-      - name: Validate documentation and supply chain
+      - name: Validate documentation supply chain and release workflow
         run: |
           python scripts/release/verify-docs.py
           python scripts/release/verify-supply-chain.py
+          python scripts/release/verify-release-workflow.py
 
       - name: Validate version synchronization
         run: python scripts/release/verify-version-sync.py 1.0.0-rc.1
