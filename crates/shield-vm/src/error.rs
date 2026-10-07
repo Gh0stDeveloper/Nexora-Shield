@@ -9,6 +9,7 @@ pub enum VmError {
     EmptySealKey,
     IneligibleMethod { method_idx: u32, reason: String },
     UnsupportedDexOpcode { offset: u32, opcode: u8 },
+    InvalidDexReference { offset: u32, expected: &'static str },
     InvalidRegister(u16),
     InvalidConstant(u16),
     InvalidJump { from: usize, target: usize },
@@ -37,6 +38,9 @@ impl fmt::Display for VmError {
             }
             Self::UnsupportedDexOpcode { offset, opcode } => {
                 write!(formatter, "unsupported DEX opcode 0x{opcode:02x} at code offset {offset}")
+            }
+            Self::InvalidDexReference { offset, expected } => {
+                write!(formatter, "DEX instruction at offset {offset} is missing {expected} reference")
             }
             Self::InvalidRegister(register) => write!(formatter, "invalid VM register v{register}"),
             Self::InvalidConstant(index) => write!(formatter, "invalid VM constant #{index}"),
