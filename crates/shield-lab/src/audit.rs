@@ -1,5 +1,31 @@
 use crate::error::{LabError, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditRequirement {
+    ThreatModel,
+    SecurityPolicy,
+    PhaseChecklists,
+    RegressionCorpus,
+    BenchmarkMethodology,
+    CiEvidence,
+}
+
+impl AuditRequirement {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ThreatModel => "threat model",
+            Self::SecurityPolicy => "security policy",
+            Self::PhaseChecklists => "phase checklists",
+            Self::RegressionCorpus => "regression corpus",
+            Self::BenchmarkMethodology => "benchmark methodology",
+            Self::CiEvidence => "CI evidence",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -19,12 +45,7 @@ pub struct AuditEvidenceItem {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuditReadinessInput {
-    pub threat_model_present: bool,
-    pub security_policy_present: bool,
-    pub phase_checklists_present: bool,
-    pub regression_corpus_present: bool,
-    pub benchmark_methodology_present: bool,
-    pub ci_evidence_present: bool,
+    pub requirements_present: BTreeSet<AuditRequirement>,
     pub evidence: Vec<AuditEvidenceItem>,
 }
 
@@ -40,25 +61,19 @@ pub struct AuditPreparation;
 
 impl AuditPreparation {
     pub fn evaluate(input: &AuditReadinessInput) -> Result<AuditReadinessReport> {
-        let mut missing_requirements = Vec::new();
-        if !input.threat_model_present {
-            missing_requirements.push("threat model".to_owned());
-        }
-        if !input.security_policy_present {
-            missing_requirements.push("security policy".to_owned());
-        }
-        if !input.phase_checklists_present {
-            missing_requirements.push("phase checklists".to_owned());
-        }
-        if !input.regression_corpus_present {
-            missing_requirements.push("regression corpus".to_owned());
-        }
-        if !input.benchmark_methodology_present {
-            missing_requirements.push("benchmark methodology".to_owned());
-        }
-        if !input.ci_evidence_present {
-            missing_requirements.push("CI evidence".to_owned());
-        }
+        let required = [
+            AuditRequirement::ThreatModel,
+            AuditRequirement::SecurityPolicy,
+            AuditRequirement::PhaseChecklists,
+            AuditRequirement::RegressionCorpus,
+            AuditRequirement::BenchmarkMethodology,
+            AuditRequirement::CiEvidence,
+        ];
+        let missing_requirements = required
+            .into_iter()
+            .filter(|requirement| !input.requirements_present.contains(requirement))
+            .map(|requirement| requirement.label().to_owned())
+            .collect::<Vec<_>>();
 
         let mut unsafe_evidence = Vec::new();
         for evidence in &input.evidence {
