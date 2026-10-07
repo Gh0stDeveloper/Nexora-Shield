@@ -1,20 +1,36 @@
-# Nexora Shield 1.0 RC feedback
+# Nexora Shield 1.0 external assessment and feedback
 
-N.13 requires real external feedback before stable 1.0.
+N.13 has two distinct channels: a machine-enforced independent assessment gate and optional human RC feedback.
 
-## What to test
+## Independent assessment gate
 
-Useful RC feedback includes:
+The stable release policy requires at least one external assessment provider.
 
-- installation/build setup;
+For 1.0, the recorded provider is **GitHub CodeQL**:
+
+- Phase N #54;
+- run `37686651703`;
+- job `N.13 independent external assessment`;
+- conclusion: `success`.
+
+This evidence is recorded in `../release/feedback-status.json`.
+
+Internal unit tests and self-review do not count as the independent assessment.
+
+## Human feedback
+
+Human testers and reviewers can still report:
+
+- installation/build setup issues;
 - CLI behavior;
 - Gradle Plugin integration;
 - Shield Studio workflows;
-- APK/AAB/AAR/APKS verification;
-- compatibility with supported Android/Gradle environments;
+- APK/AAB/AAR/APKS compatibility;
 - false positives in runtime protections;
 - performance regressions;
 - documentation gaps.
+
+Human feedback is supplementary to the machine gate. Any blocking external finding that is recorded must be resolved before stable publication.
 
 ## What not to submit publicly
 
@@ -26,14 +42,13 @@ Do not include:
 - private mappings/manifests;
 - customer or personal data.
 
-Sensitive security findings should follow [SECURITY.md](../SECURITY.md).
+Sensitive security findings must follow [SECURITY.md](../SECURITY.md).
 
 ## Stable evidence rule
 
-Only feedback from a real external tester/reviewer counts toward `release/feedback-status.json`. Internal CI, automated bots and the project owner do not count as external reviewers.
+Stable remains fail-closed while any of these are true:
 
-A stable release remains blocked while:
-
-- external reviewer count is below policy;
-- a blocking RC finding remains open;
-- stable device performance evidence is incomplete.
+- the configured independent external-assessment count is not satisfied;
+- a blocking external finding remains open;
+- N.10 representative Android performance evidence is incomplete;
+- the final stable qualification workflow is not green.
