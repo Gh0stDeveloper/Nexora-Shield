@@ -8,6 +8,7 @@ members = [
     "crates/shield-integrity",
     "crates/shield-native",
     "crates/shield-rasp",
+    "crates/shield-vm",
     "crates/shield-cli",
 ]
 
