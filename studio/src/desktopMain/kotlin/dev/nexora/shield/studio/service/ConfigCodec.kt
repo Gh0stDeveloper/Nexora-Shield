@@ -33,7 +33,8 @@ class ConfigCodec {
             .setLabel(path.fileName.toString())
             .build()
         val loaded = Load(settings).loadFromString(Files.readString(path))
-        val root = stringKeyMap(loaded)
+        val loadedRoot = stringKeyMap(loaded)
+        val root = ConfigMigration.migrate(loadedRoot).root
         val config = decode(root)
         validate(config)
         return ConfigDocument(root, config)
