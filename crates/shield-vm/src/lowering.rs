@@ -10,6 +10,12 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DexLowerer;
 
+#[derive(Debug, Default)]
+struct CompoundInstructionMetadata {
+    skip_offsets: BTreeSet<u32>,
+    call_destinations: BTreeMap<u32, Option<VmRegister>>,
+}
+
 impl DexLowerer {
     pub fn lower(
         dex: &DexFile,
@@ -42,14 +48,14 @@ impl DexLowerer {
             .filter(|instruction| !instruction.is_payload())
             .collect::<Vec<_>>();
         let handler_targets = exception_handler_targets(code);
-        let (skip_offsets, call_destinations) =
+        let compound =
             collect_compound_instruction_metadata(code, &executable, &handler_targets)?;
 
         let mut offset_to_pc = BTreeMap::<u32, usize>::new();
         let mut pc = 0_usize;
         for instruction in &executable {
             offset_to_pc.insert(instruction.offset, pc);
-            if !skip_offsets.contains(&instruction.offset) {
+            if !compound.skip_offsets.contains(&instruction.offset) {
                 pc = pc.saturating_add(1);
             }
         }
@@ -58,7 +64,7 @@ impl DexLowerer {
         let mut constants = ConstantPool::default();
         let mut instructions = Vec::with_capacity(pc);
         for instruction in executable {
-            if skip_offsets.contains(&instruction.offset) {
+            if compound.skip_offsets.contains(&instruction.offset) {
                 continue;
             }
             instructions.push(lower_instruction(
@@ -66,7 +72,7 @@ impl DexLowerer {
                 code,
                 instruction,
                 &offset_to_pc,
-                &call_destinations,
+                &compound.call_destinations,
                 &mut constants,
             )?);
         }
@@ -94,13 +100,12 @@ fn collect_compound_instruction_metadata(
     code: &CodeItem,
     executable: &[&Instruction],
     handler_targets: &BTreeSet<u32>,
-) -> Result<(BTreeSet<u32>, BTreeMap<u32, Option<VmRegister>>)> {
-    let mut skip_offsets = BTreeSet::new();
-    let mut call_destinations = BTreeMap::new();
+) -> Result<CompoundInstructionMetadata> {
+    let mut metadata = CompoundInstructionMetadata::default();
 
     for (index, instruction) in executable.iter().enumerate() {
         if handler_targets.contains(&instruction.offset) && instruction.opcode == 0x0d {
-            skip_offsets.insert(instruction.offset);
+            metadata.skip_offsets.insert(instruction.offset);
         }
 
         if !matches!(instruction.opcode, 0x6e..=0x72 | 0x74..=0x78) {
@@ -110,7 +115,7 @@ fn collect_compound_instruction_metadata(
         let next = executable.get(index + 1).copied();
         let destination = match next {
             Some(next) if matches!(next.opcode, 0x0a | 0x0c) => {
-                skip_offsets.insert(next.offset);
+                metadata.skip_offsets.insert(next.offset);
                 Some(VmRegister(register_a8(code, next.offset)?))
             }
             Some(next) if next.opcode == 0x0b => {
@@ -121,10 +126,10 @@ fn collect_compound_instruction_metadata(
             }
             _ => None,
         };
-        call_destinations.insert(instruction.offset, destination);
+        metadata.call_destinations.insert(instruction.offset, destination);
     }
 
-    Ok((skip_offsets, call_destinations))
+    Ok(metadata)
 }
 
 fn lower_instruction(
