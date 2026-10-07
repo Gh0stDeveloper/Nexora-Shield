@@ -84,15 +84,11 @@ impl Interpreter {
                     let left_value = registers[usize::from(left.0)].as_int()?;
                     let right_value = registers[usize::from(right.0)].as_int()?;
                     if right_value == 0 {
-                        pc = dispatch_exception(
-                            method,
-                            &mut registers,
-                            pc,
-                            VmException {
-                                type_name: Some("Ljava/lang/ArithmeticException;".to_owned()),
-                                value: VmValue::Null,
-                            },
-                        )?;
+                        let exception = host.create_exception(
+                            "Ljava/lang/ArithmeticException;",
+                            &method.constants,
+                        );
+                        pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                     } else {
                         let value = if left_value == i32::MIN && right_value == -1 {
                             i32::MIN
@@ -168,7 +164,7 @@ impl Interpreter {
                             pc += 1;
                         }
                         Err(exception) => {
-                            pc = dispatch_exception(method, &mut registers, pc, exception)?;
+                            pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                         }
                     }
                 }
@@ -179,7 +175,7 @@ impl Interpreter {
                     match host.store_field(object_value, *field, value, &method.constants) {
                         Ok(()) => pc += 1,
                         Err(exception) => {
-                            pc = dispatch_exception(method, &mut registers, pc, exception)?;
+                            pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                         }
                     }
                 }
@@ -276,18 +272,25 @@ fn required_right(right: Option<&VmValue>) -> Result<&VmValue> {
     right.ok_or(VmError::InvalidValueType("branch right operand"))
 }
 
-fn dispatch_exception(
+fn dispatch_exception<H: VmHost>(
     method: &VmMethod,
     registers: &mut [VmValue],
     pc: usize,
     exception: VmException,
+    host: &H,
 ) -> Result<usize> {
     for handler in &method.handlers {
         if pc < handler.start || pc >= handler.end {
             continue;
         }
-        if !handler_matches(handler.type_name.as_deref(), exception.type_name.as_deref()) {
-            continue;
+        if let Some(expected) = handler.type_name.as_deref() {
+            if !host.exception_matches(
+                expected,
+                exception.type_name.as_deref(),
+                &method.constants,
+            ) {
+                continue;
+            }
         }
 
         if let Some(register) = handler.exception_register {
@@ -301,9 +304,3 @@ fn dispatch_exception(
     })
 }
 
-fn handler_matches(handler: Option<&str>, actual: Option<&str>) -> bool {
-    match handler {
-        None => true,
-        Some(expected) => actual == Some(expected),
-    }
-}
