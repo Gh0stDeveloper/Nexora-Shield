@@ -324,6 +324,8 @@ Estado actual: **COMPLETADA**. L.1–L.15 están implementadas y validadas. Shie
 Criterio:
 - todo bypass conocido entra al corpus y se prueba en cada release.
 
+Estado actual: **COMPLETADA**. M.1–M.12 están implementadas y validadas en `nexora-shield-lab`, con corpus versionado, repack/re-sign E2E real, Rust 1.81, portabilidad cross-build, regresiones Phase L/K y CI general. Phase M #47 (`37639187441`) pasó 6/6 jobs y CI #1006 (`37639187513`) pasó 24/24 jobs, sin fallos.
+
 ---
 
 ## Fase N — Production Hardening
