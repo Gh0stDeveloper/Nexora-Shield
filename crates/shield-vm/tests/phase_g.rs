@@ -75,6 +75,10 @@ fn opcode_allocation_changes_per_build_without_changing_semantics(
     assert_ne!(first_stream, second_stream);
     assert_eq!(first_stream.decode(&first)?, method.instructions);
     assert_eq!(second_stream.decode(&second)?, method.instructions);
+
+    let mut truncated = first_stream.clone();
+    truncated.bytes.pop();
+    assert!(truncated.decode(&first).is_err());
     assert_eq!(
         first_stream.semantics(&first)?,
         second_stream.semantics(&second)?
@@ -89,9 +93,20 @@ fn metadata_seal_rejects_tampering() -> Result<(), Box<dyn std::error::Error>> {
     let metadata = nexora_shield_vm::VmMetadata::from_method(&method, &allocation)?;
     let sealed = MetadataSealer::seal(&metadata, b"metadata-key")?;
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
+    let wrong_allocation = OpcodeAllocation::derive("other-build", b"seed")?;
     assert_eq!(
         MetadataSealer::verify_program(&sealed, b"metadata-key", &stream, &allocation)?,
         metadata
+    );
+
+    assert_eq!(
+        MetadataSealer::verify_program(
+            &sealed,
+            b"metadata-key",
+            &stream,
+            &wrong_allocation
+        ),
+        Err(VmError::OpcodeFingerprintMismatch)
     );
 
     let mut tampered_metadata = sealed.clone();
