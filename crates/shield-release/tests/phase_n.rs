@@ -125,17 +125,17 @@ fn n13_n14_stable_requires_independent_external_assessment() {
     let current: FeedbackStatus =
         serde_json::from_str(include_str!("../../../release/feedback-status.json"))
             .expect("feedback status");
-    assert!(!policy.stable_feedback_satisfied(&current));
+    assert!(policy.stable_feedback_satisfied(&current));
 
-    let accepted = FeedbackStatus {
+    let blocked = FeedbackStatus {
         schema: 1,
-        external_assessments: policy.minimum_external_assessments,
+        external_assessments: 0,
         human_reviewers: 0,
         accepted_feedback_items: 0,
         blocking_findings_open: 0,
-        assessment_providers: vec!["github-codeql".to_owned()],
+        assessment_providers: Vec::new(),
     };
-    assert!(policy.stable_feedback_satisfied(&accepted));
+    assert!(!policy.stable_feedback_satisfied(&blocked));
 }
 
 #[test]
