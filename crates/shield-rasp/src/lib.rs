@@ -21,6 +21,9 @@ mod hook;
 mod instrumentation;
 mod integrity_fusion;
 mod modified_system;
+mod policy;
+mod response;
+mod risk;
 mod signal;
 
 pub use debug::{DebugEvaluator, DebugObservation};
@@ -29,6 +32,9 @@ pub use hook::{HookInjectionEvaluator, HookInjectionObservation};
 pub use instrumentation::{InstrumentationEvaluator, InstrumentationObservation};
 pub use integrity_fusion::IntegritySignalFusion;
 pub use modified_system::{ModifiedSystemEvaluator, ModifiedSystemObservation};
+pub use policy::{CompiledPolicy, PolicyError, PolicySpec};
+pub use response::{RaspResponse, ResponseDecision, ResponseEngine};
+pub use risk::{RiskAssessment, RiskEngine, RiskLevel, RiskReason, RiskThresholds};
 pub use signal::{
     EvidenceStrength, RaspSignal, SignalCategory, SignalSet, SignalSeverity, SignalSource,
 };
