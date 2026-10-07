@@ -1,4 +1,5 @@
-import org.gradle.api.tasks.testing.Test\nimport org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.testing.Test
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -30,7 +31,8 @@ kotlin {
 
         val desktopTest by getting {
             dependencies {
-                implementation(kotlin("test-junit5"))\n                implementation("org.junit.jupiter:junit-jupiter:5.11.4")
+                implementation(kotlin("test-junit5"))
+                implementation("org.junit.jupiter:junit-jupiter:5.11.4")
             }
         }
     }
