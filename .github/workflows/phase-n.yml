@@ -1,0 +1,224 @@
+name: Phase N
+
+on:
+  push:
+    branches:
+      - main
+      - feat/phase-n-production-hardening
+  pull_request:
+    branches:
+      - main
+      - feat/phase-m-security-lab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-n-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-contracts:
+    name: N.1-N.5 release contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test release contracts
+        run: cargo test --locked -p nexora-shield-release --all-targets
+
+      - name: Clippy release contracts
+        run: cargo clippy --locked -p nexora-shield-release --all-targets -- -D warnings
+
+      - name: Validate API freeze
+        run: |
+          cargo run --locked --quiet -p nexora-shield-release -- api-validate release/api-surface-v1.json
+          python scripts/release/verify-api-freeze.py
+
+      - name: Validate schema lock and migration tooling
+        run: |
+          python scripts/release/verify-schema-lock.py
+          printf '%s' '{"applicationId":"dev.nexora.legacy","minSdk":24,"protectionProfile":"hardened","dex":{"rename":true}}' > build-legacy.json
+          cargo run --locked --quiet -p nexora-shield-release -- config-migrate-json build-legacy.json build-migrated.json
+          python -m json.tool build-migrated.json >/dev/null
+          grep -q '"schema": 1' build-migrated.json
+          grep -q '"application"' build-migrated.json
+          grep -q '"dex"' build-migrated.json
+
+      - name: Validate documentation and supply chain
+        run: |
+          python scripts/release/verify-docs.py
+          python scripts/release/verify-supply-chain.py
+
+      - name: Validate version synchronization
+        run: python scripts/release/verify-version-sync.py 1.0.0-rc.1
+
+  sbom-provenance:
+    name: N.6 SBOM and provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate locked Cargo metadata and CycloneDX SBOM
+        run: |
+          mkdir -p build/phase-n
+          cargo metadata --locked --format-version 1 > build/phase-n/cargo-metadata.json
+          python scripts/release/generate-sbom.py build/phase-n/cargo-metadata.json build/phase-n/nexora-shield.cdx.json
+          python -m json.tool build/phase-n/nexora-shield.cdx.json >/dev/null
+          grep -q '"bomFormat": "CycloneDX"' build/phase-n/nexora-shield.cdx.json
+          grep -q '"specVersion": "1.5"' build/phase-n/nexora-shield.cdx.json
+
+      - name: Build release CLI and generate provenance
+        run: |
+          cargo build --locked --release -p nexora-shield
+          python scripts/release/generate-provenance.py build/phase-n/provenance.json target/release/nexora-shield
+          python -m json.tool build/phase-n/provenance.json >/dev/null
+          cargo run --locked --quiet -p nexora-shield-release -- artifact-digest target/release/nexora-shield > build/phase-n/digests.json
+          python -m json.tool build/phase-n/digests.json >/dev/null
+
+  migration-studio-retrace:
+    name: N.3 N.8 Studio migration and retrace
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Test Shield Studio migration
+        run: gradle -p studio desktopTest --no-daemon --stacktrace
+
+      - name: Test Gradle Plugin retrace and validate plugin
+        run: gradle -p gradle-plugin clean test validatePlugins --no-daemon --stacktrace
+
+  reviews:
+    name: N.9-N.11 security performance compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate compatibility contract
+        run: cargo run --locked --quiet -p nexora-shield-release -- compatibility-validate release/compatibility-matrix.json
+
+      - name: Validate RC review metadata
+        run: python scripts/release/verify-release-metadata.py rc
+
+      - name: Verify stable remains blocked before N.13
+        run: |
+          if python scripts/release/verify-release-metadata.py stable; then
+            echo "stable unexpectedly eligible before external feedback/device evidence" >&2
+            exit 1
+          fi
+
+      - name: Run Phase M performance regression
+        run: cargo test --locked -p nexora-shield-lab --test phase_m m8_performance_farm_enforces_runtime_and_size_budgets -- --exact
+
+  release-msrv:
+    name: N.1-N.14 Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test release crate on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-release --all-targets
+
+  inherited-regressions:
+    name: Phase M K L inherited regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Phase M Security Lab
+        run: cargo test --locked -p nexora-shield-lab --all-targets
+
+      - name: Phase K package models
+        run: cargo test --locked -p nexora-shield-package --test phase_k
+
+      - name: Phase L Studio compile
+        run: gradle -p studio compileKotlinDesktop --no-daemon --stacktrace
+
+  rc-qualification:
+    name: N.12 1.0 RC qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - release-contracts
+      - sbom-provenance
+      - migration-studio-retrace
+      - reviews
+      - release-msrv
+      - inherited-regressions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate qualification policy
+        run: cargo run --locked --quiet -p nexora-shield-release -- qualification-validate release/qualification-policy.json
+
+      - name: Validate 1.0 RC version
+        run: cargo run --locked --quiet -p nexora-shield-release -- version-check 1.0.0-rc.1 rc
+
+      - name: Confirm stable guard is still closed
+        run: |
+          if cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json; then
+            echo "stable feedback gate unexpectedly open" >&2
+            exit 1
+          fi
