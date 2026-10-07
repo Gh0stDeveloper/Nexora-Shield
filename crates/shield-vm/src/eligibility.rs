@@ -36,15 +36,21 @@ pub enum EligibilityReason {
     MalformedIr(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EligibilityFeature {
+    Calls,
+    Fields,
+    Exceptions,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EligibilityReport {
     pub method_idx: u32,
     pub eligible: bool,
     pub register_count: u16,
     pub instruction_count: usize,
-    pub has_calls: bool,
-    pub has_fields: bool,
-    pub has_exceptions: bool,
+    pub features: std::collections::BTreeSet<EligibilityFeature>,
     pub reasons: Vec<EligibilityReason>,
 }
 
@@ -64,9 +70,7 @@ impl EligibilityAnalyzer {
                 eligible: false,
                 register_count: 0,
                 instruction_count: 0,
-                has_calls: false,
-                has_fields: false,
-                has_exceptions: false,
+                features: std::collections::BTreeSet::new(),
                 reasons: vec![EligibilityReason::MissingCode],
             };
         };
@@ -122,14 +126,23 @@ impl EligibilityAnalyzer {
             reasons.push(EligibilityReason::MalformedIr(error.to_string()));
         }
 
+        let mut features = std::collections::BTreeSet::new();
+        if has_calls {
+            features.insert(EligibilityFeature::Calls);
+        }
+        if has_fields {
+            features.insert(EligibilityFeature::Fields);
+        }
+        if has_exceptions {
+            features.insert(EligibilityFeature::Exceptions);
+        }
+
         EligibilityReport {
             method_idx,
             eligible: reasons.is_empty(),
             register_count: code.registers_size,
             instruction_count: executable.len(),
-            has_calls,
-            has_fields,
-            has_exceptions,
+            features,
             reasons,
         }
     }
