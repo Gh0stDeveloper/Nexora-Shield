@@ -113,6 +113,9 @@ fn response_engine_applies_compiled_policy() -> Result<(), PolicyError> {
     let decision = ResponseEngine::decide(&policy, &assessment);
 
     assert_eq!(decision.risk_level, RiskLevel::Critical);
-    assert_eq!(decision.response, RaspResponse::DenySensitiveOperation);
+    assert_eq!(
+        decision.effective_response,
+        RaspResponse::DenySensitiveOperation
+    );
     Ok(())
 }
