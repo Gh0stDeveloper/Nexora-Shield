@@ -4,7 +4,7 @@
 
 Phase J removes the manual APK post-processing step for Android application projects.
 
-The plugin id is dev.nexora.shield. It integrates with Android Gradle Plugin through the public Variant API and transforms SingleArtifact.APK in the selected variants.
+The plugin id is dev.nexora.shield. It integrates with Android Gradle Plugin through the public Variant API and transforms SingleArtifact.APK in the selected variants through the ContainsMany-aware transformation request.
 
 Current compatibility target:
 
@@ -23,7 +23,7 @@ The plugin obtains ApplicationAndroidComponentsExtension and registers variant-a
 
 ## J.2 — Variant API
 
-Each selected application variant receives a NexoraShieldApkTransformTask wired to SingleArtifact.APK using wiredWithDirectories(...).toTransform(...).
+Each selected application variant receives a NexoraShieldApkTransformTask wired to SingleArtifact.APK using wiredWithDirectories(...).toTransformMany(...). The returned ArtifactTransformationRequest processes every BuiltArtifact and preserves AGP split/output metadata.
 
 AGP therefore owns task ordering and artifact dependencies. Running assembleRelease produces the transformed APK artifact without a separate manual shell pipeline.
 
