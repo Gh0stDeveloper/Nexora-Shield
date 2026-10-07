@@ -278,45 +278,216 @@ jobs:
       - name: Provision representative Android virtual device
         shell: bash
         run: |
-          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-            "platform-tools" \
-            "emulator" \
-            "system-images;android-35;google_apis;x86_64"
-          echo no | "$SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd \
-            --force \
-            --name nexora_phase_n \
-            --package "system-images;android-35;google_apis;x86_64" \
-            --device "pixel_6"
-          if [[ -e /dev/kvm ]]; then
-            sudo chmod 666 /dev/kvm
-          else
-            echo "/dev/kvm is unavailable; representative Android benchmark requires hardware acceleration" >&2
+          set -euo pipefail
+
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          AVDMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
+          ADB="$SDK_ROOT/platform-tools/adb"
+          PERF_DIR="build/phase-n/android-perf"
+          mkdir -p "$PERF_DIR"
+
+          if [[ ! -x "$EMULATOR" ]]; then
+            echo "Android emulator is not preinstalled; installing with a bounded timeout."
+            timeout 300 "$SDKMANAGER" "emulator"
+          fi
+          test -x "$EMULATOR"
+
+          if [[ ! -e /dev/kvm ]]; then
+            echo "/dev/kvm is unavailable; representative Android benchmark requires hardware acceleration." >&2
             exit 1
           fi
-          nohup "$SDK_ROOT/emulator/emulator" \
+          sudo chmod 666 /dev/kvm
+          "$EMULATOR" -accel-check
+
+          IMAGE_DIR="$(find "$SDK_ROOT/system-images" -type f -name source.properties -path '*/x86_64/*' -print 2>/dev/null \
+            | grep -E '/(aosp_atd|google_apis)/x86_64/source\.properties
+      - name: Measure baseline and protected startup memory and size
+        run: |
+          ADB="$SDK_ROOT/platform-tools/adb"
+          python scripts/release/android-performance.py measure \
+            --adb "$ADB" \
+            --apk build/phase-n/android-perf/baseline.apk \
+            --package dev.nexora.shield.sample \
+            --activity .MainActivity \
+            --label baseline \
+            --warmups 5 \
+            --runs 20 \
+            --output build/phase-n/android-perf/baseline.json
+          python scripts/release/android-performance.py measure \
+            --adb "$ADB" \
+            --apk build/phase-n/android-perf/protected.apk \
+            --package dev.nexora.shield.sample \
+            --activity .MainActivity \
+            --label protected \
+            --warmups 5 \
+            --runs 20 \
+            --output build/phase-n/android-perf/protected.json
+          python scripts/release/android-performance.py compare \
+            --baseline build/phase-n/android-perf/baseline.json \
+            --protected build/phase-n/android-perf/protected.json \
+            --output build/phase-n/android-perf/comparison.json \
+            --max-startup-percent 100 \
+            --max-startup-delta-ms 250 \
+            --max-memory-percent 75 \
+            --max-size-percent 100
+
+      - name: Upload Android performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-n-android-performance
+          path: |
+            build/phase-n/android-perf/baseline.json
+            build/phase-n/android-perf/protected.json
+            build/phase-n/android-perf/comparison.json
+            build/phase-n/android-perf/emulator.log
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  external-assessment:
+    name: N.13 independent external assessment
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Analyze JVM surfaces
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
+
+
+  rc-qualification:
+    name: N.12 1.0 RC qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - release-contracts
+      - sbom-provenance
+      - migration-studio-retrace
+      - reviews
+      - release-msrv
+      - inherited-regressions
+      - android-stable-performance
+      - external-assessment
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate qualification policy
+        run: cargo run --locked --quiet -p nexora-shield-release -- qualification-validate release/qualification-policy.json
+
+      - name: Validate 1.0 RC version
+        run: cargo run --locked --quiet -p nexora-shield-release -- version-check 1.0.0-rc.1 rc
+
+      - name: Confirm stable guard is still closed
+        run: |
+          if cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json; then
+            echo "stable feedback gate unexpectedly open" >&2
+            exit 1
+          fi
+ \
+            | sort -V \
+            | tail -n 1 \
+            | xargs -r dirname || true)"
+
+          if [[ -z "$IMAGE_DIR" ]]; then
+            IMAGE_PACKAGE="system-images;android-35;aosp_atd;x86_64"
+            echo "No suitable preinstalled x86_64 image found; installing compact ATD image: $IMAGE_PACKAGE"
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            timeout 600 "$SDKMANAGER" "$IMAGE_PACKAGE"
+            IMAGE_DIR="$SDK_ROOT/system-images/android-35/aosp_atd/x86_64"
+          else
+            IMAGE_PACKAGE="$(grep '^Pkg.Path=' "$IMAGE_DIR/source.properties" | head -n 1 | cut -d= -f2- | tr -d '\r')"
+            if [[ -z "$IMAGE_PACKAGE" ]]; then
+              RELATIVE="${IMAGE_DIR#"$SDK_ROOT/system-images/"}"
+              IMAGE_PACKAGE="system-images;${RELATIVE//\//;}"
+            fi
+            echo "Using preinstalled Android image: $IMAGE_PACKAGE"
+          fi
+
+          test -d "$IMAGE_DIR"
+          echo no | "$AVDMANAGER" create avd \
+            --force \
+            --name nexora_phase_n \
+            --package "$IMAGE_PACKAGE" \
+            --device "pixel_6"
+
+          "$ADB" kill-server || true
+          "$ADB" start-server
+
+          nohup "$EMULATOR" \
             -avd nexora_phase_n \
             -no-window \
             -noaudio \
             -no-boot-anim \
-            -gpu swiftshader_indirect \
             -no-snapshot \
+            -no-snapshot-save \
+            -no-metrics \
+            -gpu swiftshader_indirect \
             -accel on \
             -cores 2 \
             -memory 2048 \
-            > build/phase-n/android-perf/emulator.log 2>&1 &
-          "$SDK_ROOT/platform-tools/adb" wait-for-device
+            -camera-back none \
+            -camera-front none \
+            -netfast \
+            > "$PERF_DIR/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > "$PERF_DIR/emulator.pid"
+
+          READY=0
           for i in {1..120}; do
-            BOOT="$("$SDK_ROOT/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')"
-            if [[ "$BOOT" == "1" ]]; then
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before boot completed." >&2
+              cat "$PERF_DIR/emulator.log" >&2 || true
+              exit 1
+            fi
+
+            STATE="$("$ADB" get-state 2>/dev/null || true)"
+            BOOT="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [[ "$STATE" == "device" && "$BOOT" == "1" ]]; then
+              READY=1
               break
+            fi
+
+            if (( i % 15 == 0 )); then
+              echo "Waiting for Android boot: attempt=$i state=${STATE:-none} boot=${BOOT:-0}"
+              "$ADB" devices -l || true
             fi
             sleep 2
           done
-          test "$("$SDK_ROOT/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" = "1"
-          "$SDK_ROOT/platform-tools/adb" shell settings put global window_animation_scale 0
-          "$SDK_ROOT/platform-tools/adb" shell settings put global transition_animation_scale 0
-          "$SDK_ROOT/platform-tools/adb" shell settings put global animator_duration_scale 0
+
+          if [[ "$READY" != "1" ]]; then
+            echo "Android emulator did not become ready within 240 seconds." >&2
+            "$ADB" devices -l >&2 || true
+            tail -n 250 "$PERF_DIR/emulator.log" >&2 || true
+            exit 1
+          fi
+
+          echo "Android emulator booted successfully."
+          "$ADB" shell getprop ro.build.fingerprint
+          "$ADB" shell getprop ro.product.cpu.abi
+          "$ADB" shell settings put global window_animation_scale 0
+          "$ADB" shell settings put global transition_animation_scale 0
+          "$ADB" shell settings put global animator_duration_scale 0
 
       - name: Measure baseline and protected startup memory and size
         run: |
