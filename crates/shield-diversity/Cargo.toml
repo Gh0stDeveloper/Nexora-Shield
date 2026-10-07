@@ -9,7 +9,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-hmac = "0.12.1"
+hmac = "0.13.0"
 nexora-shield-dex = { path = "../shield-dex" }
 nexora-shield-crypto = { path = "../shield-crypto" }
 nexora-shield-integrity = { path = "../shield-integrity" }
