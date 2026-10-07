@@ -68,20 +68,12 @@ pub enum AbiDecision {
     Rejected,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AbiPolicy {
     allow_32_bit: bool,
     additional: BTreeSet<Abi>,
 }
 
-impl Default for AbiPolicy {
-    fn default() -> Self {
-        Self {
-            allow_32_bit: false,
-            additional: BTreeSet::new(),
-        }
-    }
-}
 
 impl AbiPolicy {
     #[must_use]
