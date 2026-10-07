@@ -1,11 +1,10 @@
 use crate::error::{DiversityError, Result};
 use crate::seed::{DiversityDomain, SeedDeriver};
 use nexora_shield_integrity::{
-    IntegrityEdge, IntegrityGraph, IntegrityNode, IntegrityNodeKind, Sha256Digest,
+    IntegrityEdge, IntegrityGraph, IntegrityNodeKind, Sha256Digest,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -40,13 +39,27 @@ impl IntegrityTopologyPlan {
             .find(|node| node.kind == IntegrityNodeKind::Package)
             .ok_or(DiversityError::MissingPackageNode)?;
 
-        let mut remaining = graph
+        let mut keyed_remaining = graph
             .nodes
             .iter()
             .filter(|node| node.id != certificate.id && node.id != package.id)
-            .cloned()
+            .map(|node| {
+                Ok((
+                    seed.derive_u64(
+                        DiversityDomain::IntegrityTopology,
+                        node.label.as_bytes(),
+                    )?,
+                    node.clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        keyed_remaining.sort_by(|(left_key, left), (right_key, right)| {
+            left_key.cmp(right_key).then_with(|| left.id.cmp(&right.id))
+        });
+        let remaining = keyed_remaining
+            .into_iter()
+            .map(|(_, node)| node)
             .collect::<Vec<_>>();
-        remaining.sort_by(|left, right| seeded_node_order(seed, left, right));
 
         let variant_selector =
             seed.derive_u64(DiversityDomain::IntegrityTopology, b"topology-variant")?;
@@ -120,21 +133,6 @@ impl IntegrityTopologyPlan {
             diversified,
         ))
     }
-}
-
-fn seeded_node_order(
-    seed: &SeedDeriver,
-    left: &IntegrityNode,
-    right: &IntegrityNode,
-) -> Ordering {
-    let left_key = node_key(seed, left);
-    let right_key = node_key(seed, right);
-    left_key.cmp(&right_key).then_with(|| left.id.cmp(&right.id))
-}
-
-fn node_key(seed: &SeedDeriver, node: &IntegrityNode) -> u64 {
-    seed.derive_u64(DiversityDomain::IntegrityTopology, node.label.as_bytes())
-        .unwrap_or(0)
 }
 
 fn topology_fingerprint(
