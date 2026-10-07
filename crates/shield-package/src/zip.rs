@@ -677,13 +677,14 @@ mod tests {
     }
 
     #[test]
-    fn raw_zero_alignment_padding_is_accepted_and_removed() {
-        assert_eq!(filter_extra_fields(&[0_u8; 1]).unwrap(), Vec::<u8>::new());
-        assert_eq!(filter_extra_fields(&[0_u8; 7]).unwrap(), Vec::<u8>::new());
+    fn raw_zero_alignment_padding_is_accepted_and_removed() -> super::Result<()> {
+        assert_eq!(filter_extra_fields(&[0_u8; 1])?, Vec::<u8>::new());
+        assert_eq!(filter_extra_fields(&[0_u8; 7])?, Vec::<u8>::new());
+        Ok(())
     }
 
     #[test]
-    fn structured_fields_can_be_followed_by_raw_zero_padding() {
+    fn structured_fields_can_be_followed_by_raw_zero_padding() -> super::Result<()> {
         let extra = [
             0x34, 0x12, // id 0x1234
             0x02, 0x00, // payload size 2
@@ -691,9 +692,10 @@ mod tests {
             0x00, 0x00, 0x00, // Zipflinger alignment padding
         ];
         assert_eq!(
-            filter_extra_fields(&extra).unwrap(),
+            filter_extra_fields(&extra)?,
             vec![0x34, 0x12, 0x02, 0x00, 0xaa, 0xbb]
         );
+        Ok(())
     }
 
     #[test]
