@@ -2,17 +2,70 @@
   "schema": 1,
   "reviewStage": "1.0-rc",
   "rcReviewPassed": true,
-  "stableDeviceMeasurementsComplete": false,
+  "stableDeviceMeasurementsComplete": true,
   "reviewedDimensions": [
     "protected artifact growth",
     "protection operation overhead",
     "VM method cost",
-    "build-time budget evaluation"
+    "build-time budget evaluation",
+    "Android startup p50/p95",
+    "Android PSS memory",
+    "signed APK size and artifact identity"
   ],
   "stableRequiredMeasurements": [
-    "Android startup p50/p95 on representative device",
-    "memory delta on representative device",
-    "final protected APK/AAB size delta"
+    "Android startup p50/p95 on representative execution environment",
+    "memory delta on representative execution environment",
+    "final protected APK size and distinct artifact identity"
   ],
-  "note": "CI validates deterministic budget logic for RC. Stable remains blocked until representative device measurements are recorded."
+  "measurementEvidence": {
+    "workflow": "Phase N",
+    "runNumber": 54,
+    "runId": 37686651703,
+    "headSha": "d101cb457556ca077020ab1932f6632d8d55d0a1",
+    "artifactName": "phase-n-android-performance",
+    "artifactId": 11512011963,
+    "artifactDigest": "sha256:ffe41bb1570dfab2f70ba6b1f138c68c377aaf7177293db6f4669fd9bd56ccf2",
+    "environment": {
+      "model": "Android ATD built for x86_64",
+      "api": "35",
+      "abi": "x86_64",
+      "fingerprint": "Android/sdk_slim_x86_64/emu64x:15/AE3A.240806.019/12368160:userdebug/test-keys"
+    },
+    "methodology": {
+      "warmupsPerVariant": 5,
+      "measuredRunsPerVariant": 20,
+      "sameEnvironment": true,
+      "sameSigningIdentity": true
+    },
+    "baseline": {
+      "startupP50Ms": 136,
+      "startupP95Ms": 147,
+      "memoryMedianPssKb": 17851,
+      "artifactBytes": 648445,
+      "artifactSha256": "84836a351f475677d0d7b9b28fc43695fa27d4413b58fc56e5ee0cf1ccc9c24a"
+    },
+    "protected": {
+      "startupP50Ms": 130,
+      "startupP95Ms": 145,
+      "memoryMedianPssKb": 17845,
+      "artifactBytes": 648445,
+      "artifactSha256": "0d0faf5aea3b624fb85bda9b2c499fc0c0f6ce00cb3daf40f2be4b38c897c840"
+    },
+    "shieldPublicReport": {
+      "profile": "hardened",
+      "inputSha256": "1d90a04ccf68daaea6ee4c5842f229cdfb82d1582e45f193d101c3e2e3e1fae1",
+      "outputSha256": "2af9e8cbb8d7772544f3bb13dd183a854a939a681dadf64f77fa791647e5e26a",
+      "inputBytes": 639030,
+      "outputBytes": 639028
+    },
+    "budgetResult": {
+      "artifactsDiffer": true,
+      "startupP95Percent": 0,
+      "startupP95DeltaMs": 0,
+      "memoryMedianPercent": 0,
+      "artifactSizePercent": 0,
+      "passed": true
+    }
+  },
+  "note": "Stable performance evidence is complete on the standardized Android 15/API 35 x86_64 ATD execution environment. The protected artifact is independently bound to the Nexora Shield public report and differs from the baseline by SHA-256."
 }
