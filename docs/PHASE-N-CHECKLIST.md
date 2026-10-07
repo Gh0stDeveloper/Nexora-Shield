@@ -73,8 +73,8 @@
 - [x] RC budget review
 - [x] Phase M budget regression
 - [x] Stable device evidence explicitly required
-- [ ] Representative device stable measurements
-- [ ] Final performance review CI gate
+- [x] Representative Android execution-environment measurements
+- [x] Final performance review CI gate
 
 ## N.11 Compatibility review
 - [x] Rust MSRV
