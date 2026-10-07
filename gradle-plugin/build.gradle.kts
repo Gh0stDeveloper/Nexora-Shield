@@ -6,12 +6,6 @@ plugins {
 group = "dev.nexora.shield"
 version = "0.1.0"
 
-repositories {
-    google()
-    mavenCentral()
-    gradlePluginPortal()
-}
-
 dependencies {
     compileOnly("com.android.tools.build:gradle:9.4.1")
 
