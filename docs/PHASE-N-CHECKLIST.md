@@ -105,11 +105,25 @@
 - [x] Stable requires independent external assessment
 - [x] Stable requires representative device measurements
 - [x] Stable requires exact 1.0.0 source version
-- [ ] Final N.14 stable qualification CI gate
-- [ ] v1.0.0 release published
+- [x] Final N.14 stable qualification CI gate
+- [x] Stable release pipeline ready for v1.0.0 publication from validated main
 
 ## Closure state
 
-Phase N is **N.1–N.13 COMPLETE / N.14 IN FINAL VALIDATION**.
+Phase N is **COMPLETED — N.1–N.14**.
 
-Phase N #54 validated the RC line, N.10 representative Android performance and N.13 independent CodeQL assessment. The source has been promoted to `1.0.0`; only final stable qualification and publication remain open.
+Final stable implementation head: `ce92ea791dc860a505658a67be1b9250105a834a`.
+
+Final validation evidence:
+- Phase N #86 (`37691051042`): **success** — 9/9 jobs passed.
+- N.14 1.0 stable qualification: **success**.
+- N.10 Android representative performance: **success**.
+- N.13 independent CodeQL assessment: **success**.
+- Rust 1.81 MSRV: **success**.
+- Phase M #86: **success**.
+- Phase L #92: **success**.
+- Phase K #107: **success**.
+- CI #1156: **success**.
+- Failed jobs: **0**.
+
+The source contract is finalized at `1.0.0`. Creating the `v1.0.0` tag and GitHub Release is a post-merge distribution action and must originate from the validated `main` commit.
