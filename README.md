@@ -45,10 +45,10 @@ The most important open item is the production protection path: the current user
 | VM Shield | Completed |
 | Per-Build Diversification | Completed |
 | Attestation & Remote Policy | Completed |
-| Gradle Plugin | Completed |
-| AAB / AAR / Splits | Completed |
-| Shield Studio | Completed |
-| Security Lab | Completed |
+| Gradle Plugin component | Completed; production orchestration pending O.1 |
+| AAB / AAR / Splits compatibility foundation | Completed; final-artifact protection proof pending O.3/O.4 |
+| Shield Studio component | Completed; signed/notarized distribution pending O.7 |
+| Security Lab | Completed; coverage-guided fuzzing expansion pending O.9 |
 | Production hardening / Phase N | Completed within Phase N scope |
 | Production release audit / Phase O | **OPEN — release blocking** |
 | Stable 1.0 | **NO-GO until Phase O closes** |
