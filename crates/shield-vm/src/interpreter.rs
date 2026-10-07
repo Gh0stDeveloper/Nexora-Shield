@@ -161,8 +161,7 @@ impl Interpreter {
                     }
                 }
                 VmInstruction::LoadField { dst, object, field } => {
-                    let object_value =
-                        object.map(|register| &registers[usize::from(register.0)]);
+                    let object_value = object.map(|register| &registers[usize::from(register.0)]);
                     match host.load_field(object_value, *field) {
                         Ok(value) => {
                             registers[usize::from(dst.0)] = value;
@@ -184,7 +183,11 @@ impl Interpreter {
                         }
                     }
                 }
-                VmInstruction::Call { dst, method: call, args } => {
+                VmInstruction::Call {
+                    dst,
+                    method: call,
+                    args,
+                } => {
                     let values = args
                         .iter()
                         .map(|register| registers[usize::from(register.0)].clone())
