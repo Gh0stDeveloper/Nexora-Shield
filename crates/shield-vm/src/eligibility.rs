@@ -59,11 +59,7 @@ pub struct EligibilityAnalyzer;
 
 impl EligibilityAnalyzer {
     #[must_use]
-    pub fn analyze(
-        dex: &DexFile,
-        method_idx: u32,
-        policy: EligibilityPolicy,
-    ) -> EligibilityReport {
+    pub fn analyze(dex: &DexFile, method_idx: u32, policy: EligibilityPolicy) -> EligibilityReport {
         let Some(code) = dex.code_for_method(method_idx) else {
             return EligibilityReport {
                 method_idx,
@@ -81,7 +77,9 @@ impl EligibilityAnalyzer {
             .filter(|instruction| !instruction.is_payload())
             .collect::<Vec<_>>();
         let mut reasons = Vec::new();
-        let has_calls = executable.iter().any(|instruction| is_call(instruction.opcode));
+        let has_calls = executable
+            .iter()
+            .any(|instruction| is_call(instruction.opcode));
         let has_fields = executable
             .iter()
             .any(|instruction| is_field(instruction.opcode));
