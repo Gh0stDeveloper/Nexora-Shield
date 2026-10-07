@@ -1,5 +1,7 @@
 # Nexora Shield 1.0 — internal security review
 
+> **Post-Phase-N audit clarification:** this document records the internal security review performed within Phase N. A later production-readiness audit identified new P0/P1 findings, especially production-path orchestration, release governance and CodeQL finding-state enforcement. The authoritative current release decision is Phase O, not this historical N.9 review.
+
 ## Scope
 
 This is the internal production-hardening review for the 1.0 stable line. It complements, but does not replace, the independent N.13 external assessment.
