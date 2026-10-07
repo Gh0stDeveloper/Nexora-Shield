@@ -109,6 +109,19 @@ fn metadata_seal_rejects_tampering() -> Result<(), Box<dyn std::error::Error>> {
         Err(VmError::OpcodeFingerprintMismatch)
     );
 
+    let mut tampered_method = method.clone();
+    tampered_method.parameter_registers.reverse();
+    assert_eq!(
+        MetadataSealer::verify_executable(
+            &sealed,
+            b"metadata-key",
+            &tampered_method,
+            &stream,
+            &allocation
+        ),
+        Err(VmError::MetadataSealMismatch)
+    );
+
     let mut tampered_metadata = sealed.clone();
     tampered_metadata.payload[0] ^= 1;
     assert!(MetadataSealer::verify(&tampered_metadata, b"metadata-key").is_err());
