@@ -754,11 +754,16 @@ jobs:
         with:
           targets: aarch64-linux-android,x86_64-linux-android
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verify hosted Android SDK
+        run: |
+          test -n "${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          command -v sdkmanager
+          sdkmanager --version
 
       - name: Install pinned Android NDK
-        run: sdkmanager "ndk;${NEXORA_NDK_VERSION}" >/dev/null
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "ndk;${NEXORA_NDK_VERSION}" >/dev/null
 
       - name: Export pinned Android NDK
         run: echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NEXORA_NDK_VERSION}" >> "${GITHUB_ENV}"
