@@ -2,6 +2,7 @@
 
 ## H.1 Seed model
 - [x] Private seed type
+- [x] 32-byte minimum seed strength
 - [x] Debug redaction
 - [x] Zeroize on drop
 - [x] Application/build context
@@ -33,12 +34,12 @@
 
 ## H.5 CFG variants
 - [x] Per-method derivation
-- [x] Seeded block permutation
-- [x] Seeded tail rotation
-- [x] Branch-style variant
-- [x] Split budget
-- [x] Entry block invariant
-- [x] Complete-permutation invariant
+- [x] Seeded VM block-boundary selection
+- [x] Boundary padding variant
+- [x] Boundary trampoline variant
+- [x] Branch/handler target remapping
+- [x] Post-transform VM validation
+- [x] Original-vs-diversified semantic execution test
 
 ## H.6 Integrity graph topology variants
 - [x] Seeded tree
@@ -58,6 +59,9 @@
 - [x] Seeded partition offset
 - [x] No empty emitted shards
 - [x] Every logical id exactly once
+- [x] Phase C ProtectedString materialization
+- [x] Public shards contain opaque id + ciphertext only
+- [x] Private logical lookup redacted from Debug
 - [x] Cross-build partition fingerprint
 
 ## H.8 VM map variants
