@@ -113,10 +113,9 @@ fn build_edges(
             for node in remaining {
                 let selector =
                     seed.derive_u64(DiversityDomain::IntegrityTopology, node.label.as_bytes())?;
-                let parent_index = usize::try_from(
-                    selector % u64::try_from(parents.len()).unwrap_or(u64::MAX),
-                )
-                .unwrap_or(0);
+                let parent_index =
+                    usize::try_from(selector % u64::try_from(parents.len()).unwrap_or(u64::MAX))
+                        .unwrap_or(0);
                 edges.push(IntegrityEdge {
                     from: parents[parent_index],
                     to: node.id,

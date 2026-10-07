@@ -1,11 +1,11 @@
+use nexora_shield_crypto::{ProtectedString, ProtectedStringRecord, Sensitivity};
+use nexora_shield_dex::RenameConfig;
 use nexora_shield_diversity::{
     BuildDiversitySignature, BuildSeedContext, BypassPortabilityReport, CfgVariantPlan,
     CrossBuildBypassRegression, DiversityDomain, DiversityMode, IntegrityTopologyPlan,
     NativeConstantVariant, PassVariantPlan, PrivateBuildSeed, RenameVariant, SeedDeriver,
     StringPartitionPlan, VmMapVariant,
 };
-use nexora_shield_crypto::{ProtectedString, ProtectedStringRecord, Sensitivity};
-use nexora_shield_dex::RenameConfig;
 use nexora_shield_integrity::{
     IntegrityEdge, IntegrityError, IntegrityGraph, IntegrityNode, IntegrityNodeKind, Sha256Digest,
 };
@@ -184,8 +184,7 @@ fn h1_domains_are_separated_and_private_material_is_redacted(
 }
 
 #[test]
-fn h2_reproducible_private_mode_is_exactly_repeatable(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h2_reproducible_private_mode_is_exactly_repeatable() -> Result<(), Box<dyn std::error::Error>> {
     let private = private_seed(0x22)?;
     let context = BuildSeedContext {
         application_id: "dev.nexora.sample".to_owned(),
@@ -211,8 +210,7 @@ fn h2_unique_build_nonce_changes_the_plan() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn h3_rename_seed_changes_per_build_but_is_repeatable(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h3_rename_seed_changes_per_build_but_is_repeatable() -> Result<(), Box<dyn std::error::Error>> {
     let private = private_seed(0x44)?;
     let first_seed = SeedDeriver::derive(&private, &context("build-a", "n-a"))?;
     let second_seed = SeedDeriver::derive(&private, &context("build-b", "n-b"))?;
@@ -228,8 +226,7 @@ fn h3_rename_seed_changes_per_build_but_is_repeatable(
 }
 
 #[test]
-fn h4_pass_variants_preserve_required_constraints(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h4_pass_variants_preserve_required_constraints() -> Result<(), Box<dyn std::error::Error>> {
     let private = private_seed(0x55)?;
     let mut fingerprints = BTreeSet::new();
 
@@ -248,8 +245,7 @@ fn h4_pass_variants_preserve_required_constraints(
 }
 
 #[test]
-fn h5_cfg_variants_materialize_and_preserve_semantics(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h5_cfg_variants_materialize_and_preserve_semantics() -> Result<(), Box<dyn std::error::Error>> {
     let private = private_seed(0x66)?;
     let original = sample_vm_method();
     let first_seed = SeedDeriver::derive(&private, &context("cfg-a", "n-a"))?;
@@ -319,8 +315,7 @@ fn h6_integrity_topology_changes_without_invalidating_graph(
 }
 
 #[test]
-fn h7_string_partition_variants_cover_each_item_once(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h7_string_partition_variants_cover_each_item_once() -> Result<(), Box<dyn std::error::Error>> {
     let private = private_seed(0x88)?;
     let ids = string_ids();
     let first_seed = SeedDeriver::derive(&private, &context("strings-a", "n-a"))?;
@@ -350,8 +345,7 @@ fn h7_string_partition_variants_cover_each_item_once(
 }
 
 #[test]
-fn h8_vm_and_h9_native_variants_change_per_build(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h8_vm_and_h9_native_variants_change_per_build() -> Result<(), Box<dyn std::error::Error>> {
     let private = private_seed(0x99)?;
     let first_seed = SeedDeriver::derive(&private, &context("runtime-a", "n-a"))?;
     let second_seed = SeedDeriver::derive(&private, &context("runtime-b", "n-b"))?;
@@ -364,18 +358,16 @@ fn h8_vm_and_h9_native_variants_change_per_build(
         second_allocation.fingerprint()
     );
 
-    let (first_native, first_data) =
-        NativeConstantVariant::derive(&first_seed, "runtime-a")?;
-    let (second_native, second_data) =
-        NativeConstantVariant::derive(&second_seed, "runtime-b")?;
+    let (first_native, first_data) = NativeConstantVariant::derive(&first_seed, "runtime-a")?;
+    let (second_native, second_data) = NativeConstantVariant::derive(&second_seed, "runtime-b")?;
     assert_ne!(first_native.fingerprint, second_native.fingerprint);
     assert_ne!(first_data, second_data);
     Ok(())
 }
 
 #[test]
-fn h10_cross_build_bypass_portability_stays_below_budget(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn h10_cross_build_bypass_portability_stays_below_budget() -> Result<(), Box<dyn std::error::Error>>
+{
     let private = private_seed(0xaa)?;
     let signatures = (0..32)
         .map(|index| {
