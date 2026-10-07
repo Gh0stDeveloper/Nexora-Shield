@@ -1,5 +1,5 @@
 pub const REQUIRED_JNI_EXPORTS: [&str; 2] = [
-    "Java_dev_nexora_shield_NativeShield_nativeRuntimeVersion",
+    "Java_dev_nexora_shield_NativeShield_nativeRuntimeApiVersion",
     "Java_dev_nexora_shield_NativeShield_nativeAbiCode",
 ];
 
