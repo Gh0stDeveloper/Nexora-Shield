@@ -1,0 +1,38 @@
+name: Android release with Nexora Shield
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Build Nexora Shield CLI
+        run: cargo build --release -p nexora-shield-cli
+
+      - name: Build protected Android release
+        env:
+          NEXORA_SHIELD_CLI: ${{ github.workspace }}/target/release/nexora-shield
+          NEXORA_ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          NEXORA_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Upload public protection report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexora-shield-report
+          path: app/build/reports/nexora-shield/release/
