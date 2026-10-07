@@ -157,10 +157,11 @@ impl OpcodeStream {
     }
 
     pub fn semantics(&self, allocation: &OpcodeAllocation) -> Result<Vec<SemanticOpcode>> {
-        self.decode(allocation)?
+        Ok(self
+            .decode(allocation)?
             .iter()
-            .map(|instruction| Ok(semantic_opcode(instruction)))
-            .collect()
+            .map(semantic_opcode)
+            .collect())
     }
 
     #[must_use]
