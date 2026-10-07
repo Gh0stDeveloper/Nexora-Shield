@@ -89,11 +89,25 @@ impl StringPartitionPlan {
         let partition_count = min_allowed
             + usize::try_from(selector % u64::try_from(span).unwrap_or(u64::MAX)).unwrap_or(0);
 
-        let mut ordered = unique.into_iter().collect::<Vec<_>>();
-        ordered.sort_by_key(|logical_id| {
-            seed.derive_u64(DiversityDomain::StringPartition, logical_id.as_bytes())
-                .unwrap_or(0)
+        let mut keyed = unique
+            .into_iter()
+            .map(|logical_id| {
+                Ok((
+                    seed.derive_u64(
+                        DiversityDomain::StringPartition,
+                        logical_id.as_bytes(),
+                    )?,
+                    logical_id,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        keyed.sort_by(|(left_key, left), (right_key, right)| {
+            left_key.cmp(right_key).then_with(|| left.cmp(right))
         });
+        let ordered = keyed
+            .into_iter()
+            .map(|(_, logical_id)| logical_id)
+            .collect::<Vec<_>>();
 
         let offset_selector =
             seed.derive_u64(DiversityDomain::StringPartition, b"partition-offset")?;
