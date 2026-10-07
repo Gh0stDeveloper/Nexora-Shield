@@ -278,6 +278,8 @@ Estado actual: **COMPLETADA**. J.1–J.10 están implementadas: plugin Gradle ap
 ### K.9 Baseline profiles interaction
 ### K.10 Publishing tests
 
+Estado actual: **COMPLETADA**. K.1–K.10 quedaron integradas y validadas con AAB real, dynamic feature, bundletool 1.18.3, APK Sets default/universal, upload signing, publicación/consumo AAR, preservación de Baseline Profiles y compatibilidad Rust 1.81. GitHub Actions Phase K run #25 (`37588269683`) y CI run #849 (`37588269688`) finalizaron correctamente. PR #13 fue fusionado a `main` en el commit `7211607b34cc320dd80e52e523f41f364cfe2e77`.
+
 ---
 
 ## Fase L — Shield Studio
