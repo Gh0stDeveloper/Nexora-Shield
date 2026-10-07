@@ -30,7 +30,7 @@ kotlin {
 
         val desktopTest by getting {
             dependencies {
-                implementation(kotlin("test"))
+                implementation(kotlin("test-junit5"))\n                implementation("org.junit.jupiter:junit-jupiter:5.11.4")
             }
         }
     }
