@@ -55,8 +55,7 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn differential_branch_matches_reference_for_boundary_values(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn differential_branch_matches_reference_for_boundary_values() -> Result<(), Box<dyn std::error::Error>> {
     let method = DexLowerer::lower(&branch_dex(), 0, EligibilityPolicy::default())?;
     let allocation = OpcodeAllocation::derive("diff-branch", b"differential-seed")?;
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
