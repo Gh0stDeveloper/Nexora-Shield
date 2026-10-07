@@ -16,7 +16,10 @@ fun main() = application {
         state = rememberWindowState(width = 1440.dp, height = 900.dp),
     ) {
         LaunchedEffect(Unit) {
-            window.minimumSize = Dimension(\n                StudioLayoutPolicy.minimumWindowWidthPx,\n                StudioLayoutPolicy.minimumWindowHeightPx,\n            )
+            window.minimumSize = Dimension(
+                StudioLayoutPolicy.minimumWindowWidthPx,
+                StudioLayoutPolicy.minimumWindowHeightPx,
+            )
         }
         NexoraShieldTheme {
             StudioApp()
