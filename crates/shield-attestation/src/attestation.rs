@@ -2,6 +2,7 @@ use crate::error::{AttestationError, Result};
 use crate::session::{AttestationChallenge, ChallengeNonce, SessionId};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use zeroize::Zeroize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -43,6 +44,12 @@ impl AttestationEvidence {
             return Err(AttestationError::EvidenceBindingMismatch);
         }
         Ok(())
+    }
+}
+
+impl Drop for AttestationEvidence {
+    fn drop(&mut self) {
+        self.token.zeroize();
     }
 }
 
