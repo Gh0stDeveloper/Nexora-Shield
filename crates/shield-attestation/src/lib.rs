@@ -29,13 +29,17 @@ pub use attestation::{
 };
 pub use error::{AttestationError, Result};
 pub use policy::{
-    BuildRevocation, FeatureAccessDecision, FeatureDecisionReason, FeatureEvaluationContext,
-    FeaturePolicy, OfflineAction, OfflinePolicy, PolicyAuthenticator, PolicySignatureAlgorithm,
-    PolicySignatureVerifier, RemotePolicyPayload, SampleHmacPolicyAuthenticator,
-    SignedPolicyEnvelope, VerifiedRemotePolicy,
+    BuildRevocation, FeatureAccessDecision, FeatureDecisionReason, FeatureEvaluation,
+    FeatureEvaluationContext, FeaturePolicy, OfflineAction, OfflinePolicy, PolicyAuthenticator,
+    PolicySignatureAlgorithm, PolicySignatureVerifier, PolicySigner, RemotePolicyPayload,
+    SampleHmacPolicyAuthenticator, SignedPolicyEnvelope, VerifiedRemotePolicy,
+    MAX_OFFLINE_STALENESS_MS, REMOTE_POLICY_SCHEMA,
 };
 pub use privacy::{PrivacyAudit, PrivacyAuditReport, PrivacyDataCategory};
-pub use server::{AttestationRequest, SampleRemotePolicyServer, ServerAttestationResponse};
+pub use server::{
+    AttestationRequest, SampleHmacEvidenceAuthenticator, SampleRemotePolicyServer,
+    ServerAttestationResponse,
+};
 pub use session::{
     AttestationChallenge, ChallengeDeriver, ChallengeNonce, ReplayGuard, SessionId,
     DEFAULT_CHALLENGE_TTL_MS, MAX_CHALLENGE_TTL_MS,
