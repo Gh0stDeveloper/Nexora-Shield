@@ -62,7 +62,8 @@ impl PerformanceFarm {
         }
 
         protected_times.sort_unstable();
-        let p95_index = ((protected_times.len() - 1) * 95) / 100;
+        let rank = protected_times.len().saturating_mul(95).saturating_add(99) / 100;
+        let p95_index = rank.saturating_sub(1).min(protected_times.len() - 1);
         let maximum_runtime_overhead_basis_points =
             runtime_overheads.into_iter().max().unwrap_or(0);
         let maximum_size_overhead_basis_points = size_overheads.into_iter().max().unwrap_or(0);
