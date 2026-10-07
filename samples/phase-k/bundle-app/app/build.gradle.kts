@@ -20,7 +20,7 @@ android {
         versionName = "1.0"
     }
 
-    dynamicFeatures += setOf(":feature-payments")
+    dynamicFeatures += setOf(":feature_payments")
 
     signingConfigs {
         create("upload") {

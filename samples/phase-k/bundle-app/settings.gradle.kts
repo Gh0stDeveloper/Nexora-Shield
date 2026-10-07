@@ -17,4 +17,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "nexora-shield-phase-k-bundle"
 include(":app")
-include(":feature-payments")
+include(":feature_payments")
+project(":feature_payments").projectDir = file("feature-payments")
