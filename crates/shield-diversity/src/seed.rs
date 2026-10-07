@@ -18,6 +18,13 @@ impl PrivateBuildSeed {
         if bytes.is_empty() {
             return Err(DiversityError::EmptyPrivateSeed);
         }
+        const MIN_PRIVATE_SEED_BYTES: usize = 32;
+        if bytes.len() < MIN_PRIVATE_SEED_BYTES {
+            return Err(DiversityError::WeakPrivateSeed {
+                observed: bytes.len(),
+                minimum: MIN_PRIVATE_SEED_BYTES,
+            });
+        }
         Ok(Self { bytes })
     }
 
