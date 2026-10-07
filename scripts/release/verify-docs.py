@@ -16,6 +16,9 @@ REQUIRED = [
     "docs/TESTING.md",
     "docs/PHASE-M.md",
     "docs/PHASE-N.md",
+    "docs/PHASE-O.md",
+    "docs/PHASE-O-CHECKLIST.md",
+    "docs/PRODUCTION-READINESS-AUDIT.md",
     "docs/API-STABILITY.md",
     "docs/RELEASE-PROCESS.md",
     "docs/PHASE-N-SECURITY-REVIEW.md",
@@ -36,15 +39,34 @@ def main() -> int:
         "Next milestone | **Phase K",
         "current stable implementation covers the protection pipeline through **Phase J",
         "Future roadmap components such as Native Shield",
+        "| **F** | Native Shield | Next |",
+        "| **N** | Production hardening / 1.0 | Planned |",
+        "validated for stable publication.",
+        "Stable 1.0 | **Qualified",
     ]
     found = [marker for marker in stale if marker in readme]
     if found:
         raise SystemExit("documentation audit failed: stale README markers: " + repr(found))
 
     roadmap = (ROOT / "docs/ROADMAP.md").read_text()
-    for phase in ["Fase L", "Fase M", "Fase N"]:
+    for phase in ["Fase L", "Fase M", "Fase N", "Fase O"]:
         if phase not in roadmap:
             raise SystemExit(f"documentation audit failed: roadmap missing {phase}")
+
+    required_release_markers = {
+        "README.md": ["Phase O", "NO-GO until Phase O closes"],
+        "docs/RELEASE-PROCESS.md": ["Stable release freeze", "Phase O"],
+        "docs/PHASE-O.md": ["OPEN — RELEASE BLOCKING", "NO-GO for public stable"],
+        "docs/PHASE-O-CHECKLIST.md": ["Current decision: **NO-GO for public stable v1.0.0**"],
+        "docs/PRODUCTION-READINESS-AUDIT.md": ["NO-GO for public stable"],
+    }
+    for path, markers in required_release_markers.items():
+        content = (ROOT / path).read_text()
+        missing_markers = [marker for marker in markers if marker not in content]
+        if missing_markers:
+            raise SystemExit(
+                f"documentation audit failed: {path} missing release markers {missing_markers!r}"
+            )
 
     # Validate local markdown links that resolve to explicit file paths.
     pattern = re.compile(r"\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)")
