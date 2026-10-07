@@ -5,7 +5,7 @@ use nexora_shield_lab::{
     AuditEvidenceClass, AuditEvidenceItem, AuditPreparation, AuditReadinessInput,
     AuditRequirement, BenchmarkControl, ComparativeBenchmarkMethodology, ExposureRule, FuzzFarm, ModifiedEnvironmentCase,
     ModifiedEnvironmentLab, PerformanceBudget, PerformanceFarm, PerformanceSample, PortabilityLab,
-    RegressionCorpus, RuntimeInstrumentationCase, RuntimeInstrumentationLab, SecurityControlResult,
+    RegressionCorpus, RegressionCoverage, RuntimeInstrumentationCase, RuntimeInstrumentationLab, SecurityControlResult,
     SecurityScore, StaticExposureHarness, TamperKind, TamperLab, TamperObservation,
 };
 use nexora_shield_rasp::{
@@ -184,6 +184,14 @@ fn m9_regression_corpus_is_versioned_unique_and_fingerprinted() {
     corpus.validate().expect("valid corpus");
     assert!(corpus.cases.len() >= 12);
     assert_ne!(corpus.fingerprint().expect("fingerprint"), [0_u8; 32]);
+
+    let coverage: RegressionCoverage = serde_json::from_str(include_str!(
+        "../../../security-lab/corpus/coverage.json"
+    ))
+    .expect("coverage JSON");
+    coverage
+        .validate_against(&corpus)
+        .expect("every corpus case has a release gate");
 }
 
 #[test]
