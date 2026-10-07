@@ -1,4 +1,6 @@
-use nexora_shield_lab::{ExposureRule, RegressionCorpus, RegressionCoverage, StaticExposureHarness};
+use nexora_shield_lab::{
+    ExposureRule, RegressionCorpus, RegressionCoverage, StaticExposureHarness,
+};
 use std::path::PathBuf;
 
 fn main() {
@@ -46,17 +48,16 @@ fn run_corpus_validate(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-
 fn run_coverage_validate(args: &[String]) -> Result<(), String> {
     if args.len() != 2 {
         return Err(
             "usage: nexora-shield-lab coverage-validate <index.json> <coverage.json>".into(),
         );
     }
-    let corpus = RegressionCorpus::load(&PathBuf::from(&args[0]))
-        .map_err(|error| error.to_string())?;
-    let coverage = RegressionCoverage::load(&PathBuf::from(&args[1]))
-        .map_err(|error| error.to_string())?;
+    let corpus =
+        RegressionCorpus::load(&PathBuf::from(&args[0])).map_err(|error| error.to_string())?;
+    let coverage =
+        RegressionCoverage::load(&PathBuf::from(&args[1])).map_err(|error| error.to_string())?;
     coverage
         .validate_against(&corpus)
         .map_err(|error| error.to_string())?;
@@ -66,11 +67,7 @@ fn run_coverage_validate(args: &[String]) -> Result<(), String> {
 }
 
 fn run_static_scan(args: &[String]) -> Result<(), String> {
-    if args.len() != 7
-        || args[1] != "--needle-env"
-        || args[3] != "--id"
-        || args[5] != "--max"
-    {
+    if args.len() != 7 || args[1] != "--needle-env" || args[3] != "--id" || args[5] != "--max" {
         return Err(
             "usage: nexora-shield-lab static-scan <artifact> --needle-env <VAR> --id <RULE> --max <N>"
                 .into(),
