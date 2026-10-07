@@ -35,12 +35,22 @@ pub struct ApkSetInspection {
     pub apks: Vec<SplitApkInspection>,
 }
 
+/// Inspects a bundletool APK Set and classifies contained APK artifacts.
+///
+/// # Errors
+///
+/// Returns an error when the APK Set cannot be read or its ZIP container is
+/// malformed/unsupported.
 pub fn inspect_apk_set(path: &Path) -> Result<ApkSetInspection> {
     let directory = read_zip_directory(path)?;
     let mut apks = directory
         .entries
         .iter()
-        .filter(|entry| entry.name.ends_with(".apk"))
+        .filter(|entry| {
+            Path::new(&entry.name)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("apk"))
+        })
         .map(|entry| SplitApkInspection {
             path: entry.name.clone(),
             kind: classify_apk(&entry.name),
@@ -60,6 +70,12 @@ pub fn inspect_apk_set(path: &Path) -> Result<ApkSetInspection> {
     })
 }
 
+/// Verifies the minimum structural contract of a bundletool APK Set.
+///
+/// # Errors
+///
+/// Returns an error when toc.pb is missing, no APK artifacts are present, or
+/// the underlying archive cannot be inspected.
 pub fn verify_apk_set_structure(path: &Path) -> Result<ApkSetInspection> {
     let inspection = inspect_apk_set(path)?;
     if !inspection.toc_present {
