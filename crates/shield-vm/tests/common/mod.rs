@@ -71,6 +71,34 @@ pub fn branch_dex() -> DexFile {
     )
 }
 
+pub fn orphan_move_result_dex() -> DexFile {
+    dex_with_code(
+        1,
+        0,
+        vec![0x000a, 0x000f],
+        vec![
+            Instruction {
+                offset: 0,
+                opcode: 0x0a,
+                width: 1,
+                pseudo: None,
+                branch_targets: Vec::new(),
+                reference: None,
+                secondary_reference: None,
+            },
+            Instruction {
+                offset: 1,
+                opcode: 0x0f,
+                width: 1,
+                pseudo: None,
+                branch_targets: Vec::new(),
+                reference: None,
+                secondary_reference: None,
+            },
+        ],
+    )
+}
+
 pub fn unsupported_dex() -> DexFile {
     dex_with_code(
         1,
