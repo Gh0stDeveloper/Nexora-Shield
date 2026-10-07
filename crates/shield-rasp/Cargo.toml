@@ -1,0 +1,15 @@
+[package]
+name = "nexora-shield-rasp"
+description = "Runtime application self-protection evidence and policy primitives for Nexora Shield."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[lints]
+workspace = true
