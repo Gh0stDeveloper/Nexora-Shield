@@ -1,15 +1,22 @@
 use crate::error::{LabError, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BenchmarkControl {
+    SameDevice,
+    SameOsImage,
+    SameToolchain,
+    ResetBetweenColdStarts,
+    RetainRawSamples,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComparativeBenchmarkMethodology {
     pub warmup_runs: u32,
     pub measured_runs: u32,
-    pub same_device: bool,
-    pub same_os_image: bool,
-    pub same_toolchain: bool,
-    pub reset_between_cold_starts: bool,
-    pub retain_raw_samples: bool,
+    pub controls: BTreeSet<BenchmarkControl>,
 }
 
 impl ComparativeBenchmarkMethodology {
@@ -24,16 +31,18 @@ impl ComparativeBenchmarkMethodology {
                 "at least ten measured runs are required".into(),
             ));
         }
-        if !(self.same_device && self.same_os_image && self.same_toolchain) {
-            return Err(LabError::InvalidMethodology(
-                "baseline and protected runs must use the same device, OS image and toolchain"
-                    .into(),
-            ));
-        }
-        if !self.retain_raw_samples {
-            return Err(LabError::InvalidMethodology(
-                "raw benchmark samples must be retained".into(),
-            ));
+
+        for required in [
+            BenchmarkControl::SameDevice,
+            BenchmarkControl::SameOsImage,
+            BenchmarkControl::SameToolchain,
+            BenchmarkControl::RetainRawSamples,
+        ] {
+            if !self.controls.contains(&required) {
+                return Err(LabError::InvalidMethodology(format!(
+                    "required benchmark control is missing: {required:?}"
+                )));
+            }
         }
         Ok(())
     }
@@ -44,11 +53,13 @@ impl Default for ComparativeBenchmarkMethodology {
         Self {
             warmup_runs: 5,
             measured_runs: 30,
-            same_device: true,
-            same_os_image: true,
-            same_toolchain: true,
-            reset_between_cold_starts: true,
-            retain_raw_samples: true,
+            controls: BTreeSet::from([
+                BenchmarkControl::SameDevice,
+                BenchmarkControl::SameOsImage,
+                BenchmarkControl::SameToolchain,
+                BenchmarkControl::ResetBetweenColdStarts,
+                BenchmarkControl::RetainRawSamples,
+            ]),
         }
     }
 }
