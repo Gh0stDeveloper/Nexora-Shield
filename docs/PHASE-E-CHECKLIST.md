@@ -89,11 +89,26 @@
 - [x] Policy-to-response integration test
 
 ## E.11 Report-only mode
-- [ ] Pending
+- [x] Typed policy mode
+- [x] Enforce mode
+- [x] Report-only mode
+- [x] Configured/effective response separation
+- [x] Blocking-response suppression in report-only mode
+- [x] Critical-risk report-only regression test
+- [x] Configuration schema support
 
 ## E.12 False-positive lab
-- [ ] Pending
+- [x] Deterministic case model
+- [x] Maximum allowed risk assertions
+- [x] Maximum allowed response assertions
+- [x] Clean production profile
+- [x] Debuggable-only profile
+- [x] Weak emulator profile
+- [x] Unlocked-bootloader-only profile
+- [x] Root-artifact profile
+- [x] QEMU-only profile
+- [x] Regression-failure detection
 
 ## Closure state
 
-Phase E is **IN PROGRESS**. E.1–E.10 are implemented. E.1–E.7 were closed by CI #304. The phase must not be marked complete until E.11–E.12, full CI, documentation and the final false-positive acceptance gate are complete.
+Phase E implementation is **COMPLETE, PENDING FINAL CI CLOSURE**. E.1–E.12 are implemented. E.1–E.7 were closed by CI #304. The phase is marked DONE only after the complete E.1–E.12 acceptance matrix, Rust quality, RustSec, MSRV and A–D regression gates are green on the final head.
