@@ -105,3 +105,19 @@ Its release build is intentionally unsigned and unaligned for repository CI so t
 The Gradle plugin is orchestration. It does not turn build-time secrets into runtime secrets and it does not make Android client code uninspectable.
 
 The plugin deliberately avoids logging raw secret values. Production release signing remains an explicit external trust boundary.
+
+
+## AGP 9.4.1 compatibility correction
+
+The real J.10 integration build exposed two Android packaging details that are now covered by regression tests:
+
+- `SingleArtifact.APK` is a ContainsMany artifact and is transformed through `toTransformMany` plus `ArtifactTransformationRequest.submit`;
+- Android Zipflinger can encode local-entry alignment as raw zero padding in the ZIP extra area. Nexora Shield accepts and strips only an all-zero residual suffix while malformed non-zero trailing data remains rejected.
+
+This keeps the ZIP parser strict while making it compatible with APKs produced by current AGP tooling.
+
+## Closure state
+
+Phase J is **COMPLETED**. GitHub Actions run **#760** (ID `37581846372`) passed all **24 jobs** on commit `b1e493204ce95241f3c53d4f0957a0338e984177`.
+
+The acceptance matrix includes Rust quality, RustSec, all Phase A–I regressions, J.1–J.9 plugin tests/validation, and J.10's real AGP 9.4.1 `assembleRelease` with Nexora Shield APK transformation and report verification.

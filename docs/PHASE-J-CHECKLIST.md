@@ -13,7 +13,7 @@
 - [x] SingleArtifact.APK transformation
 - [x] Directory artifact wiring
 - [x] AGP-owned task dependencies
-- [ ] Real sample assembleRelease CI validation
+- [x] Real sample assembleRelease CI validation — run #760
 
 ## J.3 Release-only defaults
 - [x] releaseOnly=true default
@@ -61,15 +61,15 @@
 
 ## J.9 CI examples
 - [x] GitHub Actions example
-- [ ] Dedicated plugin build/test CI green
-- [ ] Full repository regression matrix green
+- [x] Dedicated plugin build/test CI green — run #760
+- [x] Full repository regression matrix green — run #760
 
 ## J.10 Sample apps
 - [x] Minimal Android application
 - [x] Composite plugin build
 - [x] Release-only configuration
-- [ ] Protected sample release validated in CI
+- [x] Protected sample release validated in CI — run #760
 
 ## Closure state
 
-Phase J implementation is **IN PROGRESS**. Code, schema, documentation and sample project are present. The phase is not closed until the Gradle plugin validates, the real Android sample release passes through the artifact transform, and the complete Phase A-I regression matrix remains green.
+Phase J is **COMPLETED**. J.1–J.10 are implemented. GitHub Actions run #760 (`37581846372`) passed all 24 jobs on commit `b1e493204ce95241f3c53d4f0957a0338e984177`, including strict Rust quality, Phase A–I regressions, Gradle plugin validation, and a real AGP 9.4.1 `assembleRelease` whose APK passed through the Nexora Shield artifact transform.
