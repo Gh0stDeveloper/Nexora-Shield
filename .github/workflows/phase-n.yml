@@ -60,7 +60,7 @@ jobs:
           python scripts/release/verify-release-workflow.py
 
       - name: Validate version synchronization
-        run: python scripts/release/verify-version-sync.py 1.0.0-rc.1
+        run: python scripts/release/verify-version-sync.py 1.0.0
 
   sbom-provenance:
     name: N.6 SBOM and provenance
@@ -132,15 +132,11 @@ jobs:
       - name: Validate compatibility contract
         run: cargo run --locked --quiet -p nexora-shield-release -- compatibility-validate release/compatibility-matrix.json
 
-      - name: Validate RC review metadata
-        run: python scripts/release/verify-release-metadata.py rc
+      - name: Validate stable review metadata
+        run: python scripts/release/verify-release-metadata.py stable
 
-      - name: Verify stable remains blocked before N.13
-        run: |
-          if python scripts/release/verify-release-metadata.py stable; then
-            echo "stable unexpectedly eligible before external feedback/device evidence" >&2
-            exit 1
-          fi
+      - name: Validate recorded external assessment
+        run: cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json
 
       - name: Run Phase M performance regression
         run: cargo test --locked -p nexora-shield-lab --test phase_m m8_performance_farm_enforces_runtime_and_size_budgets -- --exact
@@ -468,8 +464,8 @@ jobs:
           category: "/language:java-kotlin"
 
 
-  rc-qualification:
-    name: N.12 1.0 RC qualification
+  stable-qualification:
+    name: N.14 1.0 stable qualification
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
@@ -492,12 +488,14 @@ jobs:
       - name: Validate qualification policy
         run: cargo run --locked --quiet -p nexora-shield-release -- qualification-validate release/qualification-policy.json
 
-      - name: Validate 1.0 RC version
-        run: cargo run --locked --quiet -p nexora-shield-release -- version-check 1.0.0-rc.1 rc
+      - name: Validate stable release metadata
+        run: python scripts/release/verify-release-metadata.py stable
 
-      - name: Confirm stable guard is still closed
+      - name: Validate external assessment gate
+        run: cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json
+
+      - name: Validate exact 1.0.0 stable version
         run: |
-          if cargo run --locked --quiet -p nexora-shield-release -- feedback-validate release/qualification-policy.json release/feedback-status.json; then
-            echo "stable feedback gate unexpectedly open" >&2
-            exit 1
-          fi
+          python scripts/release/verify-version-sync.py 1.0.0
+          cargo run --locked --quiet -p nexora-shield-release -- version-check 1.0.0 stable
+
