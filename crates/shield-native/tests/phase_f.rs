@@ -10,7 +10,7 @@ fn runtime_descriptor_has_stable_api_version() {
     let descriptor = NativeRuntimeDescriptor::current();
     assert_eq!(descriptor.api_version, NATIVE_RUNTIME_API_VERSION);
     assert_eq!(descriptor.crate_version, env!("CARGO_PKG_VERSION"));
-    assert!(!descriptor.target_arch.is_empty());
+    assert_ne!(descriptor.target_arch, "");
 }
 
 #[test]
