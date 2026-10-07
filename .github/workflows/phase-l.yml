@@ -1,0 +1,64 @@
+name: Phase L
+
+on:
+  push:
+    branches:
+      - main
+      - feat/phase-l-shield-studio
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-l-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  studio-tests:
+    name: L.1-L.10 Studio services
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Run Studio unit tests
+        run: gradle -p studio desktopTest --no-daemon --stacktrace
+
+  studio-compile:
+    name: L.1 Compose desktop compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Compile Shield Studio
+        run: gradle -p studio compileKotlinDesktop --no-daemon --stacktrace
