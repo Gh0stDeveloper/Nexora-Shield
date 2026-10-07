@@ -1,0 +1,198 @@
+name: Phase M
+
+on:
+  push:
+    branches:
+      - main
+      - feat/phase-m-security-lab
+  pull_request:
+    branches:
+      - main
+      - feat/phase-l-uiux-polish
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-m-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lab-core:
+    name: M.1 M.4-M.12 Security Lab core
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXORA_LAB_PROBE: NX_SECURITY_LAB_SYNTHETIC_MARKER_4F7826
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test Phase M
+        run: cargo test --locked -p nexora-shield-lab --all-targets
+
+      - name: Clippy Phase M
+        run: cargo clippy --locked -p nexora-shield-lab --all-targets -- -D warnings
+
+      - name: Validate regression corpus
+        run: cargo run --locked --quiet -p nexora-shield-lab -- corpus-validate security-lab/corpus/index.json
+
+      - name: Validate static exposure pass/fail behavior
+        run: |
+          mkdir -p build/phase-m
+          printf '%s' 'opaque protected fixture' > build/phase-m/clean.bin
+          printf '%s' "prefix-${NEXORA_LAB_PROBE}-suffix" > build/phase-m/exposed.bin
+
+          cargo run --locked --quiet -p nexora-shield-lab --             static-scan build/phase-m/clean.bin             --needle-env NEXORA_LAB_PROBE             --id phase-m-ci-probe             --max 0
+
+          if cargo run --locked --quiet -p nexora-shield-lab --             static-scan build/phase-m/exposed.bin             --needle-env NEXORA_LAB_PROBE             --id phase-m-ci-probe             --max 0; then
+            echo "exposed synthetic marker unexpectedly passed" >&2
+            exit 1
+          fi
+
+  lab-msrv:
+    name: M.1-M.12 Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test Security Lab on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-lab --all-targets
+
+  tamper-e2e:
+    name: M.2-M.3 real repack and re-sign rejection
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Discover Android build tools
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          test -d "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+
+      - name: Create owned Security Lab fixtures
+        run: |
+          mkdir -p build/phase-m
+          python scripts/security-lab/make_dex_fixture.py build/phase-m/classes.dex
+          printf '%s' '{"mode":"strict","fixture":"phase-m"}' > build/phase-m/config.json
+          printf '\177ELFphase-m-native-fixture-v1' > build/phase-m/libnexora.so
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          with zipfile.ZipFile("build/phase-m/base.apk", "w", compression=zipfile.ZIP_STORED) as apk:
+              apk.writestr("AndroidManifest.xml", b'<manifest package="dev.nexora.securitylab"/>')
+              apk.writestr("classes.dex", Path("build/phase-m/classes.dex").read_bytes())
+          PY
+
+      - name: Create independent signer A and signer B
+        run: |
+          keytool -genkeypair -noprompt             -keystore build/phase-m/signer-a.p12             -storetype PKCS12             -storepass phase-m-pass             -keypass phase-m-pass             -alias signer-a             -keyalg RSA             -keysize 2048             -validity 3650             -dname "CN=Nexora Shield Security Lab A, O=CI, C=MX"
+
+          keytool -genkeypair -noprompt             -keystore build/phase-m/signer-b.p12             -storetype PKCS12             -storepass phase-m-pass             -keypass phase-m-pass             -alias signer-b             -keyalg RSA             -keysize 2048             -validity 3650             -dname "CN=Nexora Shield Security Lab B, O=CI, C=MX"
+
+          cp build/phase-m/base.apk build/phase-m/app-a.apk
+          cp build/phase-m/base.apk build/phase-m/app-b.apk
+
+          "$APKSIGNER" sign             --min-sdk-version 24             --ks build/phase-m/signer-a.p12             --ks-key-alias signer-a             --ks-pass pass:phase-m-pass             --key-pass pass:phase-m-pass             build/phase-m/app-a.apk
+
+          "$APKSIGNER" sign             --min-sdk-version 24             --ks build/phase-m/signer-b.p12             --ks-key-alias signer-b             --ks-pass pass:phase-m-pass             --key-pass pass:phase-m-pass             build/phase-m/app-b.apk
+
+          CERTS_A="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-m/app-a.apk)"
+          CERTS_B="$("$APKSIGNER" verify --min-sdk-version 24 --print-certs build/phase-m/app-b.apk)"
+          SIGNER_A="$(printf '%s\n' "$CERTS_A" | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' | head -n 1)"
+          SIGNER_B="$(printf '%s\n' "$CERTS_B" | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' | head -n 1)"
+          test -n "$SIGNER_A"
+          test -n "$SIGNER_B"
+          test "$SIGNER_A" != "$SIGNER_B"
+          echo "SIGNER_A=$SIGNER_A" >> "$GITHUB_ENV"
+          echo "SIGNER_B=$SIGNER_B" >> "$GITHUB_ENV"
+
+      - name: Build and verify clean integrity evidence
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- integrity-create             --output build/phase-m/integrity.json             --build-id phase-m-ci             --app-id dev.nexora.securitylab             --version-code 1             --signer-sha256 "$SIGNER_A"             --dex classes.dex=build/phase-m/classes.dex             --resource assets/config.json=build/phase-m/config.json             --native lib/arm64-v8a/libnexora.so=build/phase-m/libnexora.so             --seed phase-m-distribution             --checks 5             --redundancy 2
+
+          cargo run --locked --quiet -p nexora-shield -- integrity-verify             build/phase-m/integrity.json             --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.securitylab             --version-code 1             --dex classes.dex=build/phase-m/classes.dex             --artifact assets/config.json=build/phase-m/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-m/libnexora.so
+
+      - name: M.2 reject DEX resource native and identity repacks
+        run: |
+          cp build/phase-m/classes.dex build/phase-m/classes-patched.dex
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("build/phase-m/classes-patched.dex")
+          data = bytearray(path.read_bytes())
+          data[-1] ^= 0x01
+          path.write_bytes(data)
+          PY
+
+          cp build/phase-m/config.json build/phase-m/config-patched.json
+          printf '\npatched=true\n' >> build/phase-m/config-patched.json
+          cp build/phase-m/libnexora.so build/phase-m/libnexora-patched.so
+          printf 'patch' >> build/phase-m/libnexora-patched.so
+
+          reject() {
+            if "$@"; then
+              echo "tampered evidence unexpectedly passed: $*" >&2
+              exit 1
+            fi
+          }
+
+          reject cargo run --locked --quiet -p nexora-shield -- integrity-verify             build/phase-m/integrity.json --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.securitylab --version-code 1             --dex classes.dex=build/phase-m/classes-patched.dex             --artifact assets/config.json=build/phase-m/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-m/libnexora.so
+
+          reject cargo run --locked --quiet -p nexora-shield -- integrity-verify             build/phase-m/integrity.json --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.securitylab --version-code 1             --dex classes.dex=build/phase-m/classes.dex             --artifact assets/config.json=build/phase-m/config-patched.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-m/libnexora.so
+
+          reject cargo run --locked --quiet -p nexora-shield -- integrity-verify             build/phase-m/integrity.json --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.securitylab --version-code 1             --dex classes.dex=build/phase-m/classes.dex             --artifact assets/config.json=build/phase-m/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-m/libnexora-patched.so
+
+          reject cargo run --locked --quiet -p nexora-shield -- integrity-verify             build/phase-m/integrity.json --observed-signer-sha256 "$SIGNER_A"             --app-id dev.nexora.repacked --version-code 1             --dex classes.dex=build/phase-m/classes.dex             --artifact assets/config.json=build/phase-m/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-m/libnexora.so
+
+      - name: M.3 reject independently re-signed evidence
+        run: |
+          if cargo run --locked --quiet -p nexora-shield -- integrity-verify             build/phase-m/integrity.json             --observed-signer-sha256 "$SIGNER_B"             --app-id dev.nexora.securitylab             --version-code 1             --dex classes.dex=build/phase-m/classes.dex             --artifact assets/config.json=build/phase-m/config.json             --artifact lib/arm64-v8a/libnexora.so=build/phase-m/libnexora.so; then
+            echo "re-signed evidence unexpectedly passed" >&2
+            exit 1
+          fi
+
+  portability-regression:
+    name: M.6 cross-build bypass portability
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Phase H 32-build regression
+        run: cargo test --locked -p nexora-shield-diversity --test phase_h h10_cross_build_bypass_portability_stays_below_budget -- --exact
+
+      - name: Run Phase M portability gate
+        run: cargo test --locked -p nexora-shield-lab --test phase_m m6_bypass_portability_gate_rejects_transferable_builds -- --exact
