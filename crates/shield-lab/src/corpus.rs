@@ -37,7 +37,6 @@ pub struct RegressionCorpus {
     pub cases: Vec<RegressionCase>,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegressionCoverageEntry {
     pub case_id: String,
@@ -171,8 +170,6 @@ fn valid_case_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 96
         && id.bytes().all(|byte| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'.' | b'-' | b'_')
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'_')
         })
 }
