@@ -288,6 +288,12 @@ jobs:
             --name nexora_phase_n \
             --package "system-images;android-35;google_apis;x86_64" \
             --device "pixel_6"
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 666 /dev/kvm
+          else
+            echo "/dev/kvm is unavailable; representative Android benchmark requires hardware acceleration" >&2
+            exit 1
+          fi
           nohup "$SDK_ROOT/emulator/emulator" \
             -avd nexora_phase_n \
             -no-window \
@@ -295,6 +301,9 @@ jobs:
             -no-boot-anim \
             -gpu swiftshader_indirect \
             -no-snapshot \
+            -accel on \
+            -cores 2 \
+            -memory 2048 \
             > build/phase-n/android-perf/emulator.log 2>&1 &
           "$SDK_ROOT/platform-tools/adb" wait-for-device
           for i in {1..120}; do
