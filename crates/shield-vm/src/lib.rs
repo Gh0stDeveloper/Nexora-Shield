@@ -40,9 +40,7 @@ pub use ir::{
     BranchCondition, VmException, VmExceptionHandler, VmInstruction, VmMethod, VmRegister,
 };
 pub use lowering::DexLowerer;
-pub use opcode::{
-    OpcodeAllocation, OpcodeStream, SemanticOpcode, ALL_SEMANTIC_OPCODES,
-};
+pub use opcode::{OpcodeAllocation, OpcodeStream, SemanticOpcode, ALL_SEMANTIC_OPCODES};
 pub use perf::{PerformanceEstimate, PerformanceEstimator};
 pub use seal::{MetadataSealer, SealedMetadata, VmMetadata};
 pub use security::{SecurityBenchmarkReport, VmSecurityBenchmark};
