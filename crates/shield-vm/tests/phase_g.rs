@@ -79,8 +79,7 @@ fn metadata_seal_rejects_tampering() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn arithmetic_exception_handler_preserves_control_flow(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn arithmetic_exception_handler_preserves_control_flow() -> Result<(), Box<dyn std::error::Error>> {
     let mut constants = ConstantPool::default();
     let fallback = constants.intern(VmConstant::Int(-1))?;
     let method = VmMethod {
@@ -204,8 +203,7 @@ fn performance_estimator_accounts_for_host_boundaries() {
 }
 
 #[test]
-fn config_and_annotation_selection_are_both_supported(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn config_and_annotation_selection_are_both_supported() -> Result<(), Box<dyn std::error::Error>> {
     let dex = add_dex();
     let annotated = BTreeSet::from([0_u32]);
     let config = VmSelectionConfig {
