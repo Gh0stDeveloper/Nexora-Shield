@@ -1,5 +1,6 @@
 package dev.nexora.shield.gradle
 
+import com.android.build.api.artifact.ArtifactTransformationRequest
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
@@ -9,6 +10,7 @@ import org.gradle.work.DisableCachingByDefault
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
@@ -16,7 +18,6 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import java.io.File
-import java.nio.file.Files
 import javax.inject.Inject
 
 @DisableCachingByDefault(
@@ -80,6 +81,10 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     @get:Input
     abstract val cacheKeyVersion: Property<String>
 
+    @get:Internal
+    abstract val transformationRequest:
+        Property<ArtifactTransformationRequest<NexoraShieldApkTransformTask>>
+
     @get:Inject
     abstract val execOperations: ExecOperations
 
@@ -87,48 +92,36 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     fun protect() {
         validateConfiguration()
 
-        val inputRoot = inputDirectory.get().asFile.toPath()
-        val outputRoot = outputDirectory.get().asFile.toPath()
+        val outputRoot = outputDirectory.get().asFile
         val publicRoot = publicReportsDirectory.get().asFile
         val privateRoot = privateReportsDirectory.get().asFile
 
-        outputRoot.toFile().deleteRecursively()
-        Files.createDirectories(outputRoot)
         publicRoot.deleteRecursively()
         privateRoot.deleteRecursively()
         publicRoot.mkdirs()
         privateRoot.mkdirs()
 
-        val apkFiles = Files.walk(inputRoot).use { stream ->
-            stream
-                .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".apk") }
-                .sorted()
-                .toList()
-        }
-
-        if (apkFiles.isEmpty()) {
-            throw GradleException(
-                "Nexora Shield found no APKs for variant '" + variantName.get() + "'.",
-            )
-        }
-
-        copyNonApkFiles(inputRoot.toFile(), outputRoot.toFile())
-
         val secretEnvironment = linkedMapOf<String, String>()
         configureSigningEnvironment(secretEnvironment)
 
-        apkFiles.forEach { inputApk ->
-            val relative = inputRoot.relativize(inputApk)
-            val outputApk = outputRoot.resolve(relative)
-            Files.createDirectories(outputApk.parent)
+        var apkCount = 0
+        transformationRequest.get().submit(this) { builtArtifact ->
+            val inputApk = File(builtArtifact.outputFile)
+            if (!inputApk.isFile || !inputApk.name.endsWith(".apk")) {
+                throw GradleException(
+                    "Nexora Shield received an invalid APK artifact: " + inputApk.path,
+                )
+            }
 
-            val stem = inputApk.fileName.toString().removeSuffix(".apk")
+            outputRoot.mkdirs()
+            val outputApk = File(outputRoot, inputApk.name)
+            val stem = inputApk.name.removeSuffix(".apk")
             val command = mutableListOf(
                 cliExecutable.get(),
                 "protect",
-                inputApk.toFile().absolutePath,
+                inputApk.absolutePath,
                 "--output",
-                outputApk.toFile().absolutePath,
+                outputApk.absolutePath,
                 "--profile",
                 profile.get(),
                 "--min-sdk",
@@ -172,10 +165,25 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
                 commandLine(command)
                 environment(secretEnvironment)
             }
+
+            if (!outputApk.isFile || outputApk.length() == 0L) {
+                throw GradleException(
+                    "Nexora Shield did not produce a non-empty APK for " + inputApk.name,
+                )
+            }
+
+            apkCount += 1
+            outputApk
+        }
+
+        if (apkCount == 0) {
+            throw GradleException(
+                "Nexora Shield found no APKs for variant '" + variantName.get() + "'.",
+            )
         }
 
         File(publicRoot, "variant-summary.json").writeText(
-            summaryJson(apkFiles.size),
+            summaryJson(apkCount),
             Charsets.UTF_8,
         )
     }
@@ -225,17 +233,6 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
 
         target[STORE_PASSWORD_ENV] = storePassword
         target[KEY_PASSWORD_ENV] = keyPassword
-    }
-
-    private fun copyNonApkFiles(inputRoot: File, outputRoot: File) {
-        inputRoot.walkTopDown()
-            .filter { it.isFile && !it.name.endsWith(".apk") }
-            .forEach { source ->
-                val relative = source.relativeTo(inputRoot)
-                val destination = File(outputRoot, relative.path)
-                destination.parentFile.mkdirs()
-                source.copyTo(destination, overwrite = true)
-            }
     }
 
     private fun summaryJson(apkCount: Int): String {
