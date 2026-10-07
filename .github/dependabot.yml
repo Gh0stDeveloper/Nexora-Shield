@@ -7,3 +7,24 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "build(deps)"
+  - package-ecosystem: gradle
+    directory: "/gradle-plugin"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+  - package-ecosystem: gradle
+    directory: "/studio"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
