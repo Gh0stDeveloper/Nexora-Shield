@@ -57,13 +57,8 @@ fn differential_branch_matches_reference_for_boundary_values(
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
     let metadata = VmMetadata::from_method(&method, &allocation)?;
     let sealed = MetadataSealer::seal(&metadata, b"differential-key")?;
-    let protected = SealedExecution::new(
-        &method,
-        &stream,
-        &allocation,
-        &sealed,
-        b"differential-key",
-    );
+    let protected =
+        SealedExecution::new(&method, &stream, &allocation, &sealed, b"differential-key");
     let mut host = NullHost;
 
     for condition in [i32::MIN, -1, 0, 1, i32::MAX] {
