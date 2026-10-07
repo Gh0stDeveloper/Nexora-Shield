@@ -657,8 +657,8 @@ jobs:
 
 
 
-  phase-e-rasp-e1-e7:
-    name: Phase E RASP E.1-E.7
+  phase-e-rasp-e1-e10:
+    name: Phase E RASP E.1-E.10
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -677,8 +677,8 @@ jobs:
       - name: Clippy RASP evidence crate
         run: cargo clippy --locked -p nexora-shield-rasp --all-targets -- -D warnings
 
-  phase-e-rasp-e1-e7-msrv:
-    name: Phase E RASP E.1-E.7 Rust 1.81 MSRV
+  phase-e-rasp-e1-e10-msrv:
+    name: Phase E RASP E.1-E.10 Rust 1.81 MSRV
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
