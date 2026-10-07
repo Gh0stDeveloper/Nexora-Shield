@@ -35,7 +35,7 @@ impl VmHost for NullHost {
         _object: Option<&VmValue>,
         field: u32,
     ) -> std::result::Result<VmValue, VmException> {
-        Err(host_exception(format!("field read #{field} is unavailable")))
+        Err(host_exception(&format!("field read #{field} is unavailable")))
     }
 
     fn store_field(
@@ -44,7 +44,7 @@ impl VmHost for NullHost {
         field: u32,
         _value: &VmValue,
     ) -> std::result::Result<(), VmException> {
-        Err(host_exception(format!("field write #{field} is unavailable")))
+        Err(host_exception(&format!("field write #{field} is unavailable")))
     }
 
     fn call(
@@ -52,11 +52,11 @@ impl VmHost for NullHost {
         method: u32,
         _args: &[VmValue],
     ) -> std::result::Result<VmValue, VmException> {
-        Err(host_exception(format!("method call #{method} is unavailable")))
+        Err(host_exception(&format!("method call #{method} is unavailable")))
     }
 }
 
-fn host_exception(message: String) -> VmException {
+fn host_exception(message: &str) -> VmException {
     VmException {
         type_name: Some("Ldev/nexora/shield/VmHostException;".to_owned()),
         value: VmValue::Const(hash_message(&message)),
