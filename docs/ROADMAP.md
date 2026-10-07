@@ -302,7 +302,7 @@ Estado actual: **COMPLETADA**. K.1–K.10 quedaron integradas y validadas con AA
 
 Studio nunca reemplaza la CLI; es una capa de UX.
 
-Estado actual: **L.1–L.10 COMPLETADAS; L.11–L.15 EN VALIDACIÓN**. El núcleo funcional quedó validado por Phase L run #20 (`37591941642`), CI #891 (`37591941514`) y Phase K regression #36 (`37591941555`). La extensión L.11–L.15 eleva Shield Studio a calidad de producto final con design system propio, dashboard, navegación jerárquica, estados semánticos, ergonomía responsive, accesibilidad y presentación desktop.
+Estado actual: **COMPLETADA**. L.1–L.15 están implementadas y validadas. Shield Studio dispone de núcleo funcional completo y una UX/UI de producto final con design system propio, dashboard, navegación jerárquica, estados semánticos, ergonomía responsive, accesibilidad, consola diferenciada y presentación desktop. GitHub Actions Phase L run #35 (`37601597136`), Phase K regression #50 (`37601597546`) y CI run #929 (`37601597217`) finalizaron correctamente sobre el head validado `6e5ed0ba67dc73bf56c36f47cac758106aa6a43d`.
 
 ---
 

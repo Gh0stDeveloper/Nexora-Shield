@@ -86,7 +86,7 @@
 - [x] Semantic success/warning/error states
 - [x] Reusable panel/metric/status/empty-state components
 - [x] Consistent product iconography
-- [ ] Final Compose compile gate
+- [x] Final Compose compile gate
 
 ## L.12 Dashboard & information architecture
 - [x] Dashboard as default landing screen
@@ -94,7 +94,7 @@
 - [x] Project readiness summary
 - [x] Protection/profile/module/artifact metrics
 - [x] Contextual quick actions
-- [ ] Final navigation compile gate
+- [x] Final navigation compile gate
 
 ## L.13 End-user workflow UX
 - [x] Consistent page hierarchy
@@ -103,7 +103,7 @@
 - [x] Structured project/report/policy panels
 - [x] Dedicated command/retrace console surface
 - [x] Selectable hashes, paths and output
-- [ ] Final workflow UI gate
+- [x] Final workflow UI gate
 
 ## L.14 Responsive desktop & accessibility
 - [x] Minimum viewport policy
@@ -113,7 +113,7 @@
 - [x] UX policy unit tests
 - [x] Text/icon status in addition to color
 - [x] Accessible navigation descriptions
-- [ ] Final accessibility/responsive compile gate
+- [x] Final accessibility/responsive compile gate
 
 ## L.15 Final polish & distribution presentation
 - [x] Branded application shell
@@ -121,17 +121,17 @@
 - [x] Consistent Windows/macOS/Linux distribution metadata
 - [x] No regression to secret handling boundaries
 - [x] No regression to direct argument-vector execution
-- [ ] Final Studio test gate
-- [ ] Final Phase K regression gate
-- [ ] Final repository CI gate
+- [x] Final Studio test gate
+- [x] Final Phase K regression gate
+- [x] Final repository CI gate
 
 ## Closure state
 
-Phase L core L.1–L.10 is **COMPLETED**. UX polish L.11–L.15 is **IN VALIDATION** until its final Compose, Studio-test and regression gates pass.
+Phase L is **COMPLETED** through L.15. All functional, UX/UI, responsive, accessibility and regression acceptance gates passed.
 
 Validated by GitHub Actions:
-- Phase L run #20 (`37591941642`): **success**
-- CI run #891 (`37591941514`): **success**
-- Phase K regression run #36 (`37591941555`): **success**
+- Phase L run #35 (`37601597136`): **success**
+- Phase K regression run #50 (`37601597546`): **success**
+- CI run #929 (`37601597217`): **success** — 24/24 jobs passed
 
-The validated implementation head is `7e9d149e72885263b183f71e907d3ef6482a4e4a`.
+The validated implementation head is `6e5ed0ba67dc73bf56c36f47cac758106aa6a43d`.

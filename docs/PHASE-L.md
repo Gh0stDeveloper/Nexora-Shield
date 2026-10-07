@@ -173,17 +173,19 @@ Phase L is complete only when:
 
 ## Closure status
 
-**CORE COMPLETED — UX POLISH L.11–L.15 IN VALIDATION**
+**COMPLETED — L.1–L.15**
 
-All Phase L closure requirements were satisfied on the validated implementation head:
+All Phase L core and UX polish closure requirements were satisfied on the validated implementation head:
 
 - Compose Multiplatform desktop compilation passed;
 - project import, configuration round-trip, selectors, reports and performance-budget services are covered by tests;
 - Gradle, artifact verification and Retrace use explicit argument vectors rather than shell interpolation;
 - APK/AAB/AAR/APKS routing and unsupported-artifact rejection are tested;
 - secret-provider handling exposes references/status only and never renders raw secret material;
-- Phase L run #20 (`37591941642`), CI run #891 (`37591941514`) and Phase K regression #36 (`37591941555`) all passed.
+- Phase L run #35 (`37601597136`) passed Compose compilation and all Studio service/UX policy tests;
+- Phase K regression run #50 (`37601597546`) passed;
+- CI run #929 (`37601597217`) passed all 24 jobs with zero failures.
 
-Validated implementation head: `7e9d149e72885263b183f71e907d3ef6482a4e4a`.
+Validated implementation head: `6e5ed0ba67dc73bf56c36f47cac758106aa6a43d`.
 
-The next roadmap phase remains **Phase M — Security Lab** after the L.11–L.15 UX polish extension is validated.
+Phase L is formally complete through L.15. The next roadmap phase is **Phase M — Security Lab**.
