@@ -351,6 +351,31 @@ jobs:
           retention-days: 30
 
 
+  external-assessment:
+    name: N.13 independent external assessment
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Analyze JVM surfaces
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
+
+
   rc-qualification:
     name: N.12 1.0 RC qualification
     runs-on: ubuntu-latest
@@ -363,6 +388,7 @@ jobs:
       - release-msrv
       - inherited-regressions
       - android-stable-performance
+      - external-assessment
 
     steps:
       - name: Checkout
