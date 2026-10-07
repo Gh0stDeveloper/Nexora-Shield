@@ -99,9 +99,9 @@ fn run_feedback(args: &[String]) -> Result<(), String> {
         FeedbackStatus::load(&PathBuf::from(&args[1])).map_err(|error| error.to_string())?;
     if !policy.stable_feedback_satisfied(&feedback) {
         return Err(format!(
-            "stable release blocked: external_reviewers={} required={} blocking_findings_open={}",
-            feedback.external_reviewers,
-            policy.minimum_external_reviewers,
+            "stable release blocked: external_assessments={} required={} blocking_findings_open={}",
+            feedback.external_assessments,
+            policy.minimum_external_assessments,
             feedback.blocking_findings_open
         ));
     }
