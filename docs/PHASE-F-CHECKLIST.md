@@ -24,7 +24,7 @@
 - [x] ABI model
 - [x] Rust target mapping
 - [x] Android build script
-- [ ] Final CI linked-library validation
+- [x] Final CI linked-library validation
 
 ## F.5 Additional ABI policy
 - [x] 64-bit primary defaults
@@ -72,4 +72,4 @@
 
 ## Closure state
 
-Phase F is **COMPLETED**. F.1–F.10 are implemented. GitHub Actions run #416 (`37562562437`) passed Rust quality, RustSec, all Phase A–E regressions, Phase F host tests, Phase F Rust 1.81 MSRV, real Android arm64-v8a/x86_64 linking, ELF hardening/export inspection and byte-for-byte rebuild reproducibility.
+Phase F is **COMPLETED**. F.1–F.10 are implemented. GitHub Actions run #425 (`37562726466`) passed Rust quality, RustSec, all Phase A–E regressions, Phase F host tests, Phase F Rust 1.81 MSRV, real Android arm64-v8a/x86_64 linking, ELF hardening/export inspection and byte-for-byte rebuild reproducibility.
