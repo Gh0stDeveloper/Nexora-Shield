@@ -754,11 +754,16 @@ jobs:
         with:
           targets: aarch64-linux-android,x86_64-linux-android
 
-      - name: Verify hosted Android SDK
+      - name: Discover hosted Android SDK
         run: |
-          test -n "${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          command -v sdkmanager
-          sdkmanager --version
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          test -d "$SDK_ROOT"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          "$SDKMANAGER" --version
 
       - name: Install pinned Android NDK
         run: |
@@ -766,7 +771,10 @@ jobs:
           sdkmanager "ndk;${NEXORA_NDK_VERSION}" >/dev/null
 
       - name: Export pinned Android NDK
-        run: echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NEXORA_NDK_VERSION}" >> "${GITHUB_ENV}"
+        run: |
+          NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NEXORA_NDK_VERSION}"
+          test -d "$NDK_HOME"
+          echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
 
       - name: Build primary ABI libraries
         run: bash scripts/build-native-android.sh build/phase-f/first
