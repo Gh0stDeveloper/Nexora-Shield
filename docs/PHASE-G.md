@@ -40,6 +40,8 @@ Every method is validated before execution.
 
 The semantic instruction set currently contains arithmetic, branches, field access, calls, exceptions and return operations required by the supported lowering contract.
 
+`OpcodeStream` serializes the complete VM program, not only opcode identities. Register operands, constant indices, branch targets, field/method ids and call arguments are encoded in a deterministic little-endian format. Decoding requires the per-build opcode allocation.
+
 ## G.4 — Lowering
 
 `DexLowerer` lowers only eligible DEX methods.
@@ -69,6 +71,7 @@ Unsupported instructions cause explicit rejection. They are not approximated.
 - wrapping 32-bit integer arithmetic compatible with supported Dalvik int operations;
 - configurable step limit;
 - deterministic return values;
+- execution directly from allocated `OpcodeStream` bytecode;
 - no unsafe code.
 
 ## G.6 — Exception semantics
@@ -82,7 +85,9 @@ It supports:
 - host-produced exceptions;
 - typed handlers;
 - catch-all handlers;
-- move-exception register transfer.
+- move-exception register transfer;
+- host-provided exception construction;
+- host-provided subtype/assignability matching for Java-style catch semantics.
 
 Unhandled exceptions are surfaced explicitly.
 
@@ -132,7 +137,10 @@ Sealed metadata binds:
 - instruction count;
 - exception-handler count;
 - constant-pool digest;
-- opcode-map fingerprint.
+- opcode-map fingerprint;
+- encoded VM bytecode digest.
+
+`verify_program` rejects both a mismatched opcode allocation and any change to the encoded bytecode stream.
 
 This is authenticity/integrity protection, not an encryption claim.
 
@@ -146,7 +154,7 @@ It is an estimator, not a replacement for device benchmarks.
 
 ## G.12 — Differential tests
 
-The test suite compares VM output against reference semantics across:
+The test suite compares **encoded VM bytecode execution** against reference semantics across:
 
 - integer boundaries;
 - wrapping addition;
