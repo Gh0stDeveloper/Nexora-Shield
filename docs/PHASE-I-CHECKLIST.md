@@ -80,8 +80,8 @@
 - [x] I.1-I.10 protocol tests
 - [x] End-to-end attestation flow
 - [x] End-to-end policy evaluation
-- [ ] Final dedicated CI gate
+- [x] Final dedicated CI gate — run #709
 
 ## Closure state
 
-Phase I implementation is **IN PROGRESS**. Code, protocol tests, configuration and documentation are present. The phase is not closed until strict Rust quality, Rust 1.81 MSRV, dedicated Phase I integration CI and all Phase A-H regressions are green on the final head.
+Phase I is **COMPLETED**. I.1–I.10 are implemented. GitHub Actions run #709 (`37576325958`) passed Rust quality, RustSec, Phase A–H regressions, Phase I I.1–I.10, the protocol integration/server example gate and Rust 1.81 MSRV on commit `86152ab0abd2a212354483a82be56488cd2fa15c`.

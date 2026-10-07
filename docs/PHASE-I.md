@@ -176,3 +176,10 @@ The typed request intentionally has no generic device-metadata map and no fields
 Phase I raises the cost of replay, policy forgery and reuse of compromised builds. It does not make code executing on an attacker-controlled device impossible to patch.
 
 Server-side authorization for high-value assets or account operations remains authoritative where applicable.
+
+
+## Closure state
+
+Phase I is **COMPLETED**. GitHub Actions run **#709** (ID `37576325958`) passed the complete implementation acceptance matrix on commit `86152ab0abd2a212354483a82be56488cd2fa15c`.
+
+The closure includes Rust quality, RustSec, Rust 1.81 MSRV, all Phase A–H regressions, I.1–I.10 tests, the end-to-end attestation/policy integration gate and compilation of the server-verification example.
