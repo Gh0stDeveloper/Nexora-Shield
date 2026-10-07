@@ -122,14 +122,14 @@ private fun DashboardScreen(
                 value = state.config.profile.wireValue.replaceFirstChar(Char::uppercase),
                 detail = "Schema ${state.config.schema} · minSdk ${state.config.minSdk}",
                 tone = ShieldTone.Info,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             MetricCard(
                 icon = Icons.Outlined.Layers,
                 label = "Gradle modules",
                 value = project.modules.size.toString(),
                 detail = "Detected without executing Gradle",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             MetricCard(
                 icon = Icons.Outlined.Rule,
@@ -137,7 +137,7 @@ private fun DashboardScreen(
                 value = state.config.selectors.size.toString(),
                 detail = "Targeted include/exclude policy",
                 tone = if (state.config.selectors.isEmpty()) ShieldTone.Neutral else ShieldTone.Success,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             MetricCard(
                 icon = Icons.Outlined.VerifiedUser,
@@ -145,13 +145,13 @@ private fun DashboardScreen(
                 value = project.artifacts.size.toString(),
                 detail = state.selectedArtifact?.fileName?.toString() ?: "No artifact selected",
                 tone = if (project.artifacts.isEmpty()) ShieldTone.Warning else ShieldTone.Success,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
         AdaptivePair(compact) {
             Panel(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = "Protection readiness",
                 subtitle = "Pre-flight state for common release operations.",
             ) {
@@ -171,7 +171,7 @@ private fun DashboardScreen(
             }
 
             Panel(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = "Quick actions",
                 subtitle = "Go directly to the next operational task.",
             ) {
@@ -248,28 +248,28 @@ private fun ProjectScreen(state: StudioState) {
                 "Modules",
                 project.modules.size.toString(),
                 "Gradle modules discovered",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             MetricCard(
                 Icons.Outlined.Android,
                 "Artifacts",
                 project.artifacts.size.toString(),
                 "APK / AAB / AAR / APKS",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             MetricCard(
                 Icons.Outlined.Description,
                 "Reports",
                 project.publicReports.size.toString(),
                 "Public Shield reports",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             MetricCard(
                 Icons.Outlined.History,
                 "Mappings",
                 project.mappings.size.toString(),
                 "R8 mapping files",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -528,7 +528,7 @@ private fun PerformanceScreen(
 
         AdaptivePair(compact) {
             Panel(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = "Runtime & artifact",
                 subtitle = "Release budgets enforced by configuration.",
             ) {
@@ -547,7 +547,7 @@ private fun PerformanceScreen(
             }
 
             Panel(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = "Build & VM",
                 subtitle = "Complexity and build-time limits.",
             ) {
@@ -903,7 +903,7 @@ private fun StatusBanner(
             )
             Text(
                 text = message,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 color = ShieldColors.TextSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
