@@ -17,7 +17,9 @@ impl fmt::Display for LabError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidRule(message) => write!(formatter, "invalid exposure rule: {message}"),
-            Self::InvalidCorpus(message) => write!(formatter, "invalid regression corpus: {message}"),
+            Self::InvalidCorpus(message) => {
+                write!(formatter, "invalid regression corpus: {message}")
+            }
             Self::InvalidPerformanceSample(message) => {
                 write!(formatter, "invalid performance sample: {message}")
             }
