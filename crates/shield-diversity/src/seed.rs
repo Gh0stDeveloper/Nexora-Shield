@@ -3,6 +3,7 @@ use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
+use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -22,6 +23,12 @@ impl PrivateBuildSeed {
 
     fn as_slice(&self) -> &[u8] {
         &self.bytes
+    }
+}
+
+impl Drop for PrivateBuildSeed {
+    fn drop(&mut self) {
+        self.bytes.zeroize();
     }
 }
 
