@@ -10,7 +10,8 @@
 - [x] Minimal JNI entry points
 - [x] FFI-safe primitive contract
 - [x] No JNI pointer dereference
-- [x] No local unsafe code
+- [x] No unsafe blocks
+- [x] Scoped lint exception only for JNI export attributes
 - [x] Stable export names
 
 ## F.3 arm64-v8a
