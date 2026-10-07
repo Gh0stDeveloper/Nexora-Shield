@@ -5,6 +5,7 @@ use crate::ir::{BranchCondition, VmException, VmInstruction, VmMethod, VmRegiste
 use crate::opcode::{OpcodeAllocation, OpcodeStream};
 use crate::seal::{MetadataSealer, SealedMetadata};
 use crate::value::VmValue;
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecutionConfig {
@@ -23,6 +24,46 @@ impl Default for ExecutionConfig {
 pub struct ExecutionResult {
     pub value: VmValue,
     pub steps: u64,
+}
+
+pub struct SealedExecution<'a> {
+    method: &'a VmMethod,
+    stream: &'a OpcodeStream,
+    allocation: &'a OpcodeAllocation,
+    metadata: &'a SealedMetadata,
+    seal_key: &'a [u8],
+}
+
+impl<'a> SealedExecution<'a> {
+    #[must_use]
+    pub const fn new(
+        method: &'a VmMethod,
+        stream: &'a OpcodeStream,
+        allocation: &'a OpcodeAllocation,
+        metadata: &'a SealedMetadata,
+        seal_key: &'a [u8],
+    ) -> Self {
+        Self {
+            method,
+            stream,
+            allocation,
+            metadata,
+            seal_key,
+        }
+    }
+}
+
+impl fmt::Debug for SealedExecution<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SealedExecution")
+            .field("method_idx", &self.method.method_idx)
+            .field("stream_len", &self.stream.bytes.len())
+            .field("allocation_build_id", &self.allocation.build_id())
+            .field("metadata_payload_len", &self.metadata.payload.len())
+            .field("seal_key", &"[redacted]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -235,17 +276,26 @@ impl Interpreter {
     }
 
     pub fn execute_sealed<H: VmHost>(
-        method: &VmMethod,
-        stream: &OpcodeStream,
-        allocation: &OpcodeAllocation,
-        sealed: &SealedMetadata,
-        seal_key: &[u8],
+        program: &SealedExecution<'_>,
         args: &[VmValue],
         host: &mut H,
         config: ExecutionConfig,
     ) -> Result<ExecutionResult> {
-        MetadataSealer::verify_executable(sealed, seal_key, method, stream, allocation)?;
-        Self::execute_stream(method, stream, allocation, args, host, config)
+        MetadataSealer::verify_executable(
+            program.metadata,
+            program.seal_key,
+            program.method,
+            program.stream,
+            program.allocation,
+        )?;
+        Self::execute_stream(
+            program.method,
+            program.stream,
+            program.allocation,
+            args,
+            host,
+            config,
+        )
     }
 }
 
