@@ -224,17 +224,20 @@ Para cada transformación:
 
 ## 15. VM differential tests
 
-Para métodos soportados:
+Para métodos soportados por la versión actual:
 
-- interpreter original vs VM;
-- integer boundaries;
-- float;
-- null;
-- exceptions;
-- arrays;
+- salida de referencia vs VM;
+- límites de enteros de 32 bits;
+- wrapping arithmetic;
+- miles de inputs deterministas;
 - branches;
-- invokes;
-- synchronization solo cuando esté soportado.
+- exceptions;
+- calls/fields mediante host de prueba;
+- mapas de opcode con seeds/build ids distintos.
+
+Los tipos u opcodes todavía no soportados —por ejemplo float/arrays/synchronization en la primera implementación de Phase G— deben ser rechazados por elegibilidad y no simulados de forma aproximada.
+
+Además, el security benchmark de VM exige diversidad estructural entre builds y el metadata seal debe rechazar payloads modificados o claves incorrectas.
 
 ## 16. Release channels
 

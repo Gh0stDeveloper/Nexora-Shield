@@ -78,8 +78,20 @@ native:
 
 vm:
   enabled: true
-  scope: critical
-  maxMethods: 40
+  mode: config_or_annotation
+  annotationDescriptor: Ldev/nexora/shield/Virtualize;
+  selectors:
+    - classPattern: Lcom/example/auth/*;
+      methodPattern: verify*
+  eligibility:
+    maxRegisters: 128
+    maxInstructions: 4096
+    allowCalls: true
+    allowFields: true
+    allowExceptions: true
+  opcodeDiversification: true
+  metadataSealing: true
+  maxRelativeCostBasisPoints: 80000
 
 attestation:
   enabled: false
@@ -242,7 +254,43 @@ Android contract resources, DEX files, native libraries, signing metadata and fr
 
 The public protected resource bundle contains opaque IDs rather than plaintext logical paths. Logical-to-opaque mappings belong only in the private build metadata.
 
-## 8. Secrets providers
+## 8. VM Shield
+
+Phase G virtualiza únicamente métodos seleccionados que también pasen el analizador de elegibilidad.
+
+~~~yaml
+vm:
+  enabled: true
+  mode: config_or_annotation
+  annotationDescriptor: Ldev/nexora/shield/Virtualize;
+  selectors:
+    - classPattern: Lcom/example/auth/*;
+      methodPattern: verify*
+  eligibility:
+    maxRegisters: 128
+    maxInstructions: 4096
+    allowCalls: true
+    allowFields: true
+    allowExceptions: true
+  opcodeDiversification: true
+  metadataSealing: true
+  maxRelativeCostBasisPoints: 80000
+~~~
+
+Modos de selección:
+
+- `config_only`;
+- `annotation_only`;
+- `config_or_annotation`;
+- `config_and_annotation`.
+
+La selección y la elegibilidad son gates separados. Un método marcado para virtualización permanece en DEX normal si usa una construcción que la versión actual del VM no puede preservar con seguridad.
+
+`maxRelativeCostBasisPoints` es un presupuesto de estimación estática. No reemplaza benchmarks en dispositivos.
+
+Las semillas privadas para asignación de opcodes y las claves de sellado no se incluyen directamente en esta sección; deben llegar desde el sistema de secretos/build manifest privado.
+
+## 9. Secrets providers
 
 Configuración referencia IDs:
 
@@ -261,7 +309,7 @@ Providers previstos:
 - OS keychain;
 - external KMS futuro.
 
-## 9. Reproducibilidad
+## 10. Reproducibilidad
 
 ~~~yaml
 build:
@@ -272,7 +320,7 @@ build:
 
 Solo para investigación y reproducir errores. No reutilizar la misma seed entre releases normales.
 
-## 10. Budgets
+## 11. Budgets
 
 El planner debe estimar y el verifier medir:
 
@@ -293,7 +341,7 @@ budgetsPolicy: fail
 
 Opciones futuras: fail, warn, adaptive. Adaptive nunca se habilitará implícitamente en releases estrictos.
 
-## 11. Compatibilidad
+## 12. Compatibilidad
 
 ~~~yaml
 compatibility:
@@ -307,7 +355,7 @@ compatibility:
     enabled: true
 ~~~
 
-## 12. Reportes
+## 13. Reportes
 
 ~~~yaml
 reports:
@@ -320,7 +368,7 @@ reports:
 
 El private report no debe publicarse como artifact público.
 
-## 13. Firma
+## 14. Firma
 
 Nexora Shield recibirá referencias a material de firma, nunca contraseñas hardcoded.
 
@@ -333,7 +381,7 @@ signing:
   keyPasswordRef: ANDROID_KEY_PASSWORD
 ~~~
 
-## 14. Validation
+## 15. Validation
 
 Antes de proteger:
 
@@ -351,6 +399,6 @@ Después:
 - signature verification;
 - runtime smoke test en CI cuando esté habilitado.
 
-## 15. Config schema
+## 16. Config schema
 
 El proyecto mantendrá un JSON Schema generado para IDE completion y validación. Cambios breaking incrementan schema version.

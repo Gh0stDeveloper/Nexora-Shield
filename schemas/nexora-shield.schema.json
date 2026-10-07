@@ -306,7 +306,54 @@
     },
     "vm": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": {
+          "type": "string",
+          "enum": ["config_only", "annotation_only", "config_or_annotation", "config_and_annotation"]
+        },
+        "annotationDescriptor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["classPattern", "methodPattern"],
+            "properties": {
+              "classPattern": { "type": "string", "minLength": 1 },
+              "methodPattern": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "eligibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxRegisters": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "maxInstructions": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "allowCalls": { "type": "boolean" },
+            "allowFields": { "type": "boolean" },
+            "allowExceptions": { "type": "boolean" }
+          }
+        },
+        "opcodeDiversification": { "type": "boolean" },
+        "metadataSealing": { "type": "boolean" },
+        "maxRelativeCostBasisPoints": {
+          "type": "integer",
+          "minimum": 10000
+        }
+      }
     },
     "attestation": {
       "type": "object",
