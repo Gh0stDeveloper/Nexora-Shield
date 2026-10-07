@@ -1,5 +1,7 @@
 # Nexora Shield release process
 
+> **Stable release freeze:** a strict post-Phase-N audit opened [Phase O](PHASE-O.md). The stable `v1.0.0` tag MUST NOT be created while Phase O remains open. Phase N qualification evidence is retained as historical evidence but is not sufficient for final production approval.
+
 ## Release channels
 
 - Release candidate: `v1.0.0-rc.N`
@@ -41,11 +43,13 @@ Before `v1.0.0`:
 6. changelog/release notes must reflect the stable promotion;
 7. the stable tag must be created only from the validated `main` commit.
 
-The release workflow fails closed if any stable prerequisite is missing.
+The current release workflow enforces the Phase N-era prerequisites above. Phase O adds stricter prerequisites that must be implemented before stable publication, including exact tag-to-main ancestry, exact-commit required-check validation, a blocking CodeQL/SARIF findings gate, verified repository governance, license readiness and final O.14 approval. Until those controls exist and pass, stable publication remains blocked.
 
 ## Stable publication
 
-The `v1.0.0` tag triggers `.github/workflows/release.yml`.
+Stable publication now additionally requires **Phase O O.14 final production audit approval** and completion of O.15 pre-publication checks.
+
+The `v1.0.0` tag triggers `.github/workflows/release.yml`, but the tag must not be created until Phase O is closed.
 
 The workflow:
 
@@ -72,4 +76,6 @@ The stable source line was validated before merge at:
 - Phase M #86, Phase L #92 and Phase K #107: successful;
 - zero failed jobs.
 
-After this head is merged, the `v1.0.0` tag must be created from the resulting validated `main` commit. The tag triggers the attested release workflow; it must not be created from the feature branch.
+This Phase N evidence remains valid for the controls it tested. A post-N production audit subsequently identified release blockers outside that original qualification scope. Therefore **do not create `v1.0.0` from this N-era evidence alone**.
+
+The stable tag may be created only after Phase O closes and O.14 approves the exact final `main` commit. See [Production Readiness Audit](PRODUCTION-READINESS-AUDIT.md) and [Phase O checklist](PHASE-O-CHECKLIST.md).
