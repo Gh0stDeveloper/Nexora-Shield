@@ -425,7 +425,7 @@ jobs:
 
       - name: Upload Android performance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: phase-n-android-performance
           path: |
