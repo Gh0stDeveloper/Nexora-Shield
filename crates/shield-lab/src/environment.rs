@@ -1,6 +1,6 @@
 use nexora_shield_rasp::{
     CompiledPolicy, EmulatorEvaluator, EmulatorObservation, ModifiedSystemEvaluator,
-    ModifiedSystemObservation, ResponseEngine, RiskEngine, RiskLevel, RaspResponse, SignalSet,
+    ModifiedSystemObservation, RaspResponse, ResponseEngine, RiskEngine, RiskLevel, SignalSet,
 };
 use serde::{Deserialize, Serialize};
 
@@ -44,8 +44,18 @@ impl ModifiedEnvironmentLab {
 
         for case in cases {
             let mut signals = SignalSet::default();
-            signals.extend(ModifiedSystemEvaluator::evaluate(&case.system).signals().iter().cloned());
-            signals.extend(EmulatorEvaluator::evaluate(&case.emulator).signals().iter().cloned());
+            signals.extend(
+                ModifiedSystemEvaluator::evaluate(&case.system)
+                    .signals()
+                    .iter()
+                    .cloned(),
+            );
+            signals.extend(
+                EmulatorEvaluator::evaluate(&case.emulator)
+                    .signals()
+                    .iter()
+                    .cloned(),
+            );
             let assessment = risk_engine.evaluate(&signals);
             let decision = ResponseEngine::decide(policy, &assessment);
             let passed = assessment.level >= case.minimum_risk
