@@ -79,8 +79,7 @@ where
 
         // Consume before calling the provider verifier. A rejected or malformed
         // evidence token must not leave a reusable server challenge.
-        self.replay_guard
-            .consume(&request.challenge, now_unix_ms)?;
+        self.replay_guard.consume(&request.challenge, now_unix_ms)?;
 
         let verification =
             self.verifier
