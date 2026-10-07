@@ -38,14 +38,18 @@ impl fmt::Display for AttestationError {
             Self::InvalidPurpose => formatter.write_str("attestation purpose is invalid"),
             Self::InvalidProvider => formatter.write_str("attestation provider is invalid"),
             Self::InvalidFeature => formatter.write_str("feature identifier is invalid"),
-            Self::InvalidPolicy(message) => write!(formatter, "remote policy is invalid: {message}"),
+            Self::InvalidPolicy(message) => {
+                write!(formatter, "remote policy is invalid: {message}")
+            }
             Self::InvalidChallengeTtl => formatter.write_str("challenge TTL is invalid"),
             Self::ChallengeExpired => formatter.write_str("attestation challenge has expired"),
             Self::ChallengeNotYetValid => {
                 formatter.write_str("attestation challenge is not yet valid")
             }
             Self::UnknownSession => formatter.write_str("attestation session is unknown"),
-            Self::ReplayDetected => formatter.write_str("attestation challenge was already consumed"),
+            Self::ReplayDetected => {
+                formatter.write_str("attestation challenge was already consumed")
+            }
             Self::ChallengeMismatch => {
                 formatter.write_str("attestation challenge does not match registered session")
             }
@@ -59,11 +63,15 @@ impl fmt::Display for AttestationError {
             Self::SessionCapacityExceeded => {
                 formatter.write_str("attestation replay-guard capacity is exhausted")
             }
-            Self::SignatureKeyMismatch => formatter.write_str("policy signature key is not trusted"),
+            Self::SignatureKeyMismatch => {
+                formatter.write_str("policy signature key is not trusted")
+            }
             Self::SignatureAlgorithmMismatch => {
                 formatter.write_str("policy signature algorithm is not supported")
             }
-            Self::InvalidPolicySignature => formatter.write_str("remote policy signature is invalid"),
+            Self::InvalidPolicySignature => {
+                formatter.write_str("remote policy signature is invalid")
+            }
             Self::PolicySequenceRollback { minimum, observed } => write!(
                 formatter,
                 "remote policy sequence rollback: minimum {minimum}, observed {observed}"
