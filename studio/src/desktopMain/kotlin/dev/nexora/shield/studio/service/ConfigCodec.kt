@@ -91,7 +91,7 @@ class ConfigCodec {
             .build()
         val yaml = Dump(dumpSettings).dumpToString(root)
 
-        path.parent?.let(Files::createDirectories)
+        path.parent?.let { Files.createDirectories(it) }
         val temporary = path.resolveSibling(path.fileName.toString() + ".studio.tmp")
         Files.writeString(temporary, yaml)
         try {
