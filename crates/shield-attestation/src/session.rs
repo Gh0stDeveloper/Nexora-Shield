@@ -68,13 +68,18 @@ impl AttestationChallenge {
 
 pub struct ChallengeDeriver {
     key: [u8; 32],
+    server_instance_id: [u8; 16],
     counter: u64,
 }
 
 impl ChallengeDeriver {
     #[must_use]
-    pub const fn new(key: [u8; 32]) -> Self {
-        Self { key, counter: 0 }
+    pub const fn new(key: [u8; 32], server_instance_id: [u8; 16]) -> Self {
+        Self {
+            key,
+            server_instance_id,
+            counter: 0,
+        }
     }
 
     pub fn issue(
@@ -148,6 +153,7 @@ impl ChallengeDeriver {
         let mut mac = HmacSha256::new_from_slice(&self.key)
             .map_err(|error| AttestationError::Authentication(error.to_string()))?;
         update_component(&mut mac, domain);
+        update_component(&mut mac, &self.server_instance_id);
         update_component(&mut mac, application_id.as_bytes());
         update_component(&mut mac, build_id.as_bytes());
         update_component(&mut mac, purpose.as_bytes());
@@ -161,6 +167,7 @@ impl ChallengeDeriver {
 impl Drop for ChallengeDeriver {
     fn drop(&mut self) {
         self.key.zeroize();
+        self.server_instance_id.zeroize();
         self.counter.zeroize();
     }
 }
@@ -170,6 +177,7 @@ impl fmt::Debug for ChallengeDeriver {
         formatter
             .debug_struct("ChallengeDeriver")
             .field("key", &"[REDACTED]")
+            .field("server_instance_id", &"[REDACTED]")
             .field("counter", &self.counter)
             .finish()
     }
