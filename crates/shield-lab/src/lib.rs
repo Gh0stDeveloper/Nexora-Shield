@@ -28,9 +28,9 @@ mod tamper;
 
 pub use audit::{
     AuditEvidenceClass, AuditEvidenceItem, AuditPreparation, AuditReadinessInput,
-    AuditReadinessReport,
+    AuditReadinessReport, AuditRequirement,
 };
-pub use benchmark::ComparativeBenchmarkMethodology;
+pub use benchmark::{BenchmarkControl, ComparativeBenchmarkMethodology};
 pub use corpus::{RegressionCase, RegressionCategory, RegressionCorpus};
 pub use environment::{
     ModifiedEnvironmentCase, ModifiedEnvironmentLab, ModifiedEnvironmentReport,
