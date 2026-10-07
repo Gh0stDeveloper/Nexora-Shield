@@ -59,7 +59,10 @@ fn critical_definitive_evidence_is_critical_without_extra_signals() {
 #[test]
 fn default_policy_is_monotonic_and_non_destructive() -> Result<(), PolicyError> {
     let policy = CompiledPolicy::compile(PolicySpec::default())?;
-    assert_eq!(policy.response_for(RiskLevel::Clean), RaspResponse::Continue);
+    assert_eq!(
+        policy.response_for(RiskLevel::Clean),
+        RaspResponse::Continue
+    );
     assert_eq!(
         policy.response_for(RiskLevel::Elevated),
         RaspResponse::Report
