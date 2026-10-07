@@ -4,12 +4,17 @@
 
 mod data_cli;
 mod integrity_cli;
+mod phase_k_cli;
 
 use data_cli::{
     print_data_help, run_data_benchmark, run_data_inspect, run_data_protect, run_data_unprotect,
 };
 use integrity_cli::{
     print_integrity_help, run_integrity_create, run_integrity_inspect, run_integrity_verify,
+};
+use phase_k_cli::{
+    print_phase_k_help, run_aab_inspect, run_aab_verify, run_aar_inspect, run_aar_verify,
+    run_apks_inspect, run_apks_verify, run_bundletool_build_apks, run_bundletool_validate,
 };
 
 use nexora_shield_core::{
@@ -56,6 +61,18 @@ fn run() -> Result<(), String> {
         "inspect" => run_inspect(&args),
         "verify" => run_verify(&args),
         "protect" => run_protect(&args),
+        "aab-inspect" => run_aab_inspect(&args),
+        "aab-verify" => run_aab_verify(&args),
+        "aar-inspect" => run_aar_inspect(&args),
+        "aar-verify" => run_aar_verify(&args),
+        "apks-inspect" => run_apks_inspect(&args),
+        "apks-verify" => run_apks_verify(&args),
+        "bundletool-validate" => run_bundletool_validate(&args),
+        "bundletool-build-apks" => run_bundletool_build_apks(&args),
+        "phase-k-help" => {
+            print_phase_k_help();
+            Ok(())
+        }
         "dex-inspect" => run_dex_inspect(&args),
         "dex-roundtrip" => run_dex_roundtrip(&args),
         "dex-rewrite" => run_dex_rewrite(&args),

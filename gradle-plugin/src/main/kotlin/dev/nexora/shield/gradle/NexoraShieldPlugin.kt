@@ -2,6 +2,7 @@ package dev.nexora.shield.gradle
 
 import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -9,10 +10,13 @@ import org.gradle.kotlin.dsl.register
 
 class NexoraShieldPlugin : Plugin<Project> {
     override fun apply(project: Project) {
-        if (!project.pluginManager.hasPlugin("com.android.application")) {
+        val applicationModule = project.pluginManager.hasPlugin("com.android.application")
+        val libraryModule = project.pluginManager.hasPlugin("com.android.library")
+
+        if (applicationModule == libraryModule) {
             throw GradleException(
-                "Apply 'com.android.application' before 'dev.nexora.shield'. " +
-                    "Phase J supports Android application modules; AAR/library mode belongs to Phase K.",
+                "Apply exactly one of 'com.android.application' or 'com.android.library' " +
+                    "before 'dev.nexora.shield'.",
             )
         }
 
@@ -22,26 +26,31 @@ class NexoraShieldPlugin : Plugin<Project> {
         )
         val lifecycle = project.tasks.register("nexoraShield") {
             group = TASK_GROUP
-            description = "Protects every Nexora Shield-enabled Android application variant."
+            description = "Runs Nexora Shield for every enabled Android variant."
         }
 
+        if (applicationModule) {
+            configureApplication(project, extension, lifecycle.name)
+        } else {
+            configureLibrary(project, extension, lifecycle.name)
+        }
+    }
+
+    private fun configureApplication(
+        project: Project,
+        extension: NexoraShieldExtension,
+        lifecycleTaskName: String,
+    ) {
         val androidComponents = project.extensions.getByType(
             ApplicationAndroidComponentsExtension::class.java,
         )
 
         androidComponents.onVariants(androidComponents.selector().all()) { variant ->
-            if (!extension.enabled.get()) {
-                return@onVariants
-            }
-            if (extension.releaseOnly.get() && variant.buildType != "release") {
-                return@onVariants
-            }
-            val selected = extension.variants.get()
-            if (selected.isNotEmpty() && variant.name !in selected) {
+            if (!variantEnabled(extension, variant.name, variant.buildType)) {
                 return@onVariants
             }
 
-            val capitalized = variant.name.replaceFirstChar { it.uppercaseChar() }
+            val capitalized = capitalizeVariant(variant.name)
             val protectTask = project.tasks.register<NexoraShieldApkTransformTask>(
                 "nexoraShield" + capitalized,
             ) {
@@ -94,8 +103,31 @@ class NexoraShieldPlugin : Plugin<Project> {
                 transformationRequest.set(artifactTransformationRequest)
             }
 
-            lifecycle.configure {
+            project.tasks.named(lifecycleTaskName).configure {
                 dependsOn(protectTask)
+            }
+
+            if (extension.validateBundle.get()) {
+                val bundleTask = project.tasks.register<NexoraShieldBundleValidationTask>(
+                    "nexoraShieldValidate" + capitalized + "Bundle",
+                ) {
+                    group = TASK_GROUP
+                    description = "Validates the " + variant.name + " AAB and optional bundletool contract."
+                    bundleFile.set(variant.artifacts.get(SingleArtifact.BUNDLE))
+                    cliExecutable.set(extension.cliExecutable)
+                    javaExecutable.set(extension.javaExecutable)
+                    if (extension.bundletoolJar.isPresent) {
+                        bundletoolJar.set(extension.bundletoolJar)
+                    }
+                    reportFile.set(
+                        project.layout.buildDirectory.file(
+                            "reports/nexora-shield/" + variant.name + "/bundle-validation.json",
+                        ),
+                    )
+                }
+                project.tasks.named(lifecycleTaskName).configure {
+                    dependsOn(bundleTask)
+                }
             }
 
             registerMappingAndRetraceTasks(
@@ -106,6 +138,61 @@ class NexoraShieldPlugin : Plugin<Project> {
                 minified = variant.isMinifyEnabled,
             )
         }
+    }
+
+    private fun configureLibrary(
+        project: Project,
+        extension: NexoraShieldExtension,
+        lifecycleTaskName: String,
+    ) {
+        val androidComponents = project.extensions.getByType(
+            LibraryAndroidComponentsExtension::class.java,
+        )
+
+        androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+            if (!variantEnabled(extension, variant.name, variant.buildType)) {
+                return@onVariants
+            }
+            if (!extension.validateAar.get()) {
+                return@onVariants
+            }
+
+            val capitalized = capitalizeVariant(variant.name)
+            val aarTask = project.tasks.register<NexoraShieldAarValidationTask>(
+                "nexoraShieldValidate" + capitalized + "Aar",
+            ) {
+                group = TASK_GROUP
+                description =
+                    "Validates the publishable " + variant.name + " AAR consumer contract."
+                aarFile.set(variant.artifacts.get(SingleArtifact.AAR))
+                cliExecutable.set(extension.cliExecutable)
+                requireConsumerRules.set(extension.requireConsumerRules)
+                reportFile.set(
+                    project.layout.buildDirectory.file(
+                        "reports/nexora-shield/" + variant.name + "/aar-validation.json",
+                    ),
+                )
+            }
+
+            project.tasks.named(lifecycleTaskName).configure {
+                dependsOn(aarTask)
+            }
+        }
+    }
+
+    private fun variantEnabled(
+        extension: NexoraShieldExtension,
+        variantName: String,
+        buildType: String?,
+    ): Boolean {
+        if (!extension.enabled.get()) {
+            return false
+        }
+        if (extension.releaseOnly.get() && buildType != "release") {
+            return false
+        }
+        val selected = extension.variants.get()
+        return selected.isEmpty() || variantName in selected
     }
 
     private fun registerMappingAndRetraceTasks(
@@ -168,6 +255,9 @@ class NexoraShieldPlugin : Plugin<Project> {
             }
         }
     }
+
+    private fun capitalizeVariant(name: String): String =
+        name.replaceFirstChar { it.uppercaseChar() }
 
     private companion object {
         const val TASK_GROUP = "nexora shield"

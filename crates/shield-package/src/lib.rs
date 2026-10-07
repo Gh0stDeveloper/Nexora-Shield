@@ -6,16 +6,29 @@
 
 #![forbid(unsafe_code)]
 
+mod aab;
+mod aar;
 mod apk;
+mod apks;
+mod bundletool;
 mod error;
 mod hash;
 mod tools;
 mod zip;
 
+pub use aab::{
+    inspect_aab, verify_aab_structure, AabInspection, BundleBaselineProfile, BundleDexInspection,
+    BundleModuleInspection,
+};
+pub use aar::{inspect_aar, verify_aar_structure, AarInspection, AarMarker};
 pub use apk::{
     inspect_apk, verify_apk_structure, ApkInspection, DexFileInspection, ManifestFormat,
     ManifestInspection,
 };
+pub use apks::{
+    inspect_apk_set, verify_apk_set_structure, ApkSetInspection, SplitApkInspection, SplitApkKind,
+};
+pub use bundletool::{ApkSetMode, Bundletool, BundletoolSigningConfig};
 pub use error::{PackageError, Result};
 pub use hash::sha256_file;
 pub use tools::{AndroidTools, SigningConfig};

@@ -388,6 +388,40 @@
               ]
             }
           }
+        },
+        "playAppSigning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "deliverySignerSha256"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "uploadCertificateSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{64}$"
+            },
+            "deliverySignerSha256": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{64}$"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "deliveryLineageSha256": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{64}$"
+              },
+              "uniqueItems": true
+            }
+          }
         }
       }
     },
@@ -984,6 +1018,93 @@
             "keyVersion": {
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        "validateBundle": {
+          "type": "boolean"
+        },
+        "bundletoolJar": {
+          "type": "string",
+          "minLength": 1
+        },
+        "javaExecutable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validateAar": {
+          "type": "boolean"
+        },
+        "requireConsumerRules": {
+          "type": "boolean"
+        }
+      }
+    },
+    "packaging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aab": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "validateStructure": {
+              "type": "boolean"
+            },
+            "bundletoolValidation": {
+              "type": "boolean"
+            },
+            "requireBaseModule": {
+              "type": "boolean"
+            },
+            "validateDynamicFeatures": {
+              "type": "boolean"
+            },
+            "validateBaselineProfiles": {
+              "type": "boolean"
+            }
+          }
+        },
+        "splits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "localTesting": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "default",
+                "universal"
+              ]
+            },
+            "validateApkSet": {
+              "type": "boolean"
+            }
+          }
+        },
+        "aar": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "requireConsumerRules": {
+              "type": "boolean"
+            },
+            "preserveResourceNamespace": {
+              "type": "boolean"
+            },
+            "validateBaselineProfiles": {
+              "type": "boolean"
+            },
+            "validatePublication": {
+              "type": "boolean"
             }
           }
         }

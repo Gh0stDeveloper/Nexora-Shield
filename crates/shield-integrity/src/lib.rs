@@ -23,6 +23,7 @@ mod graph;
 mod hash;
 mod identity;
 mod manifest;
+mod play_signing;
 mod region;
 mod response;
 mod verify;
@@ -39,6 +40,7 @@ pub use identity::{
 pub use manifest::{
     DistributionConfig, IntegrityManifest, IntegrityManifestInput, INTEGRITY_MANIFEST_SCHEMA,
 };
+pub use play_signing::PlayAppSigningConfig;
 pub use region::{DexIntegrity, IntegrityRegion, RegionCheck, DEFAULT_DEX_CHUNK_BYTES};
 pub use response::{IntegrityResponse, IntegritySeverity, ResponsePolicy};
 pub use verify::{

@@ -28,6 +28,14 @@ open class NexoraShieldExtension @Inject constructor(objects: ObjectFactory) {
     val preserveMapping: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
     val retraceExecutable: Property<String> = objects.property(String::class.java).convention("retrace")
 
+    val validateBundle: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
+    val bundletoolJar: RegularFileProperty = objects.fileProperty()
+    val javaExecutable: Property<String> = objects.property(String::class.java).convention("java")
+
+    val validateAar: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
+    val requireConsumerRules: Property<Boolean> =
+        objects.property(Boolean::class.java).convention(true)
+
     val buildCacheEnabled: Property<Boolean> =
         objects.property(Boolean::class.java).convention(false)
     val cacheKeyVersion: Property<String> =
