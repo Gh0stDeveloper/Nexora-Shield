@@ -70,6 +70,9 @@ class NexoraShieldPlugin : Plugin<Project> {
                     project.layout.buildDirectory.dir("nexora-shield/private/" + variant.name),
                 )
 
+                outputs.upToDateWhen {
+                    !extension.signingKeystore.isPresent
+                }
                 outputs.cacheIf("explicit safe Nexora Shield build-cache mode") {
                     extension.buildCacheEnabled.get() &&
                         extension.allowUnsigned.get() &&
