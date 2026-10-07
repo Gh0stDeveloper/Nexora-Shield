@@ -4,6 +4,7 @@ use nexora_shield_diversity::{
     NativeConstantVariant, PassVariantPlan, PrivateBuildSeed, RenameVariant, SeedDeriver,
     StringPartitionPlan, VmMapVariant,
 };
+use nexora_shield_crypto::{ProtectedString, ProtectedStringRecord, Sensitivity};
 use nexora_shield_dex::RenameConfig;
 use nexora_shield_integrity::{
     IntegrityEdge, IntegrityError, IntegrityGraph, IntegrityNode, IntegrityNodeKind, Sha256Digest,
@@ -111,6 +112,23 @@ fn node(label: &str, kind: IntegrityNodeKind, critical: bool) -> IntegrityNode {
 fn string_ids() -> Vec<String> {
     (0..12)
         .map(|index| format!("secret.logical.{index}"))
+        .collect()
+}
+
+fn protected_strings(ids: &[String]) -> Vec<ProtectedString> {
+    ids.iter()
+        .enumerate()
+        .map(|(index, logical_id)| ProtectedString {
+            container: vec![u8::try_from(index).unwrap_or(0); 24],
+            record: ProtectedStringRecord {
+                logical_id: logical_id.clone(),
+                opaque_id: format!("opaque-{index:02}"),
+                sensitivity: Sensitivity::Sensitive,
+                original_bytes: 8,
+                protected_bytes: 24,
+                reasons: vec!["phase-h-test".to_owned()],
+            },
+        })
         .collect()
 }
 
@@ -322,6 +340,12 @@ fn h7_string_partition_variants_cover_each_item_once(
         .flat_map(|shard| shard.logical_ids.iter())
         .collect::<BTreeSet<_>>();
     assert_eq!(flattened.len(), ids.len());
+
+    let build = first.materialize(&protected_strings(&ids))?;
+    assert_eq!(build.private_lookup().len(), ids.len());
+    let public_json = serde_json::to_string(&build.public_shards)?;
+    assert!(!public_json.contains("secret.logical."));
+    assert!(!format!("{build:?}").contains("secret.logical."));
     Ok(())
 }
 
