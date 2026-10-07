@@ -155,7 +155,7 @@ Estado actual: **COMPLETADA**. Las subfases D.1–D.10 están implementadas. Git
 Criterio:
 - correlación estable, políticas auditables y baja tasa de falsos positivos.
 
-Estado actual: **EN PROGRESO**. Las subfases E.1–E.7 están implementadas en `nexora-shield-rasp`: API tipada de señales, evidencia de depuración, instrumentación, hook/inyección, sistema modificado, emulador e integración de fallos del motor de integridad de la Fase D. Las señales débiles de entorno permanecen diferenciadas de evidencia fuerte para reducir falsos positivos. E.8–E.12 permanecen pendientes y la fase no se considera cerrada.
+Estado actual: **EN PROGRESO**. Las subfases E.1–E.10 están implementadas en `nexora-shield-rasp`: señales tipadas, evidencia runtime, integración de integridad, Risk Engine correlacionado, compilador de políticas estricto y respuestas no destructivas. El CI #304 cerró E.1–E.7 con Rust quality, RustSec, regresiones A–D y Rust 1.81 en verde. E.11–E.12 permanecen pendientes; la fase no se considera cerrada hasta completar report-only mode y el laboratorio de falsos positivos.
 
 ---
 
