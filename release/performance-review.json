@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "reviewStage": "1.0-rc",
+  "rcReviewPassed": true,
+  "stableDeviceMeasurementsComplete": false,
+  "reviewedDimensions": [
+    "protected artifact growth",
+    "protection operation overhead",
+    "VM method cost",
+    "build-time budget evaluation"
+  ],
+  "stableRequiredMeasurements": [
+    "Android startup p50/p95 on representative device",
+    "memory delta on representative device",
+    "final protected APK/AAB size delta"
+  ],
+  "note": "CI validates deterministic budget logic for RC. Stable remains blocked until representative device measurements are recorded."
+}
