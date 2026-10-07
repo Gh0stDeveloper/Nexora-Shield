@@ -1,4 +1,3 @@
 <resources>
-    <string name="payments_feature_name">Payments</string>
     <string name="feature_status">Payments feature ready</string>
 </resources>
