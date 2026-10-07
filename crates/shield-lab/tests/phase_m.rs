@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use nexora_shield_diversity::{BuildDiversitySignature, DiversitySurface};
 use nexora_shield_lab::{
     AuditEvidenceClass, AuditEvidenceItem, AuditPreparation, AuditReadinessInput,
