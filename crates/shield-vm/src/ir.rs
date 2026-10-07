@@ -198,51 +198,15 @@ impl VmInstruction {
             Self::Nop | Self::Jump { .. } | Self::ReturnVoid => Vec::new(),
             Self::LoadConst { dst, .. } => vec![*dst],
             Self::Move { dst, src } | Self::Neg { dst, src } => vec![*dst, *src],
-            Self::Add {
-                dst,
-                left,
-                right,
-            }
-            | Self::Sub {
-                dst,
-                left,
-                right,
-            }
-            | Self::Mul {
-                dst,
-                left,
-                right,
-            }
-            | Self::Div {
-                dst,
-                left,
-                right,
-            }
-            | Self::Rem {
-                dst,
-                left,
-                right,
-            }
-            | Self::And {
-                dst,
-                left,
-                right,
-            }
-            | Self::Or {
-                dst,
-                left,
-                right,
-            }
-            | Self::Xor {
-                dst,
-                left,
-                right,
-            } => vec![*dst, *left, *right],
-            Self::Branch {
-                left,
-                right,
-                ..
-            } => {
+            Self::Add { dst, left, right }
+            | Self::Sub { dst, left, right }
+            | Self::Mul { dst, left, right }
+            | Self::Div { dst, left, right }
+            | Self::Rem { dst, left, right }
+            | Self::And { dst, left, right }
+            | Self::Or { dst, left, right }
+            | Self::Xor { dst, left, right } => vec![*dst, *left, *right],
+            Self::Branch { left, right, .. } => {
                 let mut registers = vec![*left];
                 if let Some(right) = right {
                     registers.push(*right);
