@@ -3,7 +3,7 @@ use crate::ir::VmMethod;
 use crate::opcode::{OpcodeAllocation, OpcodeStream};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -15,6 +15,7 @@ pub struct VmMetadata {
     pub instruction_count: usize,
     pub handler_count: usize,
     pub constant_pool_digest: [u8; 32],
+    pub control_metadata_digest: [u8; 32],
     pub opcode_fingerprint: [u8; 32],
     pub bytecode_digest: [u8; 32],
 }
@@ -29,6 +30,7 @@ impl VmMetadata {
             instruction_count: method.instructions.len(),
             handler_count: method.handlers.len(),
             constant_pool_digest: method.constants.digest()?,
+            control_metadata_digest: control_metadata_digest(method)?,
             opcode_fingerprint: allocation.fingerprint(),
             bytecode_digest: stream.digest(),
         })
@@ -84,6 +86,27 @@ impl MetadataSealer {
         }
         Ok(metadata)
     }
+
+    pub fn verify_executable(
+        sealed: &SealedMetadata,
+        key: &[u8],
+        method: &VmMethod,
+        stream: &OpcodeStream,
+        allocation: &OpcodeAllocation,
+    ) -> Result<VmMetadata> {
+        let metadata = Self::verify_program(sealed, key, stream, allocation)?;
+        let observed = VmMetadata::from_method(method, allocation)?;
+        if metadata != observed {
+            return Err(VmError::MetadataSealMismatch);
+        }
+        Ok(metadata)
+    }
+}
+
+fn control_metadata_digest(method: &VmMethod) -> Result<[u8; 32]> {
+    let encoded = serde_json::to_vec(&(&method.parameter_registers, &method.handlers))
+        .map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
+    Ok(Sha256::digest(encoded).into())
 }
 
 fn authenticate(payload: &[u8], key: &[u8]) -> Result<[u8; 32]> {
