@@ -1,6 +1,8 @@
 {
   "schema": 1,
-  "externalReviewers": 0,
+  "externalAssessments": 0,
+  "humanReviewers": 0,
   "acceptedFeedbackItems": 0,
-  "blockingFindingsOpen": 0
+  "blockingFindingsOpen": 0,
+  "assessmentProviders": []
 }
