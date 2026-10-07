@@ -10,10 +10,7 @@ pub struct VmMapVariant {
 }
 
 impl VmMapVariant {
-    pub fn derive(
-        seed: &SeedDeriver,
-        build_id: &str,
-    ) -> Result<(Self, OpcodeAllocation)> {
+    pub fn derive(seed: &SeedDeriver, build_id: &str) -> Result<(Self, OpcodeAllocation)> {
         if build_id.trim().is_empty() {
             return Err(DiversityError::EmptyBuildId);
         }
