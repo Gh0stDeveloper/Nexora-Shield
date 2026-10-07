@@ -95,7 +95,7 @@
 - [x] 4096 generated add cases
 - [x] Branch differential cases
 - [x] Exception semantics tests
-- [ ] Final CI differential gate
+- [x] Final CI differential gate — run #584
 
 ## G.13 Selective annotations/config
 - [x] Config selectors
@@ -111,8 +111,8 @@
 - [x] Unique-map metric
 - [x] Transfer-ratio metric
 - [x] 32-build regression benchmark
-- [ ] Final CI security gate
+- [x] Final CI security gate — run #584
 
 ## Closure state
 
-Phase G implementation is **IN PROGRESS**. G.1–G.14 code is present, but the phase is not closed until the dedicated VM, differential, security, MSRV and full workspace regression gates are green on the final head.
+Phase G is **COMPLETED**. G.1–G.14 are implemented. GitHub Actions run #584 (`37571516228`) passed Rust quality, RustSec, Phase A–F regressions, Phase G VM Shield G.1–G.14, differential/security validation and Rust 1.81 MSRV on commit `986f8a869fef5fd59819270b512cff1de28e3d25`.

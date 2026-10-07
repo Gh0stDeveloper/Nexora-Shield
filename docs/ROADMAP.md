@@ -199,7 +199,7 @@ Estado actual: **COMPLETADA**. F.1–F.10 están implementadas. GitHub Actions r
 Criterio:
 - métodos críticos virtualizados mantienen semántica y muestran diversidad real entre builds.
 
-Estado actual: **EN PROGRESO**. G.1–G.14 cuentan con implementación en `nexora-shield-vm`: elegibilidad fail-safe, VM IR, opcodes por build, lowering DEX selectivo, intérprete, excepciones, frontera de calls/fields, constant pool, sellado HMAC, estimación de coste, pruebas diferenciales, selección por configuración/anotación y benchmark estructural de diversidad. La fase no se considera cerrada hasta que CI valide semántica diferencial, MSRV, seguridad y regresiones A–F sobre el head final.
+Estado actual: **COMPLETADA**. G.1–G.14 están implementadas en `nexora-shield-vm`: elegibilidad fail-safe, VM IR, bytecode VM completo con operandos, asignación privada de opcodes por build, lowering DEX selectivo, intérprete, excepciones con asignabilidad delegada al host, calls/fields, constant pool, sellado HMAC del ejecutable, estimación de coste, pruebas diferenciales, selección por configuración/anotación y benchmark estructural de diversidad. GitHub Actions run #584 (`37571516228`) validó Rust quality, RustSec, regresiones A–F, Phase G G.1–G.14, diferencial/security y Rust 1.81 MSRV sin errores.
 
 ---
 
