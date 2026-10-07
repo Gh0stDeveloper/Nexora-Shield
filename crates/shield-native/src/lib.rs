@@ -5,7 +5,7 @@
 //! Android builds emit a `cdylib`; host builds also expose an `rlib` for
 //! deterministic unit and regression testing.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![allow(
     clippy::doc_markdown,
     clippy::missing_errors_doc,
