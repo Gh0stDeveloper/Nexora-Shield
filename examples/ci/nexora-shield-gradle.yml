@@ -22,7 +22,7 @@ jobs:
           gradle-version: "9.6.0"
 
       - name: Build Nexora Shield CLI
-        run: cargo build --release -p nexora-shield-cli
+        run: cargo build --release -p nexora-shield
 
       - name: Build protected Android release
         env:
