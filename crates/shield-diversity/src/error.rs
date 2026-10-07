@@ -25,7 +25,9 @@ pub enum DiversityError {
 impl fmt::Display for DiversityError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyPrivateSeed => formatter.write_str("private diversity seed must not be empty"),
+            Self::EmptyPrivateSeed => {
+                formatter.write_str("private diversity seed must not be empty")
+            }
             Self::WeakPrivateSeed { observed, minimum } => write!(
                 formatter,
                 "private diversity seed has {observed} bytes; at least {minimum} are required"
@@ -43,15 +45,18 @@ impl fmt::Display for DiversityError {
                 write!(formatter, "duplicate protected string container for '{id}'")
             }
             Self::UnplannedStringContainer(id) => {
-                write!(formatter, "protected string '{id}' is not present in the partition plan")
+                write!(
+                    formatter,
+                    "protected string '{id}' is not present in the partition plan"
+                )
             }
             Self::MissingCertificateRoot => {
                 formatter.write_str("integrity graph has no certificate root")
             }
-            Self::MissingPackageNode => {
-                formatter.write_str("integrity graph has no package node")
+            Self::MissingPackageNode => formatter.write_str("integrity graph has no package node"),
+            Self::Integrity(message) => {
+                write!(formatter, "integrity diversification failed: {message}")
             }
-            Self::Integrity(message) => write!(formatter, "integrity diversification failed: {message}"),
             Self::Cfg(message) => write!(formatter, "CFG diversification failed: {message}"),
             Self::Vm(message) => write!(formatter, "VM diversification failed: {message}"),
             Self::Native(message) => write!(formatter, "native diversification failed: {message}"),
