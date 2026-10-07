@@ -17,10 +17,10 @@ mod tools;
 mod zip;
 
 pub use aab::{
-    inspect_aab, verify_aab_structure, AabInspection, BundleDexInspection,
-    BundleModuleInspection,
+    inspect_aab, verify_aab_structure, AabInspection, BundleBaselineProfile,
+    BundleDexInspection, BundleModuleInspection,
 };
-pub use aar::{inspect_aar, verify_aar_structure, AarInspection};
+pub use aar::{inspect_aar, verify_aar_structure, AarInspection, AarMarker};
 pub use apk::{
     inspect_apk, verify_apk_structure, ApkInspection, DexFileInspection, ManifestFormat,
     ManifestInspection,
