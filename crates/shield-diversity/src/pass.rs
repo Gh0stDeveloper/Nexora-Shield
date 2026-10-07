@@ -54,11 +54,7 @@ impl PassVariantPlan {
     }
 }
 
-fn shuffle(
-    seed: &SeedDeriver,
-    label: &[u8],
-    values: &mut [DiversificationPass],
-) -> Result<()> {
+fn shuffle(seed: &SeedDeriver, label: &[u8], values: &mut [DiversificationPass]) -> Result<()> {
     for index in (1..values.len()).rev() {
         let mut item_label = label.to_vec();
         item_label.extend_from_slice(&u64::try_from(index).unwrap_or(u64::MAX).to_le_bytes());
