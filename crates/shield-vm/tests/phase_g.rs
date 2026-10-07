@@ -1,13 +1,14 @@
 mod common;
 
-use common::{add_dex, unsupported_dex};
+use common::{add_dex, orphan_move_result_dex, unsupported_dex};
 use nexora_shield_vm::{
     BranchCondition, ConstantPool, DexLowerer, EligibilityAnalyzer, EligibilityPolicy,
     ExecutionConfig, Interpreter, MetadataSealer, NullHost, OpcodeAllocation, OpcodeStream,
-    PerformanceEstimator, SelectionPlanner, VmConstant, VmExceptionHandler, VmInstruction,
-    VmMethod, VmRegister, VmSelectionConfig, VmSelectionMode, VmSelector, VmValue,
+    PerformanceEstimator, SelectionPlanner, VmConstant, VmError, VmException, VmExceptionHandler,
+    VmHost, VmInstruction, VmMethod, VmRegister, VmSelectionConfig, VmSelectionMode, VmSelector,
+    VmValue,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
 fn eligibility_accepts_supported_integer_method() {
@@ -24,6 +25,17 @@ fn eligibility_rejects_unsupported_dex_opcode() {
     let report = EligibilityAnalyzer::analyze(&dex, 0, EligibilityPolicy::default());
     assert!(!report.eligible);
     assert!(!report.reasons.is_empty());
+}
+
+#[test]
+fn eligibility_rejects_orphan_move_result() {
+    let dex = orphan_move_result_dex();
+    let report = EligibilityAnalyzer::analyze(&dex, 0, EligibilityPolicy::default());
+    assert!(!report.eligible);
+    assert!(report
+        .reasons
+        .iter()
+        .any(|reason| matches!(reason, nexora_shield_vm::EligibilityReason::OrphanMoveResult { .. })));
 }
 
 #[test]
@@ -220,4 +232,107 @@ fn config_and_annotation_selection_are_both_supported() -> Result<(), Box<dyn st
     assert_eq!(plan.selected_by_config, BTreeSet::from([0_u32]));
     assert_eq!(plan.selected_by_annotation, BTreeSet::from([0_u32]));
     Ok(())
+}
+
+
+#[derive(Debug, Default)]
+struct MemoryHost {
+    fields: BTreeMap<u32, VmValue>,
+}
+
+impl VmHost for MemoryHost {
+    fn load_field(
+        &mut self,
+        _object: Option<&VmValue>,
+        field: u32,
+    ) -> std::result::Result<VmValue, VmException> {
+        Ok(self.fields.get(&field).cloned().unwrap_or(VmValue::Null))
+    }
+
+    fn store_field(
+        &mut self,
+        _object: Option<&VmValue>,
+        field: u32,
+        value: &VmValue,
+    ) -> std::result::Result<(), VmException> {
+        self.fields.insert(field, value.clone());
+        Ok(())
+    }
+
+    fn call(
+        &mut self,
+        method: u32,
+        args: &[VmValue],
+    ) -> std::result::Result<VmValue, VmException> {
+        if method == 7 {
+            let value = args
+                .first()
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or_default();
+            Ok(VmValue::Int(value.wrapping_mul(2)))
+        } else {
+            Err(VmException {
+                type_name: Some("LTest/UnknownMethod;".to_owned()),
+                value: VmValue::Null,
+            })
+        }
+    }
+}
+
+#[test]
+fn calls_and_fields_use_explicit_host_boundary() -> Result<(), Box<dyn std::error::Error>> {
+    let method = VmMethod {
+        method_idx: 10,
+        register_count: 2,
+        parameter_registers: Vec::new(),
+        instructions: vec![
+            VmInstruction::LoadField {
+                dst: VmRegister(0),
+                object: None,
+                field: 1,
+            },
+            VmInstruction::Call {
+                dst: Some(VmRegister(1)),
+                method: 7,
+                args: vec![VmRegister(0)],
+            },
+            VmInstruction::StoreField {
+                object: None,
+                field: 1,
+                src: VmRegister(1),
+            },
+            VmInstruction::Return { src: VmRegister(1) },
+        ],
+        constants: ConstantPool::default(),
+        handlers: Vec::new(),
+    };
+    let mut host = MemoryHost {
+        fields: BTreeMap::from([(1, VmValue::Int(21))]),
+    };
+
+    let result = Interpreter::execute(&method, &[], &mut host, ExecutionConfig::default())?;
+    assert_eq!(result.value, VmValue::Int(42));
+    assert_eq!(host.fields.get(&1), Some(&VmValue::Int(42)));
+    Ok(())
+}
+
+#[test]
+fn interpreter_step_limit_stops_non_terminating_programs() {
+    let method = VmMethod {
+        method_idx: 11,
+        register_count: 0,
+        parameter_registers: Vec::new(),
+        instructions: vec![VmInstruction::Jump { target: 0 }],
+        constants: ConstantPool::default(),
+        handlers: Vec::new(),
+    };
+    let mut host = NullHost;
+
+    let result = Interpreter::execute(
+        &method,
+        &[],
+        &mut host,
+        ExecutionConfig { step_limit: 16 },
+    );
+    assert_eq!(result, Err(VmError::StepLimitExceeded { limit: 16 }));
 }
