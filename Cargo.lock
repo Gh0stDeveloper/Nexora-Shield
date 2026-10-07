@@ -161,7 +161,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "nexora-shield"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "nexora-shield-core",
  "nexora-shield-crypto",
@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-attestation"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "hmac",
  "nexora-shield-rasp",
@@ -185,14 +185,14 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-core"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "nexora-shield-package",
 ]
 
 [[package]]
 name = "nexora-shield-crypto"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "chacha20poly1305",
  "hkdf",
@@ -205,11 +205,11 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-dex"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 
 [[package]]
 name = "nexora-shield-diversity"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "hmac",
  "nexora-shield-crypto",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-integrity"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "nexora-shield-dex",
  "serde",
@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-lab"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "nexora-shield-diversity",
  "nexora-shield-rasp",
@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-native"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "serde",
  "sha2",
@@ -255,7 +255,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-release"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-rasp"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "nexora-shield-integrity",
  "serde",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-vm"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 dependencies = [
  "hmac",
  "nexora-shield-dex",
@@ -283,7 +283,7 @@ dependencies = [
 
 [[package]]
 name = "nexora-shield-package"
-version = "1.0.0-rc.1"
+version = "1.0.0"
 
 [[package]]
 name = "opaque-debug"
