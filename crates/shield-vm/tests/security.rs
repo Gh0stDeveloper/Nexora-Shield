@@ -23,6 +23,7 @@ fn wrong_metadata_key_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
         instruction_count: 9,
         handler_count: 1,
         constant_pool_digest: [3; 32],
+        control_metadata_digest: [5; 32],
         opcode_fingerprint: allocation.fingerprint(),
         bytecode_digest: [4; 32],
     };
