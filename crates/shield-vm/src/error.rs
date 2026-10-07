@@ -34,13 +34,22 @@ impl fmt::Display for VmError {
             Self::EmptySeed => formatter.write_str("VM private seed must not be empty"),
             Self::EmptySealKey => formatter.write_str("VM metadata seal key must not be empty"),
             Self::IneligibleMethod { method_idx, reason } => {
-                write!(formatter, "method {method_idx} is not eligible for VM Shield: {reason}")
+                write!(
+                    formatter,
+                    "method {method_idx} is not eligible for VM Shield: {reason}"
+                )
             }
             Self::UnsupportedDexOpcode { offset, opcode } => {
-                write!(formatter, "unsupported DEX opcode 0x{opcode:02x} at code offset {offset}")
+                write!(
+                    formatter,
+                    "unsupported DEX opcode 0x{opcode:02x} at code offset {offset}"
+                )
             }
             Self::InvalidDexReference { offset, expected } => {
-                write!(formatter, "DEX instruction at offset {offset} is missing {expected} reference")
+                write!(
+                    formatter,
+                    "DEX instruction at offset {offset} is missing {expected} reference"
+                )
             }
             Self::InvalidRegister(register) => write!(formatter, "invalid VM register v{register}"),
             Self::InvalidConstant(index) => write!(formatter, "invalid VM constant #{index}"),
@@ -51,10 +60,16 @@ impl fmt::Display for VmError {
                 write!(formatter, "invalid VM exception handler target pc {target}")
             }
             Self::InvalidValueType(expected) => {
-                write!(formatter, "VM value does not match expected type {expected}")
+                write!(
+                    formatter,
+                    "VM value does not match expected type {expected}"
+                )
             }
             Self::ArgumentCount { expected, actual } => {
-                write!(formatter, "VM expected {expected} arguments but received {actual}")
+                write!(
+                    formatter,
+                    "VM expected {expected} arguments but received {actual}"
+                )
             }
             Self::DivisionByZero => formatter.write_str("VM integer division by zero"),
             Self::Host(message) => write!(formatter, "VM host error: {message}"),
@@ -66,7 +81,9 @@ impl fmt::Display for VmError {
                 write!(formatter, "VM execution exceeded step limit {limit}")
             }
             Self::MissingReturn => formatter.write_str("VM method terminated without return"),
-            Self::InvalidOpcode(opcode) => write!(formatter, "unknown allocated VM opcode {opcode}"),
+            Self::InvalidOpcode(opcode) => {
+                write!(formatter, "unknown allocated VM opcode {opcode}")
+            }
             Self::MetadataSealMismatch => formatter.write_str("VM metadata authentication failed"),
             Self::MetadataEncoding(message) => {
                 write!(formatter, "VM metadata encoding error: {message}")
