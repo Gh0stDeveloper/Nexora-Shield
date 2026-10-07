@@ -2,7 +2,7 @@
 
 Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
 
-> Estado: **Fase D — Integrity / Anti-Tamper completada y validada por CI**. Nexora Shield ya dispone de certificate/package binding, integridad regional DEX, recursos y bibliotecas nativas, Integrity Graph determinista, checks distribuidos, respuestas no destructivas y pruebas reales de re-firma/patch/repack. La siguiente fase es **Fase E — RASP**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
+> Estado: **Fase F — Native Shield completada y validada por CI**. Las Fases 0–F ya están cerradas: packaging, motor DEX, protección de datos, integridad/anti-tamper, RASP completo y runtime nativo Android para arm64-v8a/x86_64 con hardening, JNI mínimo y reproducibilidad verificada. La siguiente fase es **Fase G — VM Shield**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
 
 ## Objetivos
 
@@ -183,6 +183,11 @@ Gradle:
 - docs/PHASE-B-CHECKLIST.md — evidencia de cierre B.1–B.12.
 - docs/PHASE-D.md — diseño e implementación de Integrity / Anti-Tamper.
 - docs/PHASE-D-CHECKLIST.md — evidencia de cierre D.1–D.10.
+- docs/PHASE-E.md — diseño e implementación RASP E.1–E.12.
+- docs/PHASE-E-CHECKLIST.md — evidencia de cierre de la Fase E.
+- docs/PHASE-F.md — diseño e implementación de Native Shield F.1–F.10.
+- docs/PHASE-F-CHECKLIST.md — evidencia de cierre de la Fase F.
+- docs/PHASE-F-CI.md — matriz de validación nativa Android y reproducibilidad.
 - docs/THREAT-MODEL.md — activos, atacantes, escenarios y no-objetivos.
 - docs/SECURITY-DESIGN.md — capas de protección y decisiones de diseño.
 - docs/CONFIGURATION.md — modelo de configuración.
