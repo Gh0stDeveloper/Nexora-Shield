@@ -84,8 +84,8 @@
 Phase L is **COMPLETED**. L.1–L.10 are implemented and their acceptance gates passed on the validated implementation head.
 
 Validated by GitHub Actions:
-- Phase L run #18 (`37591538497`): **success**
-- CI run #889 (`37591538479`): **success**
-- Phase K regression run #35 (`37591538494`): **success**
+- Phase L run #20 (`37591941642`): **success**
+- CI run #891 (`37591941514`): **success**
+- Phase K regression run #36 (`37591941555`): **success**
 
-The validated implementation head is `cae761c471deb8284c111927380ca9b4b55b5b1f`.
+The validated implementation head is `7e9d149e72885263b183f71e907d3ef6482a4e4a`.
