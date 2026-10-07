@@ -30,13 +30,10 @@ pub use integrity::{IntegrityTopologyPlan, IntegrityTopologyVariant};
 pub use native::NativeConstantVariant;
 pub use pass::{DiversificationPass, PassVariantPlan};
 pub use regression::{
-    BuildDiversitySignature, BypassPortabilityReport, CrossBuildBypassRegression,
-    DiversitySurface,
+    BuildDiversitySignature, BypassPortabilityReport, CrossBuildBypassRegression, DiversitySurface,
 };
 pub use rename::RenameVariant;
-pub use seed::{
-    BuildSeedContext, DiversityDomain, DiversityMode, PrivateBuildSeed, SeedDeriver,
-};
+pub use seed::{BuildSeedContext, DiversityDomain, DiversityMode, PrivateBuildSeed, SeedDeriver};
 pub use strings::{
     PublicStringShard, StringPartitionBuild, StringPartitionPlan, StringShard, StringShardEntry,
     StringShardLocation,
