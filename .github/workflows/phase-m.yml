@@ -196,3 +196,53 @@ jobs:
 
       - name: Run Phase M portability gate
         run: cargo test --locked -p nexora-shield-lab --test phase_m m6_bypass_portability_gate_rejects_transferable_builds -- --exact
+
+
+  phase-k-regression:
+    name: Phase K package-model regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test Phase K package models
+        run: cargo test --locked -p nexora-shield-package --test phase_k
+
+      - name: Clippy package models and CLI
+        run: cargo clippy --locked -p nexora-shield-package -p nexora-shield --all-targets -- -D warnings
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Verify Phase K package models on MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-package --test phase_k
+
+  phase-l-regression:
+    name: Phase L Studio regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.0"
+
+      - name: Test and compile Shield Studio
+        run: gradle -p studio desktopTest compileKotlinDesktop --no-daemon --stacktrace
