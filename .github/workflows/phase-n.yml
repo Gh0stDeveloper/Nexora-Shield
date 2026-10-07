@@ -300,8 +300,68 @@ jobs:
           sudo chmod 666 /dev/kvm
           "$EMULATOR" -accel-check
 
-          IMAGE_DIR="$(find "$SDK_ROOT/system-images" -type f -name source.properties -path '*/x86_64/*' -print 2>/dev/null \
-            | grep -E '/(aosp_atd|google_apis)/x86_64/source\.properties
+          IMAGE_DIR="$(find "$SDK_ROOT/system-images" -type f -name source.properties -path '*/x86_64/source.properties' -print 2>/dev/null | grep -E '/(aosp_atd|google_apis)/x86_64/source\.properties$' | sort -V | tail -n 1 | xargs -r dirname || true)"
+
+          if [[ -z "$IMAGE_DIR" ]]; then
+            IMAGE_PACKAGE="system-images;android-35;aosp_atd;x86_64"
+            echo "No suitable preinstalled x86_64 image found; installing compact ATD image: $IMAGE_PACKAGE"
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            timeout 600 "$SDKMANAGER" "$IMAGE_PACKAGE"
+            IMAGE_DIR="$SDK_ROOT/system-images/android-35/aosp_atd/x86_64"
+          else
+            IMAGE_PACKAGE="$(grep '^Pkg.Path=' "$IMAGE_DIR/source.properties" | head -n 1 | cut -d= -f2- | tr -d '\r')"
+            if [[ -z "$IMAGE_PACKAGE" ]]; then
+              RELATIVE="$(realpath --relative-to="$SDK_ROOT/system-images" "$IMAGE_DIR")"
+              IMAGE_PACKAGE="system-images;${RELATIVE//\//;}"
+            fi
+            echo "Using preinstalled Android image: $IMAGE_PACKAGE"
+          fi
+
+          test -d "$IMAGE_DIR"
+          echo no | "$AVDMANAGER" create avd --force --name nexora_phase_n --package "$IMAGE_PACKAGE" --device "pixel_6"
+
+          "$ADB" kill-server || true
+          "$ADB" start-server
+
+          nohup "$EMULATOR" -avd nexora_phase_n -no-window -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -gpu swiftshader_indirect -accel on -cores 2 -memory 2048 -camera-back none -camera-front none -netfast > "$PERF_DIR/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > "$PERF_DIR/emulator.pid"
+
+          READY=0
+          for i in {1..120}; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Android emulator exited before boot completed." >&2
+              tail -n 250 "$PERF_DIR/emulator.log" >&2 || true
+              exit 1
+            fi
+
+            STATE="$("$ADB" get-state 2>/dev/null || true)"
+            BOOT="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [[ "$STATE" == "device" && "$BOOT" == "1" ]]; then
+              READY=1
+              break
+            fi
+
+            if (( i % 15 == 0 )); then
+              echo "Waiting for Android boot: attempt=$i state=${STATE:-none} boot=${BOOT:-0}"
+              "$ADB" devices -l || true
+            fi
+            sleep 2
+          done
+
+          if [[ "$READY" != "1" ]]; then
+            echo "Android emulator did not become ready within 240 seconds." >&2
+            "$ADB" devices -l >&2 || true
+            tail -n 250 "$PERF_DIR/emulator.log" >&2 || true
+            exit 1
+          fi
+
+          echo "Android emulator booted successfully."
+          "$ADB" shell getprop ro.build.fingerprint
+          "$ADB" shell getprop ro.product.cpu.abi
+          "$ADB" shell settings put global window_animation_scale 0
+          "$ADB" shell settings put global transition_animation_scale 0
+          "$ADB" shell settings put global animator_duration_scale 0
       - name: Measure baseline and protected startup memory and size
         run: |
           ADB="$SDK_ROOT/platform-tools/adb"
