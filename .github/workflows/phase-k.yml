@@ -2,7 +2,7 @@ name: Phase K
 
 on:
   push:
-    branches: [main, feat/phase-k-aab-aar-splits]
+    branches: [main, feat/phase-k-aab-aar-splits, feat/phase-m-security-lab]
   pull_request:
     branches: [main]
 
