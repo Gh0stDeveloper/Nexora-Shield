@@ -1,10 +1,10 @@
-# Nexora Shield 1.0 RC — compatibility review
+# Nexora Shield 1.0 — compatibility review
 
 The machine-readable compatibility contract is `../release/compatibility-matrix.json`.
 
-## 1.0 candidate matrix
+## 1.0 stable matrix
 
-| Surface | Supported candidate |
+| Surface | Supported stable contract |
 | --- | --- |
 | Rust | MSRV 1.81 |
 | Android | minSdk 24+ |
