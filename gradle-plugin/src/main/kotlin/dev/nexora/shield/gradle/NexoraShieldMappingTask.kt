@@ -33,9 +33,10 @@ abstract class NexoraShieldMappingTask : DefaultTask() {
 
         val source = mappingFile.orNull?.asFile
         val available = source?.isFile == true
-        if (available && source != null) {
-            source.copyTo(File(output, "mapping.txt"), overwrite = true)
-        }
+        source?.takeIf { it.isFile }?.copyTo(
+            File(output, "mapping.txt"),
+            overwrite = true,
+        )
 
         val escapedVariant = variantName.get()
             .replace("\\", "\\\\")
