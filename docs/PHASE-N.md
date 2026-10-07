@@ -156,3 +156,22 @@ Stable qualification requires all of the following in the same final release lin
 - exact synchronized `1.0.0` source version.
 
 The stable tag `v1.0.0` must be created only from the validated `main` commit. The release workflow then builds Linux/macOS/Windows artifacts, checksums them, emits SBOM/provenance attestations and publishes the stable GitHub Release.
+
+
+## Closure status
+
+**COMPLETED — N.1–N.14**
+
+Final stable implementation head: `ce92ea791dc860a505658a67be1b9250105a834a`.
+
+Validated by:
+- Phase N #86 (`37691051042`): 9/9 jobs successful;
+- N.14 stable qualification: successful;
+- N.10 Android performance: successful;
+- N.13 CodeQL external assessment: successful;
+- Rust 1.81 MSRV: successful;
+- Phase M #86, Phase L #92, Phase K #107: successful;
+- CI #1156: successful;
+- zero failed jobs.
+
+The repository source is finalized at `1.0.0`. Stable GitHub Release publication is intentionally performed after merge from the validated `main` commit so the release tag cannot point at an unmerged feature branch.
