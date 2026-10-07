@@ -1,29 +1,28 @@
 use crate::abi::Abi;
-use jni::objects::JClass;
-use jni::sys::{jint, jstring};
-use jni::JNIEnv;
-use std::ptr;
+use crate::runtime::NATIVE_RUNTIME_API_VERSION;
+use core::ffi::c_void;
+
+type JInt = i32;
+type JniEnv = *mut c_void;
+type JClass = *mut c_void;
 
 #[no_mangle]
-pub extern "system" fn Java_dev_nexora_shield_NativeShield_nativeRuntimeVersion(
-    mut env: JNIEnv<'_>,
-    _class: JClass<'_>,
-) -> jstring {
-    match env.new_string(env!("CARGO_PKG_VERSION")) {
-        Ok(value) => value.into_raw(),
-        Err(_) => ptr::null_mut(),
-    }
+pub extern "system" fn Java_dev_nexora_shield_NativeShield_nativeRuntimeApiVersion(
+    _env: JniEnv,
+    _class: JClass,
+) -> JInt {
+    i32::try_from(NATIVE_RUNTIME_API_VERSION).unwrap_or(i32::MAX)
 }
 
 #[no_mangle]
 pub extern "system" fn Java_dev_nexora_shield_NativeShield_nativeAbiCode(
-    _env: JNIEnv<'_>,
-    _class: JClass<'_>,
-) -> jint {
+    _env: JniEnv,
+    _class: JClass,
+) -> JInt {
     abi_code_for_target()
 }
 
-const fn abi_code_for_target() -> jint {
+const fn abi_code_for_target() -> JInt {
     #[cfg(target_arch = "aarch64")]
     {
         return abi_code(Abi::Arm64V8a);
@@ -44,7 +43,7 @@ const fn abi_code_for_target() -> jint {
     0
 }
 
-const fn abi_code(abi: Abi) -> jint {
+const fn abi_code(abi: Abi) -> JInt {
     match abi {
         Abi::Arm64V8a => 64,
         Abi::X86_64 => 65,
