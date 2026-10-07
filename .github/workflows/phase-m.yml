@@ -41,7 +41,9 @@ jobs:
         run: cargo clippy --locked -p nexora-shield-lab --all-targets -- -D warnings
 
       - name: Validate regression corpus
-        run: cargo run --locked --quiet -p nexora-shield-lab -- corpus-validate security-lab/corpus/index.json
+        run: |
+          cargo run --locked --quiet -p nexora-shield-lab -- corpus-validate security-lab/corpus/index.json
+          cargo run --locked --quiet -p nexora-shield-lab -- coverage-validate security-lab/corpus/index.json security-lab/corpus/coverage.json
 
       - name: Validate static exposure pass/fail behavior
         run: |
