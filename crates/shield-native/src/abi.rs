@@ -85,10 +85,7 @@ impl Default for AbiPolicy {
 
 impl AbiPolicy {
     #[must_use]
-    pub fn with_additional(
-        allow_32_bit: bool,
-        additional: impl IntoIterator<Item = Abi>,
-    ) -> Self {
+    pub fn with_additional(allow_32_bit: bool, additional: impl IntoIterator<Item = Abi>) -> Self {
         Self {
             allow_32_bit,
             additional: additional.into_iter().collect(),
