@@ -1,5 +1,7 @@
 # Nexora Shield 1.0 — compatibility review
 
+> **Post-Phase-N audit clarification:** this is the Phase N declared compatibility contract. Phase O requires broader real-device/API/OEM validation before stable production approval, so this matrix must not be interpreted as proof that every listed environment has already passed full-stack O.1 production protection.
+
 The machine-readable compatibility contract is `../release/compatibility-matrix.json`.
 
 ## 1.0 stable matrix
