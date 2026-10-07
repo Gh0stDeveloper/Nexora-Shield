@@ -1,8 +1,8 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 use nexora_shield_package::{
-    inspect_aab, inspect_aar, inspect_apk_set, verify_aab_structure, verify_aar_structure,
-    verify_apk_set_structure, SplitApkKind,
+    inspect_aab, inspect_aar, verify_aab_structure, verify_aar_structure,
+    verify_apk_set_structure, AarMarker, SplitApkKind,
 };
 use std::fs::{self, File};
 use std::io::{Seek, Write};
@@ -55,8 +55,8 @@ fn k1_aab_model_discovers_base_dynamic_features_resources_and_profiles() {
     assert!(base.resources_table_present);
     assert_eq!(base.resource_entries, 1);
     assert!(base.native_abis.contains("arm64-v8a"));
-    assert!(base.baseline_profile_present);
-    assert!(base.baseline_profile_metadata_present);
+    assert!(base.baseline_profile.binary_present);
+    assert!(base.baseline_profile.metadata_present);
 
     cleanup(&directory);
 }
@@ -147,12 +147,12 @@ fn k6_k8_k9_aar_model_preserves_rules_resources_namespace_and_profiles() {
     );
 
     let inspection = verify_aar_structure(&aar).expect("valid AAR");
-    assert!(inspection.manifest_present);
-    assert!(inspection.classes_jar_present);
-    assert!(inspection.aar_metadata_present);
+    assert!(inspection.has_marker(AarMarker::Manifest));
+    assert!(inspection.has_marker(AarMarker::ClassesJar));
+    assert!(inspection.has_marker(AarMarker::AarMetadata));
     assert_eq!(inspection.consumer_rule_entries, vec!["proguard.txt"]);
     assert_eq!(inspection.resource_entries, 1);
-    assert!(inspection.resource_symbols_present);
+    assert!(inspection.has_marker(AarMarker::ResourceSymbols));
     assert!(inspection.jni_abis.contains("arm64-v8a"));
     assert_eq!(inspection.baseline_profile_entries, vec!["baseline-prof.txt"]);
 
@@ -166,7 +166,7 @@ fn k6_aar_verifier_rejects_missing_classes_jar() {
     write_stored_zip(&aar, &[("AndroidManifest.xml", b"manifest")]);
 
     let inspection = inspect_aar(&aar).expect("inspect invalid AAR");
-    assert!(!inspection.classes_jar_present);
+    assert!(!inspection.has_marker(AarMarker::ClassesJar));
     assert!(verify_aar_structure(&aar).is_err());
 
     cleanup(&directory);
