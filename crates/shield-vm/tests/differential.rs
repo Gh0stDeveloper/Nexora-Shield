@@ -6,8 +6,7 @@ use nexora_shield_vm::{
 };
 
 #[test]
-fn differential_add_matches_reference_for_4096_cases(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std::error::Error>> {
     let method = DexLowerer::lower(&add_dex(), 0, EligibilityPolicy::default())?;
     let mut host = NullHost;
     let mut state = 0x4e45_584f_5241_4744_u64;
