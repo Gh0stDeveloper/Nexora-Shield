@@ -19,10 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // deterministic, dependency-light verification sample. Production Android
     // deployments should use a platform attestation provider and verify its
     // token on the server.
-    let client_sample =
-        SampleHmacEvidenceAuthenticator::new("sample-provider", [0x61; 32])?;
-    let server_sample =
-        SampleHmacEvidenceAuthenticator::new("sample-provider", [0x61; 32])?;
+    let client_sample = SampleHmacEvidenceAuthenticator::new("sample-provider", [0x61; 32])?;
+    let server_sample = SampleHmacEvidenceAuthenticator::new("sample-provider", [0x61; 32])?;
 
     let mut server = SampleRemotePolicyServer::new(server_sample, 4096);
     server.register_challenge(challenge.clone(), now_unix_ms)?;
