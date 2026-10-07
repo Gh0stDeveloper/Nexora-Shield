@@ -20,6 +20,7 @@ mod emulator;
 mod hook;
 mod instrumentation;
 mod integrity_fusion;
+mod lab;
 mod modified_system;
 mod policy;
 mod response;
@@ -31,8 +32,11 @@ pub use emulator::{EmulatorEvaluator, EmulatorObservation};
 pub use hook::{HookInjectionEvaluator, HookInjectionObservation};
 pub use instrumentation::{InstrumentationEvaluator, InstrumentationObservation};
 pub use integrity_fusion::IntegritySignalFusion;
+pub use lab::{
+    FalsePositiveCase, FalsePositiveCaseResult, FalsePositiveLab, FalsePositiveLabReport,
+};
 pub use modified_system::{ModifiedSystemEvaluator, ModifiedSystemObservation};
-pub use policy::{CompiledPolicy, PolicyError, PolicySpec};
+pub use policy::{CompiledPolicy, PolicyError, PolicyMode, PolicySpec};
 pub use response::{RaspResponse, ResponseDecision, ResponseEngine};
 pub use risk::{RiskAssessment, RiskEngine, RiskLevel, RiskReason, RiskThresholds};
 pub use signal::{
