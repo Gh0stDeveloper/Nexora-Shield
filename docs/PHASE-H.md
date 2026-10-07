@@ -10,7 +10,7 @@ The design is deterministic only when the same private build material and the sa
 
 ## H.1 — Seed model
 
-`PrivateBuildSeed` stores private build material and redacts it from `Debug`. The memory buffer is zeroized on drop.
+`PrivateBuildSeed` requires at least 32 bytes of private build material, redacts it from `Debug`, and zeroizes the memory buffer on drop.
 
 `SeedDeriver` derives a private root using HMAC-SHA-256 over:
 
@@ -74,15 +74,18 @@ This provides recipe diversity without allowing an arbitrary ordering that could
 
 ## H.5 — CFG variants
 
-`CfgVariantPlan` derives per-method layout decisions:
+`CfgVariantPlan` derives and materializes build-specific control-flow variants on Phase G VM IR.
 
-- seeded block permutation or seeded tail rotation;
-- preserve or invert eligible branch style;
-- small split budget.
+The current safe materialization uses:
 
-The entry block is always preserved as block zero and the block order is validated as a complete permutation.
+- block-boundary padding;
+- optional boundary trampolines;
+- seeded boundary selection;
+- small build-specific padding budgets.
 
-This is a layout/transform plan. A DEX rewriter must preserve branch targets and semantics when materializing the plan.
+When the method is rewritten, all VM branch targets and exception-handler ranges are remapped and the resulting method is validated again before encoding. Differential tests execute both the original and diversified VM methods to verify identical results for representative inputs.
+
+Nexora Shield does not claim that the current fixed-layout DEX writer can safely permute arbitrary non-VM DEX blocks. H.5 therefore materializes where the project has a semantics-preserving writer today instead of pretending unsupported DEX rewriting is available.
 
 ## H.6 — Integrity graph topology variants
 
@@ -98,7 +101,7 @@ The signing certificate remains the single root and the package node remains dir
 
 ## H.7 — String container partition variants
 
-`StringPartitionPlan` assigns logical protected-string ids to a seed-derived number of opaque shards.
+`StringPartitionPlan` assigns logical protected-string ids to a seed-derived number of opaque shards and can materialize the real `ProtectedString` containers produced by Phase C.
 
 Properties:
 
@@ -107,6 +110,8 @@ Properties:
 - all emitted shards are non-empty;
 - every logical id appears exactly once;
 - shard filenames are opaque and build-specific;
+- public shard entries contain only opaque ids and authenticated ciphertext;
+- the logical-id lookup remains private build metadata and is redacted from `Debug`;
 - ordering and partition assignment vary by build.
 
 The encrypted string containers themselves remain authenticated by Phase C.
