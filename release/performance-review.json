@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "reviewStage": "1.0-rc",
+  "reviewStage": "1.0-stable",
   "rcReviewPassed": true,
   "stableDeviceMeasurementsComplete": true,
   "reviewedDimensions": [
@@ -67,5 +67,5 @@
       "passed": true
     }
   },
-  "note": "Stable performance evidence is complete on the standardized Android 15/API 35 x86_64 ATD execution environment. The protected artifact is independently bound to the Nexora Shield public report and differs from the baseline by SHA-256."
+  "note": "Stable performance evidence is complete and validated on the standardized Android 15/API 35 x86_64 ATD execution environment. The protected artifact is bound to the Nexora Shield public report, differs from the baseline by SHA-256, and the N.10 budget gate passed."
 }
