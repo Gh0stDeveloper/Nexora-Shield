@@ -34,7 +34,9 @@ All notable changes to Nexora Shield are documented here.
 
 ### Publication
 
-The source is promoted to `1.0.0`. Stable publication is permitted only after the final N.14 qualification workflow is green on the release commit and the `v1.0.0` tag is created from validated `main`.
+The source version was synchronized to `1.0.0` during Phase N. A strict post-N production-readiness audit subsequently opened **Phase O — Production Release Audit & Hardening**.
+
+Stable `v1.0.0` publication is therefore **frozen** until Phase O closes. Phase N qualification remains historical evidence, but the final stable tag requires O.14 final production audit approval and O.15 release readiness on the exact approved `main` commit.
 
 ## [1.0.0-rc.1] — Release candidate
 
