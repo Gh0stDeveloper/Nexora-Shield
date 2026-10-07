@@ -1,0 +1,183 @@
+name: Phase K
+
+on:
+  push:
+    branches: [main, feat/phase-k-aab-aar-splits]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: phase-k-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-models:
+    name: K.1-K.9 package models
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Test AAB AAR and APK Set models
+        run: cargo test --locked -p nexora-shield-package --test phase_k
+      - name: Clippy packaging and CLI
+        run: cargo clippy --locked -p nexora-shield-package -p nexora-shield --all-targets -- -D warnings
+
+  package-models-msrv:
+    name: K package models Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.81.0
+      - name: Test Phase K on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-package --test phase_k
+
+  bundle-splits:
+    name: K.1-K.5 AAB bundletool splits Play signing
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - name: Discover hosted Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          test -d "$SDK_ROOT"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+      - name: Install Android platform and build tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+      - name: Fetch pinned bundletool
+        run: |
+          BUNDLETOOL_JAR="$(bash scripts/fetch-bundletool.sh)"
+          test -s "$BUNDLETOOL_JAR"
+          echo "BUNDLETOOL_JAR=$(realpath "$BUNDLETOOL_JAR")" >> "$GITHUB_ENV"
+      - name: Build Nexora Shield CLI
+        run: cargo build --release -p nexora-shield
+      - name: Create ephemeral upload key
+        run: |
+          mkdir -p build/phase-k/signing
+          keytool -genkeypair -alias upload -keyalg RSA -keysize 2048 -validity 3650 \
+            -dname "CN=Nexora Shield Phase K,O=Nexora,C=MX" -storetype PKCS12 \
+            -keystore build/phase-k/signing/upload.p12 -storepass phase-k-password -keypass phase-k-password
+          printf '%s' 'phase-k-password' > build/phase-k/signing/store.pass
+          printf '%s' 'phase-k-password' > build/phase-k/signing/key.pass
+          echo "NEXORA_K_UPLOAD_KEYSTORE=$(realpath build/phase-k/signing/upload.p12)" >> "$GITHUB_ENV"
+          echo "NEXORA_K_UPLOAD_STORE_PASSWORD=phase-k-password" >> "$GITHUB_ENV"
+          echo "NEXORA_K_UPLOAD_KEY_PASSWORD=phase-k-password" >> "$GITHUB_ENV"
+          echo "NEXORA_K_UPLOAD_ALIAS=upload" >> "$GITHUB_ENV"
+      - name: Build upload-signed AAB and validate bundle
+        env:
+          NEXORA_SHIELD_CLI: ${{ github.workspace }}/target/release/nexora-shield
+        run: |
+          gradle -p samples/phase-k/bundle-app clean :app:bundleRelease :app:nexoraShieldValidateReleaseBundle --no-daemon --stacktrace
+      - name: Verify AAB dynamic feature upload signature and bundletool
+        run: |
+          AAB="samples/phase-k/bundle-app/app/build/outputs/bundle/release/app-release.aab"
+          test -s "$AAB"
+          jarsigner -verify -strict -certs "$AAB"
+          target/release/nexora-shield aab-verify "$AAB"
+          target/release/nexora-shield aab-inspect "$AAB" | tee build/phase-k/aab-inspection.txt
+          grep -q 'Dynamic features: 1' build/phase-k/aab-inspection.txt
+          target/release/nexora-shield bundletool-validate "$AAB" --jar "$BUNDLETOOL_JAR"
+          REPORT="samples/phase-k/bundle-app/app/build/reports/nexora-shield/release/bundle-validation.json"
+          test -s "$REPORT"
+          grep -q '"dynamicFeatures": 1' "$REPORT"
+          grep -q '"bundletoolValidated": true' "$REPORT"
+      - name: Generate and validate split APK Set
+        run: |
+          AAB="samples/phase-k/bundle-app/app/build/outputs/bundle/release/app-release.aab"
+          target/release/nexora-shield bundletool-build-apks "$AAB" --jar "$BUNDLETOOL_JAR" \
+            --output build/phase-k/default.apks --local-testing \
+            --keystore build/phase-k/signing/upload.p12 --alias upload \
+            --ks-pass-file build/phase-k/signing/store.pass --key-pass-file build/phase-k/signing/key.pass
+          target/release/nexora-shield apks-verify build/phase-k/default.apks
+          target/release/nexora-shield apks-inspect build/phase-k/default.apks | tee build/phase-k/default-apks.txt
+          grep -q 'Split:' build/phase-k/default-apks.txt
+      - name: Generate and validate universal APK Set
+        run: |
+          AAB="samples/phase-k/bundle-app/app/build/outputs/bundle/release/app-release.aab"
+          target/release/nexora-shield bundletool-build-apks "$AAB" --jar "$BUNDLETOOL_JAR" \
+            --output build/phase-k/universal.apks --mode universal \
+            --keystore build/phase-k/signing/upload.p12 --alias upload \
+            --ks-pass-file build/phase-k/signing/store.pass --key-pass-file build/phase-k/signing/key.pass
+          target/release/nexora-shield apks-verify build/phase-k/universal.apks
+          target/release/nexora-shield apks-inspect build/phase-k/universal.apks | tee build/phase-k/universal-apks.txt
+          grep -q 'Universal:' build/phase-k/universal-apks.txt
+      - name: Verify Baseline Profile and module resources
+        run: |
+          AAB="samples/phase-k/bundle-app/app/build/outputs/bundle/release/app-release.aab"
+          unzip -l "$AAB" | tee build/phase-k/aab-list.txt
+          grep -Eq 'baseline\.prof|baseline\.profm' build/phase-k/aab-list.txt
+          grep -q '/resources.pb' build/phase-k/aab-list.txt
+
+  aar-publishing:
+    name: K.6-K.10 AAR publishing and consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - name: Discover hosted Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          test -d "$SDK_ROOT"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+      - name: Install Android platform and build tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+      - name: Build Nexora Shield CLI
+        run: cargo build --release -p nexora-shield
+      - name: Build validate and publish AAR
+        env:
+          NEXORA_SHIELD_CLI: ${{ github.workspace }}/target/release/nexora-shield
+        run: |
+          gradle -p samples/phase-k/library-publishing clean :library:nexoraShield :library:publishReleasePublicationToPhaseKRepository --no-daemon --stacktrace
+      - name: Verify published AAR contract
+        run: |
+          AAR="samples/phase-k/library-publishing/library/build/outputs/aar/library-release.aar"
+          test -s "$AAR"
+          target/release/nexora-shield aar-verify "$AAR"
+          target/release/nexora-shield aar-inspect "$AAR" | tee build/phase-k-aar.txt
+          unzip -l "$AAR" | tee build/phase-k-aar-list.txt
+          grep -q 'proguard.txt' build/phase-k-aar-list.txt
+          grep -q 'classes.jar' build/phase-k-aar-list.txt
+          grep -q 'res/' build/phase-k-aar-list.txt
+          grep -Eq 'baseline-prof\.txt|startup-prof\.txt' build/phase-k-aar-list.txt
+          REPORT="samples/phase-k/library-publishing/library/build/reports/nexora-shield/release/aar-validation.json"
+          test -s "$REPORT"
+          grep -Eq '"consumerRuleEntries": [1-9]' "$REPORT"
+          PUBLISHED="$(find samples/phase-k/library-publishing/build/phase-k-repo -type f -name '*.aar' | head -n 1)"
+          test -s "$PUBLISHED"
+      - name: Consume published AAR in a minified Android app
+        run: |
+          gradle -p samples/phase-k/library-consumer clean :app:assembleRelease --no-daemon --stacktrace
+          APK="$(find samples/phase-k/library-consumer/app/build/outputs -type f -name '*.apk' | head -n 1)"
+          test -s "$APK"
