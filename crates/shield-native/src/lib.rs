@@ -26,7 +26,7 @@ mod symbols;
 pub use abi::{Abi, AbiDecision, AbiPolicy, PRIMARY_ANDROID_ABIS};
 pub use error::{NativeError, Result};
 pub use generated::{GeneratedNativeData, GENERATED_NATIVE_DATA_VERSION};
-pub use hardening::{HardeningProfile, PRODUCTION_LINKER_ARGS};
+pub use hardening::{HardeningFeature, HardeningProfile, PRODUCTION_LINKER_ARGS};
 pub use integrity::{NativeDigest, NativeIntegrityCheck, NativeRegion};
 pub use runtime::{NativeRuntimeDescriptor, NATIVE_RUNTIME_API_VERSION};
 pub use symbols::{ExportPolicy, REQUIRED_JNI_EXPORTS};
