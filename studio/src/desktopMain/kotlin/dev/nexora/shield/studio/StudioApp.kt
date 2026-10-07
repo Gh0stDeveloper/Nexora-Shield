@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.nexora.shield.studio.ui.ShieldColors
 import dev.nexora.shield.studio.ui.ShieldTone
+import dev.nexora.shield.studio.ui.StudioLayoutPolicy
 import dev.nexora.shield.studio.ui.StatusPill
 import dev.nexora.shield.studio.ui.chooseDirectory
 
