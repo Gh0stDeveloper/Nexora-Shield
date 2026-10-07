@@ -27,8 +27,8 @@
     "performance-review",
     "compatibility-review",
     "rc-build",
-    "external-feedback",
+    "external-assessment",
     "stable-device-performance"
   ],
-  "minimumExternalReviewers": 1
+  "minimumExternalAssessments": 1
 }
