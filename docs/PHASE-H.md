@@ -183,3 +183,10 @@ Phase H is complete only when:
 8. 32-build bypass portability regression is within budget;
 9. Rust quality and Rust 1.81 MSRV pass;
 10. Phase A–G regressions remain green.
+
+
+## Closure state
+
+Phase H is **COMPLETED**. GitHub Actions run **#665** (ID `37574529544`) passed the complete implementation acceptance matrix on commit `efac111728eeeba7b14761f0b8eab0d2d2f51fa4`.
+
+The closure includes Rust quality, RustSec, Rust 1.81 MSRV, all Phase A–G regressions, H.1–H.10 tests and the 32-build cross-build portability gate.

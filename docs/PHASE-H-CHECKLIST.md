@@ -83,8 +83,8 @@
 - [x] Transfer basis-points metric
 - [x] 32-build regression corpus
 - [x] 3000 bp maximum transfer acceptance threshold
-- [ ] Final dedicated CI gate
+- [x] Final dedicated CI gate — run #665
 
 ## Closure state
 
-Phase H implementation is **IN PROGRESS**. H.1–H.10 code and tests are present. The phase is not closed until strict Rust quality, Rust 1.81 MSRV, the 32-build bypass portability gate and full Phase A–G regressions are green on the final head.
+Phase H is **COMPLETED**. H.1–H.10 are implemented. GitHub Actions run #665 (`37574529544`) passed Rust quality, RustSec, Phase A–G regressions, Phase H H.1–H.10, the 32-build bypass portability gate and Rust 1.81 MSRV on commit `efac111728eeeba7b14761f0b8eab0d2d2f51fa4`.
