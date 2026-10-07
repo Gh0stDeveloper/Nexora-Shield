@@ -34,6 +34,7 @@ pub enum EligibilityReason {
     FieldsDisabled,
     ExceptionsDisabled,
     WideMoveResultUnsupported { offset: u32 },
+    WideFieldUnsupported { offset: u32, opcode: u8 },
     OrphanMoveResult { offset: u32 },
     OrphanMoveException { offset: u32 },
     WideValueUnsupported { block_start: u32 },
@@ -137,6 +138,12 @@ impl EligibilityAnalyzer {
                 0x0b => reasons.push(EligibilityReason::WideMoveResultUnsupported {
                     offset: instruction.offset,
                 }),
+                0x53 | 0x5a | 0x61 | 0x68 => {
+                    reasons.push(EligibilityReason::WideFieldUnsupported {
+                        offset: instruction.offset,
+                        opcode: instruction.opcode,
+                    });
+                }
                 0x0d if !handler_targets.contains(&instruction.offset) => {
                     reasons.push(EligibilityReason::OrphanMoveException {
                         offset: instruction.offset,
