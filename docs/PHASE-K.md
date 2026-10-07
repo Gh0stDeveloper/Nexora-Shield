@@ -172,3 +172,17 @@ Phase K is complete only when:
 7. a real AAR contains its consumer rules/resources/profile contract;
 8. the AAR publishes to Maven and an independent minified app consumes it;
 9. Phase A–J regressions remain green on the final head.
+
+## Closure status
+
+**COMPLETED**
+
+All Phase K closure requirements were satisfied before merge:
+
+- Phase K GitHub Actions run #25 (`37588269683`) completed successfully;
+- general CI run #849 (`37588269688`) completed successfully;
+- strict AAB upload-signature verification passed using the CI upload keystore as the explicit trust anchor;
+- real AAB validation, dynamic-feature counting, default/universal APK Set generation, AAR publication/consumer validation and profile/resource preservation all passed;
+- PR #13 was merged into `main` as `7211607b34cc320dd80e52e523f41f364cfe2e77`.
+
+The next roadmap phase is **Phase L — Shield Studio**.
