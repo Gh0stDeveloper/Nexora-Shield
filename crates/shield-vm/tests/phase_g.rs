@@ -32,10 +32,10 @@ fn eligibility_rejects_orphan_move_result() {
     let dex = orphan_move_result_dex();
     let report = EligibilityAnalyzer::analyze(&dex, 0, EligibilityPolicy::default());
     assert!(!report.eligible);
-    assert!(report
-        .reasons
-        .iter()
-        .any(|reason| matches!(reason, nexora_shield_vm::EligibilityReason::OrphanMoveResult { .. })));
+    assert!(report.reasons.iter().any(|reason| matches!(
+        reason,
+        nexora_shield_vm::EligibilityReason::OrphanMoveResult { .. }
+    )));
 }
 
 #[test]
@@ -101,12 +101,7 @@ fn metadata_seal_rejects_tampering() -> Result<(), Box<dyn std::error::Error>> {
     let mut tampered_stream = stream;
     tampered_stream.bytes[0] ^= 1;
     assert_eq!(
-        MetadataSealer::verify_program(
-            &sealed,
-            b"metadata-key",
-            &tampered_stream,
-            &allocation
-        ),
+        MetadataSealer::verify_program(&sealed, b"metadata-key", &tampered_stream, &allocation),
         Err(VmError::BytecodeDigestMismatch)
     );
     Ok(())
@@ -256,7 +251,6 @@ fn config_and_annotation_selection_are_both_supported() -> Result<(), Box<dyn st
     Ok(())
 }
 
-
 #[derive(Debug, Default)]
 struct MemoryHost {
     fields: BTreeMap<u32, VmValue>,
@@ -315,8 +309,7 @@ impl VmHost for MemoryHost {
         _constants: &ConstantPool,
     ) -> bool {
         actual == Some(expected)
-            || (expected == "LTest/BaseException;"
-                && actual == Some("LTest/ChildException;"))
+            || (expected == "LTest/BaseException;" && actual == Some("LTest/ChildException;"))
     }
 }
 
@@ -369,15 +362,9 @@ fn interpreter_step_limit_stops_non_terminating_programs() {
     };
     let mut host = NullHost;
 
-    let result = Interpreter::execute(
-        &method,
-        &[],
-        &mut host,
-        ExecutionConfig { step_limit: 16 },
-    );
+    let result = Interpreter::execute(&method, &[], &mut host, ExecutionConfig { step_limit: 16 });
     assert_eq!(result, Err(VmError::StepLimitExceeded { limit: 16 }));
 }
-
 
 #[test]
 fn typed_handler_uses_host_assignability_rules() -> Result<(), Box<dyn std::error::Error>> {
