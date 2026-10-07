@@ -6,6 +6,7 @@ pub type Result<T> = std::result::Result<T, VmError>;
 pub enum VmError {
     EmptyBuildId,
     EmptySeed,
+    EmptySealKey,
     IneligibleMethod { method_idx: u32, reason: String },
     UnsupportedDexOpcode { offset: u32, opcode: u8 },
     InvalidRegister(u16),
@@ -30,6 +31,7 @@ impl fmt::Display for VmError {
         match self {
             Self::EmptyBuildId => formatter.write_str("VM build id must not be empty"),
             Self::EmptySeed => formatter.write_str("VM private seed must not be empty"),
+            Self::EmptySealKey => formatter.write_str("VM metadata seal key must not be empty"),
             Self::IneligibleMethod { method_idx, reason } => {
                 write!(formatter, "method {method_idx} is not eligible for VM Shield: {reason}")
             }
