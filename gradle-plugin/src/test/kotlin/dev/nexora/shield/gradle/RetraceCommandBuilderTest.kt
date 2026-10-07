@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import kotlin.io.path.createFile
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 
 class RetraceCommandBuilderTest {
     @TempDir
@@ -29,7 +29,7 @@ class RetraceCommandBuilderTest {
         val mapping = tempDir.resolve("missing.txt").toFile()
         val stack = tempDir.resolve("stack.txt").createFile().toFile()
 
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             RetraceCommandBuilder.build("retrace", mapping, stack)
         }
     }
@@ -39,7 +39,7 @@ class RetraceCommandBuilderTest {
         val mapping = tempDir.resolve("mapping.txt").createFile().toFile()
         val stack = tempDir.resolve("stack.txt").createFile().toFile()
 
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             RetraceCommandBuilder.build(" ", mapping, stack)
         }
     }
