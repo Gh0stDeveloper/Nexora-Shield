@@ -1,5 +1,6 @@
 use nexora_shield_native::{
-    Abi, AbiDecision, AbiPolicy, ExportPolicy, GeneratedNativeData, HardeningProfile, NativeError,
+    Abi, AbiDecision, AbiPolicy, ExportPolicy, GeneratedNativeData, HardeningFeature,
+    HardeningProfile, NativeError,
     NativeRegion, NativeRuntimeDescriptor, NATIVE_RUNTIME_API_VERSION, PRIMARY_ANDROID_ABIS,
     REQUIRED_JNI_EXPORTS,
 };
@@ -104,7 +105,21 @@ fn generated_native_data_rejects_missing_inputs() {
 
 #[test]
 fn production_hardening_profile_is_complete() {
-    assert!(HardeningProfile::production().is_production_hardened());
+    let profile = HardeningProfile::production();
+    assert!(profile.is_production_hardened());
+    assert_eq!(profile, HardeningProfile::default());
+
+    for feature in [
+        HardeningFeature::PositionIndependent,
+        HardeningFeature::Relro,
+        HardeningFeature::BindNow,
+        HardeningFeature::GarbageCollectSections,
+        HardeningFeature::StripSymbols,
+        HardeningFeature::HideArchiveSymbols,
+        HardeningFeature::DisableBuildId,
+    ] {
+        assert!(profile.enables(feature));
+    }
 }
 
 #[test]
