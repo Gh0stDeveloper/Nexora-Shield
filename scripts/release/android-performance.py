@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -25,6 +26,14 @@ def run(*args: str, check: bool = True) -> str:
             f"command failed ({result.returncode}): {' '.join(args)}\n{result.stdout}"
         )
     return result.stdout
+
+
+def sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def percentile(values: list[int], quantile: float) -> int:
@@ -119,6 +128,7 @@ def measure(args: argparse.Namespace) -> int:
             "runs": args.runs,
             "warmups": args.warmups,
             "artifactBytes": apk.stat().st_size,
+            "artifactSha256": sha256_file(apk),
             "startupMs": {
                 "samples": startup_ms,
                 "p50": percentile(startup_ms, 0.50),
@@ -157,6 +167,12 @@ def compare(args: argparse.Namespace) -> int:
     if baseline["device"] != protected["device"]:
         raise SystemExit("performance comparison failed: device identity changed")
 
+    artifacts_differ = baseline.get("artifactSha256") != protected.get("artifactSha256")
+    if not artifacts_differ:
+        raise SystemExit(
+            "performance comparison failed: baseline and protected APK SHA-256 are identical"
+        )
+
     startup_overhead = overhead_percent(
         baseline["startupMs"]["p95"], protected["startupMs"]["p95"]
     )
@@ -181,12 +197,14 @@ def compare(args: argparse.Namespace) -> int:
         "schema": 1,
         "environment": protected["device"],
         "baseline": {
+            "artifactSha256": baseline["artifactSha256"],
             "startupP50Ms": baseline["startupMs"]["p50"],
             "startupP95Ms": baseline["startupMs"]["p95"],
             "memoryMedianPssKb": baseline["totalPssKb"]["median"],
             "artifactBytes": baseline["artifactBytes"],
         },
         "protected": {
+            "artifactSha256": protected["artifactSha256"],
             "startupP50Ms": protected["startupMs"]["p50"],
             "startupP95Ms": protected["startupMs"]["p95"],
             "memoryMedianPssKb": protected["totalPssKb"]["median"],
@@ -204,6 +222,7 @@ def compare(args: argparse.Namespace) -> int:
             "maxMemoryMedianPercent": args.max_memory_percent,
             "maxArtifactSizePercent": args.max_size_percent,
         },
+        "artifactsDiffer": artifacts_differ,
         "passed": passed,
     }
 
