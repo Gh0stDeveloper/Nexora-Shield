@@ -16,5 +16,13 @@ serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10.9"
 subtle = "2.6.1"
 
-[lints]
-workspace = true
+[lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
