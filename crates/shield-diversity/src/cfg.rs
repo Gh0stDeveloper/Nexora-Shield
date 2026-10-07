@@ -43,13 +43,23 @@ impl CfgVariantPlan {
             .filter(|boundary| *boundary != 0 && *boundary < method.instructions.len())
             .collect::<Vec<_>>();
 
-        candidates.sort_by_key(|boundary| {
-            seed.derive_u64(
-                DiversityDomain::Cfg,
-                format!("{method_key}:boundary:{boundary}").as_bytes(),
-            )
-            .unwrap_or(0)
+        let mut keyed = candidates
+            .into_iter()
+            .map(|boundary| {
+                let label = format!("{method_key}:boundary:{boundary}");
+                Ok((
+                    seed.derive_u64(DiversityDomain::Cfg, label.as_bytes())?,
+                    boundary,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        keyed.sort_by(|(left_key, left), (right_key, right)| {
+            left_key.cmp(right_key).then_with(|| left.cmp(right))
         });
+        let mut candidates = keyed
+            .into_iter()
+            .map(|(_, boundary)| boundary)
+            .collect::<Vec<_>>();
 
         let selector = seed.derive_u64(DiversityDomain::Cfg, method_key.as_bytes())?;
         let layout = if selector & 1 == 0 {
