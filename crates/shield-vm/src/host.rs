@@ -15,11 +15,7 @@ pub trait VmHost {
         value: &VmValue,
     ) -> std::result::Result<(), VmException>;
 
-    fn call(
-        &mut self,
-        method: u32,
-        args: &[VmValue],
-    ) -> std::result::Result<VmValue, VmException>;
+    fn call(&mut self, method: u32, args: &[VmValue]) -> std::result::Result<VmValue, VmException>;
 
     fn exception_type(&self, _value: &VmValue) -> Option<String> {
         None
@@ -35,7 +31,9 @@ impl VmHost for NullHost {
         _object: Option<&VmValue>,
         field: u32,
     ) -> std::result::Result<VmValue, VmException> {
-        Err(host_exception(&format!("field read #{field} is unavailable")))
+        Err(host_exception(&format!(
+            "field read #{field} is unavailable"
+        )))
     }
 
     fn store_field(
@@ -44,7 +42,9 @@ impl VmHost for NullHost {
         field: u32,
         _value: &VmValue,
     ) -> std::result::Result<(), VmException> {
-        Err(host_exception(&format!("field write #{field} is unavailable")))
+        Err(host_exception(&format!(
+            "field write #{field} is unavailable"
+        )))
     }
 
     fn call(
@@ -52,19 +52,21 @@ impl VmHost for NullHost {
         method: u32,
         _args: &[VmValue],
     ) -> std::result::Result<VmValue, VmException> {
-        Err(host_exception(&format!("method call #{method} is unavailable")))
+        Err(host_exception(&format!(
+            "method call #{method} is unavailable"
+        )))
     }
 }
 
 fn host_exception(message: &str) -> VmException {
     VmException {
         type_name: Some("Ldev/nexora/shield/VmHostException;".to_owned()),
-        value: VmValue::Const(hash_message(&message)),
+        value: VmValue::Const(hash_message(message)),
     }
 }
 
 fn hash_message(message: &str) -> u16 {
-    message
-        .bytes()
-        .fold(0_u16, |state, byte| state.wrapping_mul(31).wrapping_add(u16::from(byte)))
+    message.bytes().fold(0_u16, |state, byte| {
+        state.wrapping_mul(31).wrapping_add(u16::from(byte))
+    })
 }
