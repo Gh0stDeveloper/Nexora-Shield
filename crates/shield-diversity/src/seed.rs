@@ -7,6 +7,8 @@ use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;
 
+const MIN_PRIVATE_SEED_BYTES: usize = 32;
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct PrivateBuildSeed {
     bytes: Vec<u8>,
@@ -18,7 +20,6 @@ impl PrivateBuildSeed {
         if bytes.is_empty() {
             return Err(DiversityError::EmptyPrivateSeed);
         }
-        const MIN_PRIVATE_SEED_BYTES: usize = 32;
         if bytes.len() < MIN_PRIVATE_SEED_BYTES {
             return Err(DiversityError::WeakPrivateSeed {
                 observed: bytes.len(),
