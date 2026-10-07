@@ -138,10 +138,9 @@ fn n13_n14_stable_is_blocked_without_real_external_feedback() {
 
 #[test]
 fn qualification_policy_requires_stable_to_include_all_rc_gates() {
-    let policy: QualificationPolicy = serde_json::from_str(include_str!(
-        "../../../release/qualification-policy.json"
-    ))
-    .expect("qualification policy");
+    let policy: QualificationPolicy =
+        serde_json::from_str(include_str!("../../../release/qualification-policy.json"))
+            .expect("qualification policy");
     policy.validate().expect("qualification policy");
     for gate in &policy.required_rc_gates {
         assert!(policy.required_stable_gates.contains(gate));

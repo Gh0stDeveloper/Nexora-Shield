@@ -91,9 +91,7 @@ impl fmt::Display for ReleaseVersion {
 
 fn parse_component(value: Option<&str>, label: &str) -> Result<u32> {
     value
-        .ok_or_else(|| {
-            ReleaseError::InvalidVersion(format!("missing {label} version component"))
-        })?
+        .ok_or_else(|| ReleaseError::InvalidVersion(format!("missing {label} version component")))?
         .parse::<u32>()
         .map_err(|_| ReleaseError::InvalidVersion(format!("invalid {label} version component")))
 }
