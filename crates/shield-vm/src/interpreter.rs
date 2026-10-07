@@ -3,6 +3,7 @@ use crate::error::{Result, VmError};
 use crate::host::VmHost;
 use crate::ir::{BranchCondition, VmException, VmInstruction, VmMethod, VmRegister};
 use crate::opcode::{OpcodeAllocation, OpcodeStream};
+use crate::seal::{MetadataSealer, SealedMetadata};
 use crate::value::VmValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,6 +232,20 @@ impl Interpreter {
         let mut decoded = method.clone();
         decoded.instructions = stream.decode(allocation)?;
         Self::execute(&decoded, args, host, config)
+    }
+
+    pub fn execute_sealed<H: VmHost>(
+        method: &VmMethod,
+        stream: &OpcodeStream,
+        allocation: &OpcodeAllocation,
+        sealed: &SealedMetadata,
+        seal_key: &[u8],
+        args: &[VmValue],
+        host: &mut H,
+        config: ExecutionConfig,
+    ) -> Result<ExecutionResult> {
+        MetadataSealer::verify_executable(sealed, seal_key, method, stream, allocation)?;
+        Self::execute_stream(method, stream, allocation, args, host, config)
     }
 }
 
