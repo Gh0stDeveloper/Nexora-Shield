@@ -27,6 +27,12 @@ pub struct BundletoolSigningConfig {
 }
 
 impl BundletoolSigningConfig {
+    /// Validates bundletool signing material without reading password contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the keystore/password files do not exist or the
+    /// signing alias is empty.
     pub fn validate(&self) -> Result<()> {
         for path in [&self.keystore, &self.keystore_password_file] {
             if !path.is_file() {
@@ -60,6 +66,12 @@ pub struct Bundletool {
 }
 
 impl Bundletool {
+    /// Creates a bundletool wrapper from explicit Java and JAR paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bundletool JAR is missing or the Java command
+    /// path is empty.
     pub fn new(java: impl Into<PathBuf>, jar: impl Into<PathBuf>) -> Result<Self> {
         let tool = Self {
             java: java.into(),
@@ -69,6 +81,12 @@ impl Bundletool {
         Ok(tool)
     }
 
+    /// Runs official bundletool validation for an Android App Bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bundle is missing, Java cannot execute, or
+    /// bundletool rejects the bundle.
     pub fn validate_bundle(&self, bundle: &Path) -> Result<String> {
         require_file(bundle, "AAB")?;
         let args = vec![
@@ -81,6 +99,12 @@ impl Bundletool {
         Ok(combined_output(&output))
     }
 
+    /// Generates an APK Set with official bundletool.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing inputs, invalid signing material, tool
+    /// execution failure, or when bundletool does not create the output.
     pub fn build_apks(
         &self,
         bundle: &Path,
