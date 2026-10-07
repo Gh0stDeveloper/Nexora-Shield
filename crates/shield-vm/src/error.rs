@@ -25,6 +25,7 @@ pub enum VmError {
     MalformedBytecode(String),
     MetadataSealMismatch,
     BytecodeDigestMismatch,
+    OpcodeFingerprintMismatch,
     MetadataEncoding(String),
     InvalidSelector(String),
 }
@@ -92,6 +93,9 @@ impl fmt::Display for VmError {
             Self::MetadataSealMismatch => formatter.write_str("VM metadata authentication failed"),
             Self::BytecodeDigestMismatch => {
                 formatter.write_str("VM bytecode digest does not match sealed metadata")
+            }
+            Self::OpcodeFingerprintMismatch => {
+                formatter.write_str("VM opcode allocation does not match sealed metadata")
             }
             Self::MetadataEncoding(message) => {
                 write!(formatter, "VM metadata encoding error: {message}")
