@@ -162,6 +162,7 @@ jobs:
           gradle -p samples/phase-k/library-publishing clean :library:nexoraShield :library:publishReleasePublicationToPhaseKRepository --no-daemon --stacktrace
       - name: Verify published AAR contract
         run: |
+          mkdir -p build
           AAR="samples/phase-k/library-publishing/library/build/outputs/aar/library-release.aar"
           test -s "$AAR"
           target/release/nexora-shield aar-verify "$AAR"
