@@ -6,7 +6,7 @@ Phase E adds a portable Runtime Application Self-Protection evidence layer on to
 
 The design is evidence-first. Platform-specific adapters observe runtime state and submit normalized observations. The portable Rust core converts those observations into deterministic, auditable signals. Response policy and risk correlation are intentionally separate so a single detector cannot become a fragile central kill switch.
 
-## Implemented scope — E.1 to E.7
+## Implemented scope — E.1 to E.10
 
 ### E.1 — Signal API
 
@@ -95,16 +95,53 @@ Properties:
 
 This keeps Phase D as the source of truth for integrity while allowing E.8 Risk Engine to correlate integrity failures with runtime evidence.
 
+### E.8 — Risk Engine
+
+`RiskEngine` performs deterministic weighted correlation over the typed signal set.
+
+The engine:
+
+- assigns points from signal severity and evidence strength;
+- adds a bounded cross-category correlation bonus only when strong evidence exists;
+- elevates critical+definitive evidence directly to critical risk;
+- caps weak-only evidence at observed risk;
+- caps weak/moderate-only evidence at elevated risk;
+- emits auditable reasons explaining how the final level was produced.
+
+The default thresholds are intentionally separated from signal generation and can be validated by the policy compiler.
+
+### E.9 — Policy compiler
+
+`CompiledPolicy::compile` validates the complete RASP policy before it can be used.
+
+It rejects:
+
+- zero or non-increasing thresholds;
+- missing responses for any risk level;
+- policies whose response becomes less restrictive as risk rises.
+
+The configuration schema now exposes a strict `rasp.thresholds` and `rasp.responses` surface with unknown fields rejected.
+
+### E.10 — Responses
+
+`ResponseEngine` converts a risk assessment into a deterministic response decision.
+
+Supported responses are deliberately non-destructive:
+
+- continue;
+- report;
+- require reverification;
+- deny a sensitive operation.
+
+The RASP core does not terminate processes, corrupt data, delete files or perform stealth/destructive countermeasures.
+
 ## Security boundary
 
 RASP signals are evidence, not proof that client-side software is impossible to bypass. The system raises attack cost through multiple independent signals, later risk fusion, policy compilation and per-build diversity.
 
 ## Remaining Phase E work
 
-E.8–E.12 remain open:
+E.11–E.12 remain open:
 
-- risk engine;
-- policy compiler;
-- responses;
 - report-only mode;
 - false-positive lab.
