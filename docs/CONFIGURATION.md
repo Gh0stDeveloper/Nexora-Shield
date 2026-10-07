@@ -508,3 +508,91 @@ Las reglas por feature llegan dentro de la política firmada remota. Cada regla 
 Las revocaciones de build tienen prioridad sobre cualquier fallback offline.
 
 El protocolo tipado no incorpora identificadores estables de dispositivo ni metadata libre. Véase `docs/PHASE-I-PRIVACY.md`.
+
+
+## 19. Gradle Plugin
+
+Phase J provides the dev.nexora.shield plugin for Android application modules. Phase J intentionally does not claim AAR/library support; that belongs to Phase K.
+
+The Android application plugin must be applied before Nexora Shield:
+
+~~~kotlin
+plugins {
+    id("com.android.application")
+    id("dev.nexora.shield")
+}
+
+nexoraShield {
+    releaseOnly.set(true)
+    profile.set("hardened")
+    cliExecutable.set("nexora-shield")
+
+    signingKeystore.set(layout.projectDirectory.file("signing/release.jks"))
+    signingAlias.set("release")
+    storePasswordRef.set("env:NEXORA_ANDROID_STORE_PASSWORD")
+    keyPasswordRef.set("env:NEXORA_ANDROID_KEY_PASSWORD")
+
+    publicReports.set(true)
+    privateReports.set(false)
+}
+~~~
+
+### Variant policy
+
+Defaults are deliberately conservative:
+
+- enabled = true;
+- releaseOnly = true;
+- debug variants remain untouched;
+- unsigned output is rejected unless allowUnsigned=true is explicit;
+- profile = hardened;
+- minSdk = 24;
+- public reports enabled;
+- private reports disabled;
+- build cache disabled.
+
+variants can be populated to restrict protection to exact AGP variant names.
+
+### Secret references
+
+The Gradle plugin supports:
+
+- env:NAME — reads an environment variable only during task execution;
+- file:path — reads a UTF-8 secret file only during task execution.
+
+Secret values are passed to shield-cli through short-lived process environment variables. Raw passwords are never command-line arguments and are never written to public reports.
+
+### Reports
+
+Per-variant public reports are written below:
+
+build/reports/nexora-shield/<variant>/
+
+Private reports, when explicitly enabled, are isolated below:
+
+build/nexora-shield/private/<variant>/
+
+Private reports must not be uploaded as public CI artifacts.
+
+### Mapping and Retrace
+
+For minified variants, nexoraShieldPreserve<Variant>Mapping archives mapping.txt under:
+
+build/nexora-shield/mapping/<variant>/
+
+nexoraShieldRetrace<Variant> runs the Android command-line Retrace tool. Provide a stack trace with:
+
+gradle nexoraShieldRetraceRelease -PnexoraShield.stacktrace=trace.txt
+
+### Build cache
+
+Protection tasks are non-cacheable by default because signing secrets and future per-build diversification can make outputs non-reproducible.
+
+buildCacheEnabled=true only enables Gradle output caching when all of these conditions also hold:
+
+- unsigned output was explicitly selected;
+- no signing keystore is configured;
+- public reports are disabled;
+- private reports are disabled.
+
+cacheKeyVersion is an explicit non-secret invalidation token for changes in reproducible protection policy.
