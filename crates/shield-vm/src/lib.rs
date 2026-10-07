@@ -35,7 +35,7 @@ pub use eligibility::{
 };
 pub use error::{Result, VmError};
 pub use host::{NullHost, VmHost};
-pub use interpreter::{ExecutionConfig, ExecutionResult, Interpreter};
+pub use interpreter::{ExecutionConfig, ExecutionResult, Interpreter, SealedExecution};
 pub use ir::{
     BranchCondition, VmException, VmExceptionHandler, VmInstruction, VmMethod, VmRegister,
 };
