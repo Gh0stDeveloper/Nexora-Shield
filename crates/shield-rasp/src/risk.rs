@@ -111,8 +111,8 @@ impl RiskEngine {
         let mut reasons = vec![RiskReason::WeightedEvidence];
 
         if categories.len() > 1 && strongest_evidence >= EvidenceStrength::Strong {
-            let correlated_categories = u32::try_from(categories.len().saturating_sub(1))
-                .unwrap_or(u32::MAX);
+            let correlated_categories =
+                u32::try_from(categories.len().saturating_sub(1)).unwrap_or(u32::MAX);
             score = score.saturating_add(correlated_categories.saturating_mul(6));
             reasons.push(RiskReason::CrossCategoryCorrelation);
         }
