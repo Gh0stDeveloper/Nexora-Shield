@@ -10,6 +10,9 @@ pub enum DiversityError {
     EmptyBuildId,
     EmptyModeValue,
     InvalidPartitionBounds,
+    MissingStringContainer(String),
+    DuplicateStringContainer(String),
+    UnplannedStringContainer(String),
     MissingCertificateRoot,
     MissingPackageNode,
     Integrity(String),
@@ -32,6 +35,15 @@ impl fmt::Display for DiversityError {
             Self::EmptyModeValue => formatter.write_str("diversity mode value must not be empty"),
             Self::InvalidPartitionBounds => {
                 formatter.write_str("string partition bounds are invalid")
+            }
+            Self::MissingStringContainer(id) => {
+                write!(formatter, "missing protected string container for '{id}'")
+            }
+            Self::DuplicateStringContainer(id) => {
+                write!(formatter, "duplicate protected string container for '{id}'")
+            }
+            Self::UnplannedStringContainer(id) => {
+                write!(formatter, "protected string '{id}' is not present in the partition plan")
             }
             Self::MissingCertificateRoot => {
                 formatter.write_str("integrity graph has no certificate root")
