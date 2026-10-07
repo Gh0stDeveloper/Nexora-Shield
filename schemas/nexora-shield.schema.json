@@ -227,6 +227,10 @@
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" },
+        "mode": {
+          "type": "string",
+          "enum": ["enforce", "report_only"]
+        },
         "thresholds": {
           "type": "object",
           "additionalProperties": false,
