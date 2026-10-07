@@ -1,9 +1,7 @@
 use crate::signal::{
     EvidenceStrength, RaspSignal, SignalCategory, SignalSet, SignalSeverity, SignalSource,
 };
-use nexora_shield_integrity::{
-    IntegrityFailureKind, IntegritySeverity, IntegrityVerdict,
-};
+use nexora_shield_integrity::{IntegrityFailureKind, IntegritySeverity, IntegrityVerdict};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct IntegritySignalFusion;
