@@ -2,12 +2,15 @@ mod common;
 
 use common::{add_dex, branch_dex};
 use nexora_shield_vm::{
-    DexLowerer, EligibilityPolicy, ExecutionConfig, Interpreter, NullHost, VmValue,
+    DexLowerer, EligibilityPolicy, ExecutionConfig, Interpreter, NullHost, OpcodeAllocation,
+    OpcodeStream, VmValue,
 };
 
 #[test]
 fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std::error::Error>> {
     let method = DexLowerer::lower(&add_dex(), 0, EligibilityPolicy::default())?;
+    let allocation = OpcodeAllocation::derive("diff-add", b"differential-seed")?;
+    let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
     let mut host = NullHost;
     let mut state = 0x4e45_584f_5241_4744_u64;
 
@@ -30,8 +33,10 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
         );
 
         let expected = left.wrapping_add(right);
-        let actual = Interpreter::execute(
+        let actual = Interpreter::execute_stream(
             &method,
+            &stream,
+            &allocation,
             &[VmValue::Int(left), VmValue::Int(right)],
             &mut host,
             ExecutionConfig::default(),
@@ -46,6 +51,8 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
 fn differential_branch_matches_reference_for_boundary_values(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let method = DexLowerer::lower(&branch_dex(), 0, EligibilityPolicy::default())?;
+    let allocation = OpcodeAllocation::derive("diff-branch", b"differential-seed")?;
+    let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
     let mut host = NullHost;
 
     for condition in [i32::MIN, -1, 0, 1, i32::MAX] {
@@ -56,8 +63,10 @@ fn differential_branch_matches_reference_for_boundary_values(
         } else {
             when_nonzero
         };
-        let actual = Interpreter::execute(
+        let actual = Interpreter::execute_stream(
             &method,
+            &stream,
+            &allocation,
             &[
                 VmValue::Int(condition),
                 VmValue::Int(when_nonzero),
