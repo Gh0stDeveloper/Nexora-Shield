@@ -13,13 +13,8 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
     let metadata = VmMetadata::from_method(&method, &allocation)?;
     let sealed = MetadataSealer::seal(&metadata, b"differential-key")?;
-    let protected = SealedExecution::new(
-        &method,
-        &stream,
-        &allocation,
-        &sealed,
-        b"differential-key",
-    );
+    let protected =
+        SealedExecution::new(&method, &stream, &allocation, &sealed, b"differential-key");
     let mut host = NullHost;
     let mut state = 0x4e45_584f_5241_4744_u64;
 
@@ -55,7 +50,8 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn differential_branch_matches_reference_for_boundary_values() -> Result<(), Box<dyn std::error::Error>> {
+fn differential_branch_matches_reference_for_boundary_values(
+) -> Result<(), Box<dyn std::error::Error>> {
     let method = DexLowerer::lower(&branch_dex(), 0, EligibilityPolicy::default())?;
     let allocation = OpcodeAllocation::derive("diff-branch", b"differential-seed")?;
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
