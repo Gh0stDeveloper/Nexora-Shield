@@ -90,7 +90,7 @@ jobs:
         run: |
           AAB="samples/phase-k/bundle-app/app/build/outputs/bundle/release/app-release.aab"
           test -s "$AAB"
-          jarsigner -verify -strict -certs "$AAB"
+          jarsigner -verify -strict -certs -keystore "$NEXORA_K_UPLOAD_KEYSTORE" -storetype PKCS12 -storepass:env NEXORA_K_UPLOAD_STORE_PASSWORD "$AAB"
           target/release/nexora-shield aab-verify "$AAB"
           target/release/nexora-shield aab-inspect "$AAB" | tee build/phase-k/aab-inspection.txt
           grep -q 'Dynamic features: 1' build/phase-k/aab-inspection.txt
