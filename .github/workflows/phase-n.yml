@@ -285,7 +285,10 @@ jobs:
           EMULATOR="$SDK_ROOT/emulator/emulator"
           ADB="$SDK_ROOT/platform-tools/adb"
           PERF_DIR="build/phase-n/android-perf"
-          mkdir -p "$PERF_DIR"
+          ANDROID_AVD_HOME="$HOME/.android/avd"
+          export ANDROID_AVD_HOME
+          mkdir -p "$PERF_DIR" "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
 
           if [[ ! -x "$EMULATOR" ]]; then
             echo "Android emulator is not preinstalled; installing with a bounded timeout."
@@ -318,7 +321,13 @@ jobs:
           fi
 
           test -d "$IMAGE_DIR"
-          echo no | "$AVDMANAGER" create avd --force --name nexora_phase_n --package "$IMAGE_PACKAGE" --device "pixel_6"
+          echo no | "$AVDMANAGER" create avd --force --name nexora_phase_n --package "$IMAGE_PACKAGE" --device "pixel_6" --path "$ANDROID_AVD_HOME/nexora_phase_n.avd"
+
+          echo "Registered AVDs:"
+          "$EMULATOR" -list-avds | tee "$PERF_DIR/avd-list.txt"
+          grep -Fxq "nexora_phase_n" "$PERF_DIR/avd-list.txt"
+          test -f "$ANDROID_AVD_HOME/nexora_phase_n.ini"
+          test -d "$ANDROID_AVD_HOME/nexora_phase_n.avd"
 
           "$ADB" kill-server || true
           "$ADB" start-server
@@ -402,6 +411,7 @@ jobs:
             build/phase-n/android-perf/protected.json
             build/phase-n/android-perf/comparison.json
             build/phase-n/android-perf/emulator.log
+            build/phase-n/android-perf/avd-list.txt
           if-no-files-found: warn
           retention-days: 30
 
