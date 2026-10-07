@@ -78,6 +78,9 @@
 - [x] Pool digest binding
 - [x] Opcode fingerprint binding
 - [x] Encoded bytecode digest binding
+- [x] Parameter/handler control metadata binding
+- [x] Sealed execution path
+- [x] Seal-key debug redaction
 - [x] Wrong-allocation rejection path
 - [x] Bytecode tamper rejection
 - [x] Wrong-key rejection
