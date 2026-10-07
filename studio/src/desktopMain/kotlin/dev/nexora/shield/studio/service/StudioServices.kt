@@ -126,7 +126,9 @@ class CommandRunner(
                     }
                 }
                 if (capturedBytes >= maxOutputBytes) {
-                    output.append("\n[output truncated by Shield Studio]\n")
+                    output.append("
+[output truncated by Shield Studio]
+")
                 }
                 output.toString()
             }
@@ -188,7 +190,11 @@ class ArtifactVerifier(
             "apks" -> "apks-verify"
             else -> error("Unsupported artifact type '.${artifact.extension}'.")
         }
-        return if (action == "verify") {\n            listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString(), "--signature")\n        } else {\n            listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString())\n        }
+        return if (action == "verify") {
+            listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString(), "--signature")
+        } else {
+            listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString())
+        }
     }
 
     suspend fun verify(
