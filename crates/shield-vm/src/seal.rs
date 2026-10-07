@@ -46,8 +46,8 @@ impl MetadataSealer {
         if key.is_empty() {
             return Err(VmError::EmptySealKey);
         }
-        let payload =
-            serde_json::to_vec(metadata).map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
+        let payload = serde_json::to_vec(metadata)
+            .map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
         let tag = authenticate(&payload, key)?;
         Ok(SealedMetadata { payload, tag })
     }
@@ -56,8 +56,8 @@ impl MetadataSealer {
         if key.is_empty() {
             return Err(VmError::EmptySealKey);
         }
-        let mut mac =
-            HmacSha256::new_from_slice(key).map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
+        let mut mac = HmacSha256::new_from_slice(key)
+            .map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
         mac.update(b"nexora-shield/vm-metadata/v1");
         mac.update(&sealed.payload);
         mac.verify_slice(&sealed.tag)
