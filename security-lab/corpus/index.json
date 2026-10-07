@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "m1.static.synthetic-secret-absent",
+      "category": "static_exposure",
+      "description": "A synthetic critical marker must not remain visible in a protected artifact.",
+      "expected": "zero plaintext occurrences",
+      "tags": ["release", "exposure", "synthetic"]
+    },
+    {
+      "id": "m2.repack.dex-patch-rejected",
+      "category": "repack",
+      "description": "A byte-level mutation of a protected DEX must invalidate integrity evidence.",
+      "expected": "integrity verification rejects the artifact",
+      "tags": ["release", "tamper", "dex"]
+    },
+    {
+      "id": "m2.repack.resource-patch-rejected",
+      "category": "repack",
+      "description": "A protected resource mutation must invalidate integrity evidence.",
+      "expected": "integrity verification rejects the artifact",
+      "tags": ["release", "tamper", "resource"]
+    },
+    {
+      "id": "m3.resign.independent-certificate-rejected",
+      "category": "re_sign",
+      "description": "Evidence bound to signer A must reject observation from an independent signer B.",
+      "expected": "certificate-bound integrity verification fails closed",
+      "tags": ["release", "signature", "certificate"]
+    },
+    {
+      "id": "m4.runtime.method-dispatch-tamper",
+      "category": "runtime_instrumentation",
+      "description": "Definitive method-dispatch tamper evidence must reach critical risk.",
+      "expected": "critical risk and denial of sensitive operation",
+      "tags": ["rasp", "instrumentation"]
+    },
+    {
+      "id": "m5.environment.modified-virtualized",
+      "category": "modified_environment",
+      "description": "Independent modified-system and emulator evidence must be correlated.",
+      "expected": "high-or-higher risk under default policy",
+      "tags": ["rasp", "environment"]
+    },
+    {
+      "id": "m6.portability.cross-build-budget",
+      "category": "bypass_portability",
+      "description": "Build diversity signatures must remain unique and below the configured transfer budget.",
+      "expected": "cross-build portability gate passes",
+      "tags": ["diversity", "release"]
+    },
+    {
+      "id": "m7.fuzz.no-panics",
+      "category": "fuzz",
+      "description": "Deterministic mutation batches must never crash the target parser.",
+      "expected": "zero panics",
+      "tags": ["fuzz", "parser"]
+    },
+    {
+      "id": "m8.performance.release-budget",
+      "category": "performance",
+      "description": "Protected runtime and artifact overhead must stay within declared budgets.",
+      "expected": "runtime and size overhead gates pass",
+      "tags": ["performance", "release"]
+    },
+    {
+      "id": "m9.corpus.schema-and-uniqueness",
+      "category": "regression_corpus",
+      "description": "Every known bypass class must live in a versioned corpus with a stable unique id.",
+      "expected": "schema validates and fingerprint is reproducible",
+      "tags": ["corpus", "governance"]
+    },
+    {
+      "id": "m10.score.critical-cap",
+      "category": "security_score",
+      "description": "A failed critical control must cap the aggregate security grade.",
+      "expected": "critical failure prevents an A/B/C/D passing grade",
+      "tags": ["score", "release"]
+    },
+    {
+      "id": "m11.benchmark.comparable-environment",
+      "category": "comparative_benchmark",
+      "description": "Baseline and protected measurements must use equivalent device, OS and toolchain conditions.",
+      "expected": "strict methodology validates before comparison",
+      "tags": ["benchmark", "methodology"]
+    },
+    {
+      "id": "m12.audit.confidential-evidence-redacted",
+      "category": "external_audit",
+      "description": "Confidential audit evidence must be redacted before leaving the controlled environment.",
+      "expected": "unredacted confidential evidence blocks audit readiness",
+      "tags": ["audit", "privacy", "release"]
+    }
+  ]
+}

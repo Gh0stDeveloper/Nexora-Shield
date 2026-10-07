@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "entries": [
+    {"case_id":"m1.static.synthetic-secret-absent","gate":"Phase M / Validate static exposure pass/fail behavior"},
+    {"case_id":"m2.repack.dex-patch-rejected","gate":"Phase M / M.2 reject DEX resource native and identity repacks"},
+    {"case_id":"m2.repack.resource-patch-rejected","gate":"Phase M / M.2 reject DEX resource native and identity repacks"},
+    {"case_id":"m3.resign.independent-certificate-rejected","gate":"Phase M / M.3 reject independently re-signed evidence"},
+    {"case_id":"m4.runtime.method-dispatch-tamper","gate":"phase_m::m4_runtime_instrumentation_lab_uses_real_rasp_policy"},
+    {"case_id":"m5.environment.modified-virtualized","gate":"phase_m::m5_modified_environment_matrix_correlates_independent_categories"},
+    {"case_id":"m6.portability.cross-build-budget","gate":"Phase M / M.6 cross-build bypass portability"},
+    {"case_id":"m7.fuzz.no-panics","gate":"phase_m::m7_fuzz_farm_never_allows_parser_panics"},
+    {"case_id":"m8.performance.release-budget","gate":"phase_m::m8_performance_farm_enforces_runtime_and_size_budgets"},
+    {"case_id":"m9.corpus.schema-and-uniqueness","gate":"Phase M / Validate regression corpus"},
+    {"case_id":"m10.score.critical-cap","gate":"phase_m::m10_security_score_caps_grade_when_a_critical_control_fails"},
+    {"case_id":"m11.benchmark.comparable-environment","gate":"phase_m::m11_comparative_benchmark_methodology_is_strict_by_default"},
+    {"case_id":"m12.audit.confidential-evidence-redacted","gate":"phase_m::m12_external_audit_preparation_rejects_unredacted_confidential_evidence"}
+  ]
+}
