@@ -175,7 +175,7 @@ Estado actual: **COMPLETADA**. Las subfases E.1–E.12 están implementadas en `
 Criterio:
 - runtime nativo reproducible, estable y modular.
 
-Estado actual: **EN PROGRESO**. F.1–F.10 cuentan con implementación portable, runtime `cdylib`, frontera JNI mínima, política ABI, integridad nativa, datos generados por build, hardening, minimización de símbolos y fuzz-smoke. F.3/F.4/F.8/F.9/F.10 permanecen abiertos hasta que GitHub Actions enlace e inspeccione bibliotecas Android reales para arm64-v8a/x86_64 y valide reproducibilidad byte a byte.
+Estado actual: **COMPLETADA**. F.1–F.10 están implementadas. GitHub Actions run #416 (`37562562437`) validó Rust quality, RustSec, regresiones A–E, Phase F host, Rust 1.81 MSRV, enlace Android real para arm64-v8a/x86_64, RELRO/NOW, ausencia de build-id, superficie JNI mínima y reproducibilidad byte a byte.
 
 ---
 
