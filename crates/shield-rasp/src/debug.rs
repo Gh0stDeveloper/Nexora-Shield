@@ -63,20 +63,18 @@ impl DebugEvaluator {
             ));
         }
 
-        if let Some(tracer_pid) = observation.tracer_pid {
-            if tracer_pid != 0 {
-                signals.push(
-                    RaspSignal::new(
-                        "debug.tracer_present",
-                        SignalCategory::Debug,
-                        SignalSeverity::Critical,
-                        EvidenceStrength::Definitive,
-                        SignalSource::LinuxProcfs,
-                        "the process reports a non-zero tracer PID",
-                    )
-                    .with_detail("tracer_pid", tracer_pid.to_string()),
-                );
-            }
+        if let Some(tracer_pid) = observation.tracer_pid.filter(|pid| *pid != 0) {
+            signals.push(
+                RaspSignal::new(
+                    "debug.tracer_present",
+                    SignalCategory::Debug,
+                    SignalSeverity::Critical,
+                    EvidenceStrength::Definitive,
+                    SignalSource::LinuxProcfs,
+                    "the process reports a non-zero tracer PID",
+                )
+                .with_detail("tracer_pid", tracer_pid.to_string()),
+            );
         }
 
         signals
