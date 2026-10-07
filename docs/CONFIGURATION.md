@@ -20,6 +20,19 @@ profile: hardened
 build:
   diversity: true
   reproducible: false
+  diversityMode: unique_build
+  seedRef: NEXORA_BUILD_SEED
+  buildNonceRef: NEXORA_BUILD_NONCE
+  renameDiversity: true
+  passVariants: true
+  cfgVariants: true
+  integrityTopologyVariants: true
+  stringPartitions:
+    min: 2
+    max: 5
+  vmMapVariants: true
+  nativeGeneratedConstants: true
+  maxCrossBuildTransferBasisPoints: 3000
 
 selectors:
   sensitive:
@@ -309,18 +322,57 @@ Providers previstos:
 - OS keychain;
 - external KMS futuro.
 
-## 10. Reproducibilidad
+## 10. Per-Build Diversification
+
+Phase H usa una seed privada raíz con separación HMAC por dominio. El archivo de configuración contiene únicamente referencias a secretos, nunca la seed ni el nonce reales.
+
+Build normal:
+
+~~~yaml
+build:
+  diversity: true
+  reproducible: false
+  diversityMode: unique_build
+  seedRef: NEXORA_BUILD_SEED
+  buildNonceRef: NEXORA_BUILD_NONCE
+  renameDiversity: true
+  passVariants: true
+  cfgVariants: true
+  integrityTopologyVariants: true
+  stringPartitions:
+    min: 2
+    max: 5
+  vmMapVariants: true
+  nativeGeneratedConstants: true
+  maxCrossBuildTransferBasisPoints: 3000
+~~~
+
+El proveedor de secretos debe entregar una seed privada y un nonce nuevo para cada build normal.
+
+Modo reproducible privado:
 
 ~~~yaml
 build:
   diversity: true
   reproducible: true
+  diversityMode: reproducible_private
   seedRef: RELEASE_4_0_SEED
+  reproductionId: release-4.0.0-incident-17
 ~~~
 
-Solo para investigación y reproducir errores. No reutilizar la misma seed entre releases normales.
+Para reproducir exactamente un build deben coincidir seed privada, application id, build id y reproduction id. Este modo se reserva para incidentes, retrace y reconstrucciones controladas.
 
-## 11. Budgets
+Las superficies diversificadas son independientes: rename, orden de pases, CFG, topología de integridad, particiones de strings, mapa VM y constantes nativas. La misma salida derivada no se reutiliza entre dominios.
+
+`maxCrossBuildTransferBasisPoints` define el presupuesto del regression gate de H.10; 3000 equivale a un máximo observado del 30 % de superficies idénticas en cualquier par del corpus.
+
+## 11. Reproducibilidad
+
+La reproducibilidad de Phase H es privada y explícita. No existe un modo público o sin seed que permita reconstruir las decisiones de diversificación.
+
+No reutilizar la misma combinación seed/contexto entre releases normales.
+
+## 12. Budgets
 
 El planner debe estimar y el verifier medir:
 
@@ -341,7 +393,7 @@ budgetsPolicy: fail
 
 Opciones futuras: fail, warn, adaptive. Adaptive nunca se habilitará implícitamente en releases estrictos.
 
-## 12. Compatibilidad
+## 13. Compatibilidad
 
 ~~~yaml
 compatibility:
@@ -355,7 +407,7 @@ compatibility:
     enabled: true
 ~~~
 
-## 13. Reportes
+## 14. Reportes
 
 ~~~yaml
 reports:
@@ -368,7 +420,7 @@ reports:
 
 El private report no debe publicarse como artifact público.
 
-## 14. Firma
+## 15. Firma
 
 Nexora Shield recibirá referencias a material de firma, nunca contraseñas hardcoded.
 
@@ -381,7 +433,7 @@ signing:
   keyPasswordRef: ANDROID_KEY_PASSWORD
 ~~~
 
-## 15. Validation
+## 16. Validation
 
 Antes de proteger:
 
@@ -399,6 +451,6 @@ Después:
 - signature verification;
 - runtime smoke test en CI cuando esté habilitado.
 
-## 16. Config schema
+## 17. Config schema
 
 El proyecto mantendrá un JSON Schema generado para IDE completion y validación. Cambios breaking incrementan schema version.
