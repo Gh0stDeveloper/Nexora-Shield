@@ -162,7 +162,7 @@ impl Interpreter {
                 }
                 VmInstruction::LoadField { dst, object, field } => {
                     let object_value = object.map(|register| &registers[usize::from(register.0)]);
-                    match host.load_field(object_value, *field) {
+                    match host.load_field(object_value, *field, &method.constants) {
                         Ok(value) => {
                             registers[usize::from(dst.0)] = value;
                             pc += 1;
@@ -176,7 +176,7 @@ impl Interpreter {
                     let object_value =
                         object.map(|register| &registers[usize::from(register.0)]);
                     let value = &registers[usize::from(src.0)];
-                    match host.store_field(object_value, *field, value) {
+                    match host.store_field(object_value, *field, value, &method.constants) {
                         Ok(()) => pc += 1,
                         Err(exception) => {
                             pc = dispatch_exception(method, &mut registers, pc, exception)?;
@@ -192,7 +192,7 @@ impl Interpreter {
                         .iter()
                         .map(|register| registers[usize::from(register.0)].clone())
                         .collect::<Vec<_>>();
-                    match host.call(*call, &values) {
+                    match host.call(*call, &values, &method.constants) {
                         Ok(value) => {
                             if let Some(dst) = dst {
                                 registers[usize::from(dst.0)] = value;
@@ -207,7 +207,7 @@ impl Interpreter {
                 VmInstruction::Throw { src } => {
                     let value = registers[usize::from(src.0)].clone();
                     let exception = VmException {
-                        type_name: host.exception_type(&value),
+                        type_name: host.exception_type(&value, &method.constants),
                         value,
                     };
                     pc = dispatch_exception(method, &mut registers, pc, exception)?;
