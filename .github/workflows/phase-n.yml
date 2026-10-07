@@ -192,6 +192,165 @@ jobs:
       - name: Phase L Studio compile
         run: gradle -p studio compileKotlinDesktop --no-daemon --stacktrace
 
+  android-stable-performance:
+    name: N.10 Android representative performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Build Nexora Shield CLI
+        run: cargo build --locked --release -p nexora-shield
+
+      - name: Build matched baseline release APK
+        run: |
+          mkdir -p build/phase-n/android-perf
+          gradle -p samples/gradle-plugin/basic-app clean assembleRelease \
+            -PnexoraShieldEnabled=false \
+            --no-daemon --stacktrace
+          BASELINE="$(find samples/gradle-plugin/basic-app/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          test -f "$BASELINE"
+          cp "$BASELINE" build/phase-n/android-perf/baseline-unsigned.apk
+
+      - name: Build matched protected release APK
+        env:
+          NEXORA_SHIELD_CLI: ${{ github.workspace }}/target/release/nexora-shield
+        run: |
+          gradle -p samples/gradle-plugin/basic-app clean assembleRelease \
+            -PnexoraShieldEnabled=true \
+            --no-daemon --stacktrace
+          PROTECTED="$(find samples/gradle-plugin/basic-app/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          test -f "$PROTECTED"
+          cp "$PROTECTED" build/phase-n/android-perf/protected-unsigned.apk
+
+      - name: Create common benchmark signing key
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore build/phase-n/android-perf/perf.p12 \
+            -storetype PKCS12 \
+            -storepass phase-n-perf \
+            -keypass phase-n-perf \
+            -alias perf \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 365 \
+            -dname "CN=Nexora Shield Phase N Performance, O=CI, C=MX"
+
+      - name: Discover Android SDK tools
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          test -d "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          echo "SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+
+      - name: Sign both benchmark APKs identically
+        run: |
+          for NAME in baseline protected; do
+            cp "build/phase-n/android-perf/${NAME}-unsigned.apk" "build/phase-n/android-perf/${NAME}.apk"
+            "$APKSIGNER" sign \
+              --min-sdk-version 24 \
+              --ks build/phase-n/android-perf/perf.p12 \
+              --ks-key-alias perf \
+              --ks-pass pass:phase-n-perf \
+              --key-pass pass:phase-n-perf \
+              "build/phase-n/android-perf/${NAME}.apk"
+            "$APKSIGNER" verify --min-sdk-version 24 "build/phase-n/android-perf/${NAME}.apk"
+          done
+
+      - name: Provision representative Android virtual device
+        shell: bash
+        run: |
+          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64"
+          echo no | "$SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd \
+            --force \
+            --name nexora_phase_n \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_6"
+          nohup "$SDK_ROOT/emulator/emulator" \
+            -avd nexora_phase_n \
+            -no-window \
+            -noaudio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -no-snapshot \
+            > build/phase-n/android-perf/emulator.log 2>&1 &
+          "$SDK_ROOT/platform-tools/adb" wait-for-device
+          for i in {1..120}; do
+            BOOT="$("$SDK_ROOT/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')"
+            if [[ "$BOOT" == "1" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$("$SDK_ROOT/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          "$SDK_ROOT/platform-tools/adb" shell settings put global window_animation_scale 0
+          "$SDK_ROOT/platform-tools/adb" shell settings put global transition_animation_scale 0
+          "$SDK_ROOT/platform-tools/adb" shell settings put global animator_duration_scale 0
+
+      - name: Measure baseline and protected startup memory and size
+        run: |
+          ADB="$SDK_ROOT/platform-tools/adb"
+          python scripts/release/android-performance.py measure \
+            --adb "$ADB" \
+            --apk build/phase-n/android-perf/baseline.apk \
+            --package dev.nexora.shield.sample \
+            --activity .MainActivity \
+            --label baseline \
+            --warmups 5 \
+            --runs 20 \
+            --output build/phase-n/android-perf/baseline.json
+          python scripts/release/android-performance.py measure \
+            --adb "$ADB" \
+            --apk build/phase-n/android-perf/protected.apk \
+            --package dev.nexora.shield.sample \
+            --activity .MainActivity \
+            --label protected \
+            --warmups 5 \
+            --runs 20 \
+            --output build/phase-n/android-perf/protected.json
+          python scripts/release/android-performance.py compare \
+            --baseline build/phase-n/android-perf/baseline.json \
+            --protected build/phase-n/android-perf/protected.json \
+            --output build/phase-n/android-perf/comparison.json \
+            --max-startup-percent 100 \
+            --max-startup-delta-ms 250 \
+            --max-memory-percent 75 \
+            --max-size-percent 100
+
+      - name: Upload Android performance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-n-android-performance
+          path: |
+            build/phase-n/android-perf/baseline.json
+            build/phase-n/android-perf/protected.json
+            build/phase-n/android-perf/comparison.json
+          if-no-files-found: error
+          retention-days: 30
+
+
   rc-qualification:
     name: N.12 1.0 RC qualification
     runs-on: ubuntu-latest
@@ -203,6 +362,7 @@ jobs:
       - reviews
       - release-msrv
       - inherited-regressions
+      - android-stable-performance
 
     steps:
       - name: Checkout
