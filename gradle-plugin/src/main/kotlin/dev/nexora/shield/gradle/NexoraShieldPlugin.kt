@@ -82,7 +82,7 @@ class NexoraShieldPlugin : Plugin<Project> {
                 }
             }
 
-            val transformationRequest = variant.artifacts
+            val artifactTransformationRequest = variant.artifacts
                 .use(protectTask)
                 .wiredWithDirectories(
                     NexoraShieldApkTransformTask::inputDirectory,
@@ -91,7 +91,7 @@ class NexoraShieldPlugin : Plugin<Project> {
                 .toTransformMany(SingleArtifact.APK)
 
             protectTask.configure {
-                transformationRequest.set(transformationRequest)
+                transformationRequest.set(artifactTransformationRequest)
             }
 
             lifecycle.configure {
