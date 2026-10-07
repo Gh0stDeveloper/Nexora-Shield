@@ -345,6 +345,10 @@ Estado actual: **COMPLETADA**. M.1–M.12 están implementadas y validadas en `n
 ### N.13 External feedback
 ### N.14 1.0 stable
 
+Estado actual: **N.1–N.12 IMPLEMENTADAS / EN VALIDACIÓN**. La rama `feat/phase-n-production-hardening` incorpora freeze de API/schema, migraciones, documentación, supply-chain policy, SBOM/provenance, pipeline de release con attestations, retrace contract tests y revisiones de seguridad/rendimiento/compatibilidad. La línea de versión es `1.0.0-rc.1`.
+
+**N.13 y N.14 permanecen deliberadamente abiertas**: stable `v1.0.0` exige feedback externo real y mediciones representativas de rendimiento Android; esos requisitos no se sustituyen por CI interno.
+
 ---
 
 ## Después de 1.0
