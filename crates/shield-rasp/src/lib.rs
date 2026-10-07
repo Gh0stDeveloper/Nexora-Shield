@@ -16,13 +16,19 @@
 )]
 
 mod debug;
+mod emulator;
 mod hook;
 mod instrumentation;
+mod integrity_fusion;
+mod modified_system;
 mod signal;
 
 pub use debug::{DebugEvaluator, DebugObservation};
+pub use emulator::{EmulatorEvaluator, EmulatorObservation};
 pub use hook::{HookInjectionEvaluator, HookInjectionObservation};
 pub use instrumentation::{InstrumentationEvaluator, InstrumentationObservation};
+pub use integrity_fusion::IntegritySignalFusion;
+pub use modified_system::{ModifiedSystemEvaluator, ModifiedSystemObservation};
 pub use signal::{
     EvidenceStrength, RaspSignal, SignalCategory, SignalSet, SignalSeverity, SignalSource,
 };
