@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "rustMsrv": "1.81",
+  "minimumAndroidSdk": 24,
+  "jdk": "17",
+  "gradle": "9.6.0",
+  "androidGradlePlugin": "9.4.1",
+  "androidAbis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "artifactTypes": [
+    "apk",
+    "aab",
+    "aar",
+    "apks"
+  ],
+  "desktopOperatingSystems": [
+    "linux",
+    "macos",
+    "windows"
+  ]
+}
