@@ -84,8 +84,7 @@ impl StringPartitionPlan {
         let max_allowed = usize::from(max_partitions).min(unique.len());
         let min_allowed = usize::from(min_partitions).min(max_allowed).max(1);
         let span = max_allowed - min_allowed + 1;
-        let selector =
-            seed.derive_u64(DiversityDomain::StringPartition, b"partition-count")?;
+        let selector = seed.derive_u64(DiversityDomain::StringPartition, b"partition-count")?;
         let partition_count = min_allowed
             + usize::try_from(selector % u64::try_from(span).unwrap_or(u64::MAX)).unwrap_or(0);
 
@@ -93,10 +92,7 @@ impl StringPartitionPlan {
             .into_iter()
             .map(|logical_id| {
                 Ok((
-                    seed.derive_u64(
-                        DiversityDomain::StringPartition,
-                        logical_id.as_bytes(),
-                    )?,
+                    seed.derive_u64(DiversityDomain::StringPartition, logical_id.as_bytes())?,
                     logical_id,
                 ))
             })
@@ -111,10 +107,9 @@ impl StringPartitionPlan {
 
         let offset_selector =
             seed.derive_u64(DiversityDomain::StringPartition, b"partition-offset")?;
-        let offset = usize::try_from(
-            offset_selector % u64::try_from(partition_count).unwrap_or(u64::MAX),
-        )
-        .unwrap_or(0);
+        let offset =
+            usize::try_from(offset_selector % u64::try_from(partition_count).unwrap_or(u64::MAX))
+                .unwrap_or(0);
 
         let mut buckets = vec![Vec::<String>::new(); partition_count];
         for (index, logical_id) in ordered.into_iter().enumerate() {
@@ -205,7 +200,9 @@ impl StringPartitionPlan {
 
     #[must_use]
     pub fn all_shards_non_empty(&self) -> bool {
-        self.shards.iter().all(|shard| !shard.logical_ids.is_empty())
+        self.shards
+            .iter()
+            .all(|shard| !shard.logical_ids.is_empty())
     }
 }
 
