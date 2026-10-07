@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 hmac = "0.12.1"
 nexora-shield-dex = { path = "../shield-dex" }
+nexora-shield-crypto = { path = "../shield-crypto" }
 nexora-shield-integrity = { path = "../shield-integrity" }
 nexora-shield-native = { path = "../shield-native" }
 nexora-shield-vm = { path = "../shield-vm" }
