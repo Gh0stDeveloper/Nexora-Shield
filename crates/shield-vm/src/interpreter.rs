@@ -144,10 +144,8 @@ impl Interpreter {
                     let left_value = registers[usize::from(left.0)].as_int()?;
                     let right_value = registers[usize::from(right.0)].as_int()?;
                     if right_value == 0 {
-                        let exception = host.create_exception(
-                            "Ljava/lang/ArithmeticException;",
-                            &method.constants,
-                        );
+                        let exception = host
+                            .create_exception("Ljava/lang/ArithmeticException;", &method.constants);
                         pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                     } else {
                         let value = if left_value == i32::MIN && right_value == -1 {
