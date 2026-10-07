@@ -61,13 +61,32 @@
 - [x] No digest leakage into RASP details
 
 ## E.8 Risk Engine
-- [ ] Pending
+- [x] Deterministic weighted scoring
+- [x] Risk levels
+- [x] Cross-category correlation
+- [x] Critical definitive floor
+- [x] Weak-evidence escalation cap
+- [x] Moderate-evidence escalation cap
+- [x] Auditable risk reasons
+- [x] Empty/weak/strong/critical tests
 
 ## E.9 Policy compiler
-- [ ] Pending
+- [x] Typed policy specification
+- [x] Strict threshold validation
+- [x] Complete response mapping validation
+- [x] Monotonic response enforcement
+- [x] Fail-closed missing-response behavior
+- [x] Strict JSON schema surface
+- [x] Invalid-policy tests
 
 ## E.10 Responses
-- [ ] Pending
+- [x] Continue response
+- [x] Report response
+- [x] Require-reverification response
+- [x] Deny-sensitive-operation response
+- [x] No destructive process-control action
+- [x] Deterministic decision record
+- [x] Policy-to-response integration test
 
 ## E.11 Report-only mode
 - [ ] Pending
@@ -77,4 +96,4 @@
 
 ## Closure state
 
-Phase E is **IN PROGRESS**. E.1–E.7 are implemented. The phase must not be marked complete until E.8–E.12, full CI, documentation and the final false-positive acceptance gate are complete.
+Phase E is **IN PROGRESS**. E.1–E.10 are implemented. E.1–E.7 were closed by CI #304. The phase must not be marked complete until E.11–E.12, full CI, documentation and the final false-positive acceptance gate are complete.
