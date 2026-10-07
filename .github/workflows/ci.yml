@@ -927,3 +927,57 @@ jobs:
 
       - name: Run cross-build portability regression
         run: cargo test --locked -p nexora-shield-diversity --test phase_h h10_cross_build_bypass_portability_stays_below_budget -- --exact
+
+
+  phase-i-attestation:
+    name: Phase I Attestation I.1-I.10
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test attestation and remote-policy engine
+        run: cargo test --locked -p nexora-shield-attestation --all-targets
+
+      - name: Clippy attestation and remote-policy engine
+        run: cargo clippy --locked -p nexora-shield-attestation --all-targets -- -D warnings
+
+  phase-i-attestation-msrv:
+    name: Phase I Attestation Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test attestation engine on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-attestation --all-targets
+
+  phase-i-protocol-integration:
+    name: Phase I protocol integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run end-to-end attestation and policy test
+        run: cargo test --locked -p nexora-shield-attestation --test phase_i i10_end_to_end_attestation_policy_and_offline_flow -- --exact
+
+      - name: Compile server verification example
+        run: cargo build --locked -p nexora-shield-attestation --example server_verification
