@@ -18,26 +18,23 @@ pub struct ReleaseVersion {
 impl ReleaseVersion {
     pub fn parse(value: &str) -> Result<Self> {
         let value = value.strip_prefix('v').unwrap_or(value);
-        let (core, rc) = match value.split_once("-rc.") {
-            Some((core, rc)) => {
-                let number = rc.parse::<u32>().map_err(|_| {
-                    ReleaseError::InvalidVersion("RC suffix must be -rc.<positive integer>".into())
-                })?;
-                if number == 0 {
-                    return Err(ReleaseError::InvalidVersion(
-                        "RC number must be greater than zero".into(),
-                    ));
-                }
-                (core, Some(number))
+        let (core, rc) = if let Some((core, rc)) = value.split_once("-rc.") {
+            let number = rc.parse::<u32>().map_err(|_| {
+                ReleaseError::InvalidVersion("RC suffix must be -rc.<positive integer>".into())
+            })?;
+            if number == 0 {
+                return Err(ReleaseError::InvalidVersion(
+                    "RC number must be greater than zero".into(),
+                ));
             }
-            None => {
-                if value.contains('-') {
-                    return Err(ReleaseError::InvalidVersion(
-                        "only -rc.N prereleases are supported for 1.0".into(),
-                    ));
-                }
-                (value, None)
+            (core, Some(number))
+        } else {
+            if value.contains('-') {
+                return Err(ReleaseError::InvalidVersion(
+                    "only -rc.N prereleases are supported for 1.0".into(),
+                ));
             }
+            (value, None)
         };
 
         let mut parts = core.split('.');
