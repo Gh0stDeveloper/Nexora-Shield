@@ -29,16 +29,12 @@ pub struct CfgVariantPlan {
 }
 
 impl CfgVariantPlan {
-    pub fn derive_for_vm(
-        seed: &SeedDeriver,
-        method_key: &str,
-        method: &VmMethod,
-    ) -> Result<Self> {
+    pub fn derive_for_vm(seed: &SeedDeriver, method_key: &str, method: &VmMethod) -> Result<Self> {
         method
             .validate()
             .map_err(|error| DiversityError::Cfg(error.to_string()))?;
         let boundaries = basic_block_boundaries(method);
-        let mut candidates = boundaries
+        let candidates = boundaries
             .into_iter()
             .filter(|boundary| *boundary != 0 && *boundary < method.instructions.len())
             .collect::<Vec<_>>();
@@ -78,21 +74,13 @@ impl CfgVariantPlan {
         let selected_count = if max_selected == 0 {
             0
         } else {
-            1 + usize::try_from(
-                (selector >> 8) % u64::try_from(max_selected).unwrap_or(u64::MAX),
-            )
-            .unwrap_or(0)
+            1 + usize::try_from((selector >> 8) % u64::try_from(max_selected).unwrap_or(u64::MAX))
+                .unwrap_or(0)
         };
         candidates.truncate(selected_count);
         candidates.sort_unstable();
 
-        let fingerprint = cfg_fingerprint(
-            layout,
-            branch,
-            padding_slots,
-            method_key,
-            &candidates,
-        );
+        let fingerprint = cfg_fingerprint(layout, branch, padding_slots, method_key, &candidates);
         Ok(Self {
             layout,
             branch,
@@ -175,13 +163,7 @@ fn basic_block_boundaries(method: &VmMethod) -> BTreeSet<usize> {
     let mut boundaries = BTreeSet::from([0_usize]);
     for (pc, instruction) in method.instructions.iter().enumerate() {
         match instruction {
-            VmInstruction::Jump { target } => {
-                boundaries.insert(*target);
-                if pc + 1 < method.instructions.len() {
-                    boundaries.insert(pc + 1);
-                }
-            }
-            VmInstruction::Branch { target, .. } => {
+            VmInstruction::Jump { target } | VmInstruction::Branch { target, .. } => {
                 boundaries.insert(*target);
                 if pc + 1 < method.instructions.len() {
                     boundaries.insert(pc + 1);
@@ -189,10 +171,10 @@ fn basic_block_boundaries(method: &VmMethod) -> BTreeSet<usize> {
             }
             VmInstruction::Throw { .. }
             | VmInstruction::Return { .. }
-            | VmInstruction::ReturnVoid => {
-                if pc + 1 < method.instructions.len() {
-                    boundaries.insert(pc + 1);
-                }
+            | VmInstruction::ReturnVoid
+                if pc + 1 < method.instructions.len() =>
+            {
+                boundaries.insert(pc + 1);
             }
             _ => {}
         }
