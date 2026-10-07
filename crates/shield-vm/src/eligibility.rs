@@ -127,9 +127,7 @@ impl EligibilityAnalyzer {
 
         for (index, instruction) in executable.iter().enumerate() {
             match instruction.opcode {
-                0x0a | 0x0c
-                    if index == 0
-                        || !is_call(executable[index.saturating_sub(1)].opcode) =>
+                0x0a | 0x0c if index == 0 || !is_call(executable[index.saturating_sub(1)].opcode) =>
                 {
                     reasons.push(EligibilityReason::OrphanMoveResult {
                         offset: instruction.offset,
