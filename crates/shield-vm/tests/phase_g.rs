@@ -5,9 +5,8 @@ use nexora_shield_vm::{
     BranchCondition, ConstantPool, DexLowerer, EligibilityAnalyzer, EligibilityPolicy,
     ExecutionConfig, Interpreter, MetadataSealer, NullHost, OpcodeAllocation, OpcodeStream,
     PerformanceEstimator, SealedExecution, SelectionPlanner, VmConstant, VmError, VmException,
-    VmExceptionHandler,
-    VmHost, VmInstruction, VmMethod, VmRegister, VmSelectionConfig, VmSelectionMode, VmSelector,
-    VmValue,
+    VmExceptionHandler, VmHost, VmInstruction, VmMethod, VmRegister, VmSelectionConfig,
+    VmSelectionMode, VmSelector, VmValue,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,7 +24,7 @@ fn eligibility_rejects_unsupported_dex_opcode() {
     let dex = unsupported_dex();
     let report = EligibilityAnalyzer::analyze(&dex, 0, EligibilityPolicy::default());
     assert!(!report.eligible);
-    assert!(!report.reasons.is_empty());
+    assert_ne!(report.reasons.len(), 0);
 }
 
 #[test]
@@ -101,12 +100,7 @@ fn metadata_seal_rejects_tampering() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     assert_eq!(
-        MetadataSealer::verify_program(
-            &sealed,
-            b"metadata-key",
-            &stream,
-            &wrong_allocation
-        ),
+        MetadataSealer::verify_program(&sealed, b"metadata-key", &stream, &wrong_allocation),
         Err(VmError::OpcodeFingerprintMismatch)
     );
 
@@ -431,7 +425,6 @@ fn typed_handler_uses_host_assignability_rules() -> Result<(), Box<dyn std::erro
     assert_eq!(result.value, VmValue::Int(77));
     Ok(())
 }
-
 
 #[test]
 fn sealed_execution_debug_redacts_key() -> Result<(), Box<dyn std::error::Error>> {
