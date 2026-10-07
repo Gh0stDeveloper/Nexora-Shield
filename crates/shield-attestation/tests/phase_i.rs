@@ -2,10 +2,9 @@ use nexora_shield_attestation::{
     AttestationChallenge, AttestationError, AttestationProvider, AttestationRequest,
     AttestationVerdict, BuildRevocation, ChallengeDeriver, EvidenceAvailability,
     FeatureAccessDecision, FeatureDecisionReason, FeatureEvaluationContext, FeaturePolicy,
-    OfflineAction, OfflinePolicy, PolicySignatureVerifier, PrivacyAudit, RemotePolicyPayload,
+    OfflineAction, OfflinePolicy, PrivacyAudit, RemotePolicyPayload,
     ReplayGuard, SampleHmacEvidenceAuthenticator, SampleHmacPolicyAuthenticator,
-    SampleRemotePolicyServer, SignedPolicyEnvelope, DEFAULT_CHALLENGE_TTL_MS,
-    REMOTE_POLICY_SCHEMA,
+    SampleRemotePolicyServer, SignedPolicyEnvelope, DEFAULT_CHALLENGE_TTL_MS, REMOTE_POLICY_SCHEMA,
 };
 use nexora_shield_rasp::RiskLevel;
 use std::collections::BTreeMap;
@@ -100,8 +99,8 @@ fn i1_attestation_abstraction_binds_evidence_and_redacts_token(
 }
 
 #[test]
-fn i2_nonce_and_session_model_are_unique_and_ttl_bounded(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn i2_nonce_and_session_model_are_unique_and_ttl_bounded() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut deriver = ChallengeDeriver::new([0x33; 32], [0x34; 16]);
     let first = deriver.issue(
         "dev.nexora.sample",
@@ -139,8 +138,7 @@ fn i2_nonce_and_session_model_are_unique_and_ttl_bounded(
 }
 
 #[test]
-fn i3_replay_guard_consumes_each_challenge_once(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn i3_replay_guard_consumes_each_challenge_once() -> Result<(), Box<dyn std::error::Error>> {
     let challenge = challenge(0x44, "build-i3", "license")?;
     let mut guard = ReplayGuard::new(8);
 
@@ -157,15 +155,15 @@ fn i3_replay_guard_consumes_each_challenge_once(
 #[test]
 fn i4_server_sample_verifies_and_consumes_rejected_attempts(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let challenge = challenge(0x55, "build-i4", "feature:profile")?;
+    let valid_challenge = challenge(0x55, "build-i4", "feature:profile")?;
     let client = SampleHmacEvidenceAuthenticator::new("sample-provider", [0x66; 32])?;
     let server_verifier = SampleHmacEvidenceAuthenticator::new("sample-provider", [0x66; 32])?;
     let mut server = SampleRemotePolicyServer::new(server_verifier, 16);
 
-    server.register_challenge(challenge.clone(), NOW)?;
-    let evidence = client.collect(&challenge)?;
+    server.register_challenge(valid_challenge.clone(), NOW)?;
+    let evidence = client.collect(&valid_challenge)?;
     let request = AttestationRequest {
-        challenge: challenge.clone(),
+        challenge: valid_challenge.clone(),
         evidence,
         feature: "account.profile".to_owned(),
         local_risk: RiskLevel::Clean,
@@ -198,8 +196,8 @@ fn i4_server_sample_verifies_and_consumes_rejected_attempts(
 }
 
 #[test]
-fn i5_signed_policy_rejects_tamper_and_sequence_rollback(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn i5_signed_policy_rejects_tamper_and_sequence_rollback() -> Result<(), Box<dyn std::error::Error>>
+{
     let (envelope, verifier) = signed_policy(base_policy())?;
     let verified = envelope.verify(&verifier, "dev.nexora.sample", 40, NOW)?;
     assert_eq!(verified.payload().sequence, 42);
@@ -222,8 +220,7 @@ fn i5_signed_policy_rejects_tamper_and_sequence_rollback(
 }
 
 #[test]
-fn i6_build_revocation_is_fail_closed(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn i6_build_revocation_is_fail_closed() -> Result<(), Box<dyn std::error::Error>> {
     let mut payload = base_policy();
     payload.revoked_builds.insert(
         "revoked-build".to_owned(),
@@ -298,10 +295,7 @@ fn i8_offline_degradation_respects_feature_action_and_staleness(
         now_unix_ms: NOW,
     })?;
     assert_eq!(profile.decision, FeatureAccessDecision::Degraded);
-    assert_eq!(
-        profile.reason,
-        FeatureDecisionReason::OfflineCachedPolicy
-    );
+    assert_eq!(profile.reason, FeatureDecisionReason::OfflineCachedPolicy);
 
     let online = policy.evaluate(&FeatureEvaluationContext {
         online: true,
@@ -355,8 +349,7 @@ fn i9_privacy_audit_exposes_no_stable_device_identifier_fields(
 }
 
 #[test]
-fn i10_end_to_end_attestation_policy_and_offline_flow(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn i10_end_to_end_attestation_policy_and_offline_flow() -> Result<(), Box<dyn std::error::Error>> {
     let mut deriver = ChallengeDeriver::new([0xbb; 32], [0xbc; 16]);
     let challenge = deriver.issue(
         "dev.nexora.sample",
