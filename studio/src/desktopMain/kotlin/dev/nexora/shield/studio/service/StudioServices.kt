@@ -126,9 +126,7 @@ class CommandRunner(
                     }
                 }
                 if (capturedBytes >= maxOutputBytes) {
-                    output.append("
-[output truncated by Shield Studio]
-")
+                    output.append("\\n[output truncated by Shield Studio]\\n")
                 }
                 output.toString()
             }
