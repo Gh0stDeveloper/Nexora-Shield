@@ -17,7 +17,7 @@ fn challenge(
     build_id: &str,
     purpose: &str,
 ) -> Result<AttestationChallenge, AttestationError> {
-    let mut deriver = ChallengeDeriver::new([tag; 32]);
+    let mut deriver = ChallengeDeriver::new([tag; 32], [tag.wrapping_add(1); 16]);
     deriver.issue(
         "dev.nexora.sample",
         build_id,
@@ -102,7 +102,7 @@ fn i1_attestation_abstraction_binds_evidence_and_redacts_token(
 #[test]
 fn i2_nonce_and_session_model_are_unique_and_ttl_bounded(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut deriver = ChallengeDeriver::new([0x33; 32]);
+    let mut deriver = ChallengeDeriver::new([0x33; 32], [0x34; 16]);
     let first = deriver.issue(
         "dev.nexora.sample",
         "build-i2",
@@ -357,7 +357,7 @@ fn i9_privacy_audit_exposes_no_stable_device_identifier_fields(
 #[test]
 fn i10_end_to_end_attestation_policy_and_offline_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut deriver = ChallengeDeriver::new([0xbb; 32]);
+    let mut deriver = ChallengeDeriver::new([0xbb; 32], [0xbc; 16]);
     let challenge = deriver.issue(
         "dev.nexora.sample",
         "build-i10",
