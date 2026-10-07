@@ -17,8 +17,8 @@ mod tools;
 mod zip;
 
 pub use aab::{
-    inspect_aab, verify_aab_structure, AabInspection, BundleBaselineProfile,
-    BundleDexInspection, BundleModuleInspection,
+    inspect_aab, verify_aab_structure, AabInspection, BundleBaselineProfile, BundleDexInspection,
+    BundleModuleInspection,
 };
 pub use aar::{inspect_aar, verify_aar_structure, AarInspection, AarMarker};
 pub use apk::{
@@ -26,8 +26,7 @@ pub use apk::{
     ManifestInspection,
 };
 pub use apks::{
-    inspect_apk_set, verify_apk_set_structure, ApkSetInspection, SplitApkInspection,
-    SplitApkKind,
+    inspect_apk_set, verify_apk_set_structure, ApkSetInspection, SplitApkInspection, SplitApkKind,
 };
 pub use bundletool::{ApkSetMode, Bundletool, BundletoolSigningConfig};
 pub use error::{PackageError, Result};

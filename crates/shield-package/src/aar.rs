@@ -91,10 +91,7 @@ pub fn inspect_aar(path: &Path) -> Result<AarInspection> {
         entry_count: directory.entries.len(),
         markers,
         consumer_rule_entries,
-        resource_entries: names
-            .iter()
-            .filter(|name| name.starts_with("res/"))
-            .count(),
+        resource_entries: names.iter().filter(|name| name.starts_with("res/")).count(),
         asset_entries: names
             .iter()
             .filter(|name| name.starts_with("assets/"))

@@ -143,7 +143,10 @@ impl Bundletool {
                 )),
             ]);
             if let Some(path) = &config.key_password_file {
-                args.push(OsString::from(format!("--key-pass=file:{}", path.display())));
+                args.push(OsString::from(format!(
+                    "--key-pass=file:{}",
+                    path.display()
+                )));
             }
         }
 

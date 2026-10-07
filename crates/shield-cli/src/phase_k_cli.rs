@@ -61,10 +61,7 @@ pub fn run_aar_inspect(args: &[String]) -> Result<(), String> {
     println!("AAR: {}", path.display());
     println!("SHA-256: {}", inspection.sha256);
     println!("Entries: {}", inspection.entry_count);
-    println!(
-        "Manifest: {}",
-        inspection.has_marker(AarMarker::Manifest)
-    );
+    println!("Manifest: {}", inspection.has_marker(AarMarker::Manifest));
     println!(
         "classes.jar: {}",
         inspection.has_marker(AarMarker::ClassesJar)
@@ -79,7 +76,10 @@ pub fn run_aar_inspect(args: &[String]) -> Result<(), String> {
         "R.txt: {}",
         inspection.has_marker(AarMarker::ResourceSymbols)
     );
-    println!("Baseline profiles: {}", inspection.baseline_profile_entries.len());
+    println!(
+        "Baseline profiles: {}",
+        inspection.baseline_profile_entries.len()
+    );
     Ok(())
 }
 
@@ -158,7 +158,8 @@ pub fn run_bundletool_validate(args: &[String]) -> Result<(), String> {
         }
     }
 
-    let jar = jar.ok_or_else(|| "bundletool-validate requires --jar <bundletool.jar>".to_owned())?;
+    let jar =
+        jar.ok_or_else(|| "bundletool-validate requires --jar <bundletool.jar>".to_owned())?;
     verify_aab_structure(&bundle).map_err(|error| error.to_string())?;
     let tool = Bundletool::new(java, jar).map_err(|error| error.to_string())?;
     let diagnostics = tool
@@ -229,17 +230,21 @@ pub fn run_bundletool_build_apks(args: &[String]) -> Result<(), String> {
                 index += 2;
             }
             "--key-pass-file" => {
-                key_pass_file = Some(PathBuf::from(require_value(args, index, "--key-pass-file")?));
+                key_pass_file = Some(PathBuf::from(require_value(
+                    args,
+                    index,
+                    "--key-pass-file",
+                )?));
                 index += 2;
             }
             option => return Err(format!("unknown bundletool-build-apks option '{option}'")),
         }
     }
 
-    let jar = jar
-        .ok_or_else(|| "bundletool-build-apks requires --jar <bundletool.jar>".to_owned())?;
-    let output = output
-        .ok_or_else(|| "bundletool-build-apks requires --output <file.apks>".to_owned())?;
+    let jar =
+        jar.ok_or_else(|| "bundletool-build-apks requires --jar <bundletool.jar>".to_owned())?;
+    let output =
+        output.ok_or_else(|| "bundletool-build-apks requires --output <file.apks>".to_owned())?;
 
     verify_aab_structure(&bundle).map_err(|error| error.to_string())?;
 
@@ -290,9 +295,7 @@ pub fn print_phase_k_help() {
 }
 
 fn print_aab_help() {
-    println!(
-        "USAGE:\n  nexora-shield aab-inspect <app.aab>\n  nexora-shield aab-verify <app.aab>"
-    );
+    println!("USAGE:\n  nexora-shield aab-inspect <app.aab>\n  nexora-shield aab-verify <app.aab>");
 }
 
 fn print_aar_help() {

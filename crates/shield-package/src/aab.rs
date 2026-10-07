@@ -112,7 +112,11 @@ pub fn verify_aab_structure(path: &Path) -> Result<AabInspection> {
         ));
     }
 
-    if !inspection.modules.iter().any(|module| module.name == "base") {
+    if !inspection
+        .modules
+        .iter()
+        .any(|module| module.name == "base")
+    {
         return Err(PackageError::VerificationFailed(
             "AAB does not contain a base module manifest".into(),
         ));

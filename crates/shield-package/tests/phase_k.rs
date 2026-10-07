@@ -1,8 +1,8 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 use nexora_shield_package::{
-    inspect_aab, inspect_aar, verify_aab_structure, verify_aar_structure,
-    verify_apk_set_structure, AarMarker, SplitApkKind,
+    inspect_aab, inspect_aar, verify_aab_structure, verify_aar_structure, verify_apk_set_structure,
+    AarMarker, SplitApkKind,
 };
 use std::fs::{self, File};
 use std::io::{Seek, Write};
@@ -28,14 +28,14 @@ fn k1_aab_model_discovers_base_dynamic_features_resources_and_profiles() {
             ("base/assets/dexopt/baseline.prof", b"profile"),
             ("base/assets/dexopt/baseline.profm", b"profile-metadata"),
             ("base/lib/arm64-v8a/libsample.so", b"native"),
-            (
-                "payments/manifest/AndroidManifest.xml",
-                b"feature-manifest",
-            ),
+            ("payments/manifest/AndroidManifest.xml", b"feature-manifest"),
             ("payments/dex/classes.dex", b"feature-dex"),
             ("payments/resources.pb", b"feature-resources"),
             ("payments/res/layout/payment.xml", b"feature-layout"),
-            ("BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map", b"map"),
+            (
+                "BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map",
+                b"map",
+            ),
         ],
     );
 
@@ -137,7 +137,10 @@ fn k6_k8_k9_aar_model_preserves_rules_resources_namespace_and_profiles() {
             ("res/values/strings.xml", b"resources"),
             ("assets/data.bin", b"asset"),
             ("jni/arm64-v8a/liblibrary.so", b"native"),
-            ("proguard.txt", b"-keep class dev.nexora.library.PublicApi { *; }"),
+            (
+                "proguard.txt",
+                b"-keep class dev.nexora.library.PublicApi { *; }",
+            ),
             ("baseline-prof.txt", b"Ldev/nexora/library/PublicApi;"),
             (
                 "META-INF/com/android/build/gradle/aar-metadata.properties",
@@ -154,7 +157,10 @@ fn k6_k8_k9_aar_model_preserves_rules_resources_namespace_and_profiles() {
     assert_eq!(inspection.resource_entries, 1);
     assert!(inspection.has_marker(AarMarker::ResourceSymbols));
     assert!(inspection.jni_abis.contains("arm64-v8a"));
-    assert_eq!(inspection.baseline_profile_entries, vec!["baseline-prof.txt"]);
+    assert_eq!(
+        inspection.baseline_profile_entries,
+        vec!["baseline-prof.txt"]
+    );
 
     cleanup(&directory);
 }

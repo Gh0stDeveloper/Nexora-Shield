@@ -54,16 +54,12 @@ mod tests {
     use crate::{CertificateObservation, CertificatePolicy, Sha256Digest};
 
     fn digest(byte: u8) -> Sha256Digest {
-        Sha256Digest::new([byte; 32])
+        Sha256Digest([byte; 32])
     }
 
     #[test]
     fn upload_certificate_is_not_implicitly_trusted_at_runtime() -> crate::Result<()> {
-        let config = PlayAppSigningConfig::new(
-            Some(digest(0x11)),
-            [digest(0x22)],
-            [digest(0x33)],
-        )?;
+        let config = PlayAppSigningConfig::new(Some(digest(0x11)), [digest(0x22)], [digest(0x33)])?;
         let binding = config.runtime_binding(CertificatePolicy::CurrentOrLineage)?;
 
         let upload_observation = CertificateObservation::new([digest(0x11)], [])?;
