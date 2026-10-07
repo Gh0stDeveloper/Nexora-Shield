@@ -155,7 +155,7 @@ Estado actual: **COMPLETADA**. Las subfases D.1–D.10 están implementadas. Git
 Criterio:
 - correlación estable, políticas auditables y baja tasa de falsos positivos.
 
-Estado actual: **EN PROGRESO**. El bloque inicial E.1–E.4 está implementado en `nexora-shield-rasp` con API tipada de señales, evidencia de depuración, instrumentación y hook/inyección, además de pruebas de deduplicación y casos limpios. E.5–E.12 permanecen explícitamente pendientes y la fase no se considera cerrada.
+Estado actual: **EN PROGRESO**. Las subfases E.1–E.7 están implementadas en `nexora-shield-rasp`: API tipada de señales, evidencia de depuración, instrumentación, hook/inyección, sistema modificado, emulador e integración de fallos del motor de integridad de la Fase D. Las señales débiles de entorno permanecen diferenciadas de evidencia fuerte para reducir falsos positivos. E.8–E.12 permanecen pendientes y la fase no se considera cerrada.
 
 ---
 
