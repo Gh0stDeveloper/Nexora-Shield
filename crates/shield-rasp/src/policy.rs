@@ -4,8 +4,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PolicyMode {
+    Enforce,
+    ReportOnly,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicySpec {
+    pub mode: PolicyMode,
     pub thresholds: RiskThresholds,
     pub responses: BTreeMap<RiskLevel, RaspResponse>,
 }
@@ -21,6 +29,7 @@ impl Default for PolicySpec {
         ]);
 
         Self {
+            mode: PolicyMode::Enforce,
             thresholds: RiskThresholds::default(),
             responses,
         }
@@ -29,6 +38,7 @@ impl Default for PolicySpec {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompiledPolicy {
+    mode: PolicyMode,
     thresholds: RiskThresholds,
     responses: BTreeMap<RiskLevel, RaspResponse>,
 }
@@ -78,9 +88,15 @@ impl CompiledPolicy {
         }
 
         Ok(Self {
+            mode: spec.mode,
             thresholds: spec.thresholds,
             responses: spec.responses,
         })
+    }
+
+    #[must_use]
+    pub const fn mode(&self) -> PolicyMode {
+        self.mode
     }
 
     #[must_use]
