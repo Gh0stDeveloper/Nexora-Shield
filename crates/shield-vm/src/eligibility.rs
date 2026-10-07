@@ -1,5 +1,6 @@
 use nexora_shield_dex::{DexFile, IrMethod};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EligibilityPolicy {
@@ -33,6 +34,8 @@ pub enum EligibilityReason {
     FieldsDisabled,
     ExceptionsDisabled,
     WideMoveResultUnsupported { offset: u32 },
+    OrphanMoveResult { offset: u32 },
+    OrphanMoveException { offset: u32 },
     MalformedIr(String),
 }
 
@@ -50,7 +53,7 @@ pub struct EligibilityReport {
     pub eligible: bool,
     pub register_count: u16,
     pub instruction_count: usize,
-    pub features: std::collections::BTreeSet<EligibilityFeature>,
+    pub features: BTreeSet<EligibilityFeature>,
     pub reasons: Vec<EligibilityReason>,
 }
 
@@ -66,7 +69,7 @@ impl EligibilityAnalyzer {
                 eligible: false,
                 register_count: 0,
                 instruction_count: 0,
-                features: std::collections::BTreeSet::new(),
+                features: BTreeSet::new(),
                 reasons: vec![EligibilityReason::MissingCode],
             };
         };
@@ -76,6 +79,18 @@ impl EligibilityAnalyzer {
             .iter()
             .filter(|instruction| !instruction.is_payload())
             .collect::<Vec<_>>();
+        let handler_targets = code
+            .handlers
+            .iter()
+            .flat_map(|handler| {
+                handler
+                    .typed_handlers
+                    .iter()
+                    .map(|(_, target)| *target)
+                    .chain(handler.catch_all_addr)
+            })
+            .collect::<BTreeSet<_>>();
+
         let mut reasons = Vec::new();
         let has_calls = executable
             .iter()
@@ -107,16 +122,31 @@ impl EligibilityAnalyzer {
             reasons.push(EligibilityReason::ExceptionsDisabled);
         }
 
-        for instruction in &executable {
-            if instruction.opcode == 0x0b {
-                reasons.push(EligibilityReason::WideMoveResultUnsupported {
+        for (index, instruction) in executable.iter().enumerate() {
+            match instruction.opcode {
+                0x0a | 0x0c
+                    if index == 0
+                        || !is_call(executable[index.saturating_sub(1)].opcode) =>
+                {
+                    reasons.push(EligibilityReason::OrphanMoveResult {
+                        offset: instruction.offset,
+                    });
+                }
+                0x0b => reasons.push(EligibilityReason::WideMoveResultUnsupported {
                     offset: instruction.offset,
-                });
-            } else if !is_supported_opcode(instruction.opcode) {
-                reasons.push(EligibilityReason::UnsupportedOpcode {
-                    offset: instruction.offset,
-                    opcode: instruction.opcode,
-                });
+                }),
+                0x0d if !handler_targets.contains(&instruction.offset) => {
+                    reasons.push(EligibilityReason::OrphanMoveException {
+                        offset: instruction.offset,
+                    });
+                }
+                opcode if !is_supported_opcode(opcode) => {
+                    reasons.push(EligibilityReason::UnsupportedOpcode {
+                        offset: instruction.offset,
+                        opcode,
+                    });
+                }
+                _ => {}
             }
         }
 
@@ -124,7 +154,7 @@ impl EligibilityAnalyzer {
             reasons.push(EligibilityReason::MalformedIr(error.to_string()));
         }
 
-        let mut features = std::collections::BTreeSet::new();
+        let mut features = BTreeSet::new();
         if has_calls {
             features.insert(EligibilityFeature::Calls);
         }
