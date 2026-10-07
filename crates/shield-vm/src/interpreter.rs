@@ -85,10 +85,8 @@ impl Interpreter {
                     let left_value = registers[usize::from(left.0)].as_int()?;
                     let right_value = registers[usize::from(right.0)].as_int()?;
                     if right_value == 0 {
-                        let exception = host.create_exception(
-                            "Ljava/lang/ArithmeticException;",
-                            &method.constants,
-                        );
+                        let exception = host
+                            .create_exception("Ljava/lang/ArithmeticException;", &method.constants);
                         pc = dispatch_exception(method, &mut registers, pc, exception, host)?;
                     } else {
                         let value = if left_value == i32::MIN && right_value == -1 {
@@ -166,8 +164,7 @@ impl Interpreter {
                     }
                 }
                 VmInstruction::StoreField { object, field, src } => {
-                    let object_value =
-                        object.map(|register| &registers[usize::from(register.0)]);
+                    let object_value = object.map(|register| &registers[usize::from(register.0)]);
                     let value = &registers[usize::from(src.0)];
                     match host.store_field(object_value, *field, value, &method.constants) {
                         Ok(()) => pc += 1,
@@ -294,11 +291,8 @@ fn dispatch_exception<H: VmHost>(
             continue;
         }
         if let Some(expected) = handler.type_name.as_deref() {
-            if !host.exception_matches(
-                expected,
-                exception.type_name.as_deref(),
-                &method.constants,
-            ) {
+            if !host.exception_matches(expected, exception.type_name.as_deref(), &method.constants)
+            {
                 continue;
             }
         }
@@ -313,4 +307,3 @@ fn dispatch_exception<H: VmHost>(
         type_name: exception.type_name,
     })
 }
-
