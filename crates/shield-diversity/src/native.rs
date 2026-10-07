@@ -11,10 +11,7 @@ pub struct NativeConstantVariant {
 }
 
 impl NativeConstantVariant {
-    pub fn derive(
-        seed: &SeedDeriver,
-        build_id: &str,
-    ) -> Result<(Self, GeneratedNativeData)> {
+    pub fn derive(seed: &SeedDeriver, build_id: &str) -> Result<(Self, GeneratedNativeData)> {
         if build_id.trim().is_empty() {
             return Err(DiversityError::EmptyBuildId);
         }
