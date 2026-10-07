@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "dev.nexora.shield"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 
 dependencies {
     compileOnly("com.android.tools.build:gradle:9.4.1")
