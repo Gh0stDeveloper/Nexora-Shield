@@ -691,3 +691,114 @@ jobs:
 
       - name: Test RASP evidence crate on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-rasp --all-targets
+
+
+  phase-f-native-host:
+    name: Phase F Native Shield host
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test native runtime and fuzz-smoke
+        run: cargo test --locked -p nexora-shield-native --all-targets
+
+      - name: Clippy native runtime
+        run: cargo clippy --locked -p nexora-shield-native --all-targets -- -D warnings
+
+  phase-f-native-msrv:
+    name: Phase F Native Shield Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test native runtime on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-native --all-targets
+
+  phase-f-android:
+    name: Phase F Android arm64 + x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXORA_ANDROID_API_LEVEL: "24"
+      NEXORA_NDK_VERSION: "27.2.12479018"
+      SOURCE_DATE_EPOCH: "1"
+      CARGO_INCREMENTAL: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust and Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android NDK
+        run: sdkmanager "ndk;${NEXORA_NDK_VERSION}" >/dev/null
+
+      - name: Export pinned Android NDK
+        run: echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NEXORA_NDK_VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Build primary ABI libraries
+        run: bash scripts/build-native-android.sh build/phase-f/first
+
+      - name: Inspect ABI, hardening and exports
+        run: |
+          ARM="build/phase-f/first/arm64-v8a/libnexora_shield_native.so"
+          X64="build/phase-f/first/x86_64/libnexora_shield_native.so"
+          test -s "$ARM"
+          test -s "$X64"
+
+          readelf -h "$ARM" | grep -q "AArch64"
+          readelf -h "$X64" | grep -Eq "X86-64|Advanced Micro Devices"
+
+          for so in "$ARM" "$X64"; do
+            readelf -l "$so" | grep -q "GNU_RELRO"
+            readelf -d "$so" | grep -Eq "BIND_NOW|FLAGS.*NOW"
+            if readelf -n "$so" | grep -q "Build ID"; then
+              echo "unexpected ELF build-id in $so" >&2
+              exit 1
+            fi
+
+            symbols="$(nm -D --defined-only "$so" | awk '{print $3}')"
+            printf '%s\n' "$symbols"
+            printf '%s\n' "$symbols" | grep -qx "Java_dev_nexora_shield_NativeShield_nativeRuntimeApiVersion"
+            printf '%s\n' "$symbols" | grep -qx "Java_dev_nexora_shield_NativeShield_nativeAbiCode"
+
+            unexpected="$(printf '%s\n' "$symbols" | grep -Ev '^(Java_dev_nexora_shield_NativeShield_nativeRuntimeApiVersion|Java_dev_nexora_shield_NativeShield_nativeAbiCode)$' || true)"
+            if [[ -n "$unexpected" ]]; then
+              echo "unexpected exported symbols in $so:" >&2
+              printf '%s\n' "$unexpected" >&2
+              exit 1
+            fi
+          done
+
+      - name: Verify byte-for-byte reproducibility
+        run: |
+          mkdir -p build/phase-f/reference
+          cp build/phase-f/first/arm64-v8a/libnexora_shield_native.so build/phase-f/reference/arm64.so
+          cp build/phase-f/first/x86_64/libnexora_shield_native.so build/phase-f/reference/x86_64.so
+          sha256sum build/phase-f/reference/arm64.so build/phase-f/reference/x86_64.so
+
+          cargo clean -p nexora-shield-native
+          bash scripts/build-native-android.sh build/phase-f/second
+
+          cmp build/phase-f/reference/arm64.so build/phase-f/second/arm64-v8a/libnexora_shield_native.so
+          cmp build/phase-f/reference/x86_64.so build/phase-f/second/x86_64/libnexora_shield_native.so
