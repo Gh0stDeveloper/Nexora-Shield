@@ -2,11 +2,12 @@
 
 use nexora_shield_diversity::{BuildDiversitySignature, DiversitySurface};
 use nexora_shield_lab::{
-    AuditEvidenceClass, AuditEvidenceItem, AuditPreparation, AuditReadinessInput,
-    AuditRequirement, BenchmarkControl, ComparativeBenchmarkMethodology, ExposureRule, FuzzFarm, ModifiedEnvironmentCase,
-    ModifiedEnvironmentLab, PerformanceBudget, PerformanceFarm, PerformanceSample, PortabilityLab,
-    RegressionCorpus, RegressionCoverage, RuntimeInstrumentationCase, RuntimeInstrumentationLab, SecurityControlResult,
-    SecurityScore, StaticExposureHarness, TamperKind, TamperLab, TamperObservation,
+    AuditEvidenceClass, AuditEvidenceItem, AuditPreparation, AuditReadinessInput, AuditRequirement,
+    BenchmarkControl, ComparativeBenchmarkMethodology, ExposureRule, FuzzFarm,
+    ModifiedEnvironmentCase, ModifiedEnvironmentLab, PerformanceBudget, PerformanceFarm,
+    PerformanceSample, PortabilityLab, RegressionCorpus, RegressionCoverage,
+    RuntimeInstrumentationCase, RuntimeInstrumentationLab, SecurityControlResult, SecurityScore,
+    StaticExposureHarness, TamperKind, TamperLab, TamperObservation,
 };
 use nexora_shield_rasp::{
     CompiledPolicy, EmulatorObservation, HookInjectionObservation, InstrumentationObservation,
@@ -26,7 +27,7 @@ fn m1_static_exposure_harness_detects_synthetic_plaintext() {
         b"opaque-container",
         std::slice::from_ref(&rule),
     )
-        .expect("valid exposure scan");
+    .expect("valid exposure scan");
     let exposed = StaticExposureHarness::scan(
         "unprotected.apk",
         b"prefix-NX_TEST_SECRET_MARKER-suffix",
@@ -176,19 +177,17 @@ fn m8_performance_farm_enforces_runtime_and_size_budgets() {
 
 #[test]
 fn m9_regression_corpus_is_versioned_unique_and_fingerprinted() {
-    let corpus: RegressionCorpus = serde_json::from_str(include_str!(
-        "../../../security-lab/corpus/index.json"
-    ))
-    .expect("corpus JSON");
+    let corpus: RegressionCorpus =
+        serde_json::from_str(include_str!("../../../security-lab/corpus/index.json"))
+            .expect("corpus JSON");
 
     corpus.validate().expect("valid corpus");
     assert!(corpus.cases.len() >= 12);
     assert_ne!(corpus.fingerprint().expect("fingerprint"), [0_u8; 32]);
 
-    let coverage: RegressionCoverage = serde_json::from_str(include_str!(
-        "../../../security-lab/corpus/coverage.json"
-    ))
-    .expect("coverage JSON");
+    let coverage: RegressionCoverage =
+        serde_json::from_str(include_str!("../../../security-lab/corpus/coverage.json"))
+            .expect("coverage JSON");
     coverage
         .validate_against(&corpus)
         .expect("every corpus case has a release gate");
@@ -227,7 +226,9 @@ fn m11_comparative_benchmark_methodology_is_strict_by_default() {
     let methodology = ComparativeBenchmarkMethodology::default();
     methodology.validate().expect("strict methodology");
     assert!(methodology.measured_runs >= 10);
-    assert!(methodology.controls.contains(&BenchmarkControl::RetainRawSamples));
+    assert!(methodology
+        .controls
+        .contains(&BenchmarkControl::RetainRawSamples));
 }
 
 #[test]
@@ -270,7 +271,10 @@ fn m12_external_audit_preparation_rejects_unredacted_confidential_evidence() {
 fn signature(surface_seed: u8, fingerprint_seed: u8) -> BuildDiversitySignature {
     let surfaces = BTreeMap::from([
         (DiversitySurface::Rename, [surface_seed; 32]),
-        (DiversitySurface::PassOrder, [surface_seed.wrapping_add(1); 32]),
+        (
+            DiversitySurface::PassOrder,
+            [surface_seed.wrapping_add(1); 32],
+        ),
         (DiversitySurface::Cfg, [surface_seed.wrapping_add(2); 32]),
         (
             DiversitySurface::IntegrityTopology,
