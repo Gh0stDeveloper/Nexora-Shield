@@ -273,12 +273,28 @@ impl VmHost for MemoryHost {
                 .and_then(|value| value.as_int().ok())
                 .unwrap_or_default();
             Ok(VmValue::Int(value.wrapping_mul(2)))
+        } else if method == 99 {
+            Err(VmException {
+                type_name: Some("LTest/ChildException;".to_owned()),
+                value: VmValue::Ref(99),
+            })
         } else {
             Err(VmException {
                 type_name: Some("LTest/UnknownMethod;".to_owned()),
                 value: VmValue::Null,
             })
         }
+    }
+
+    fn exception_matches(
+        &self,
+        expected: &str,
+        actual: Option<&str>,
+        _constants: &ConstantPool,
+    ) -> bool {
+        actual == Some(expected)
+            || (expected == "LTest/BaseException;"
+                && actual == Some("LTest/ChildException;"))
     }
 }
 
@@ -338,4 +354,42 @@ fn interpreter_step_limit_stops_non_terminating_programs() {
         ExecutionConfig { step_limit: 16 },
     );
     assert_eq!(result, Err(VmError::StepLimitExceeded { limit: 16 }));
+}
+
+
+#[test]
+fn typed_handler_uses_host_assignability_rules() -> Result<(), Box<dyn std::error::Error>> {
+    let mut constants = ConstantPool::default();
+    let fallback = constants.intern(VmConstant::Int(77))?;
+    let method = VmMethod {
+        method_idx: 12,
+        register_count: 2,
+        parameter_registers: Vec::new(),
+        instructions: vec![
+            VmInstruction::Call {
+                dst: None,
+                method: 99,
+                args: Vec::new(),
+            },
+            VmInstruction::ReturnVoid,
+            VmInstruction::LoadConst {
+                dst: VmRegister(0),
+                constant: fallback,
+            },
+            VmInstruction::Return { src: VmRegister(0) },
+        ],
+        constants,
+        handlers: vec![VmExceptionHandler {
+            start: 0,
+            end: 1,
+            target: 2,
+            type_name: Some("LTest/BaseException;".to_owned()),
+            exception_register: Some(VmRegister(1)),
+        }],
+    };
+    let mut host = MemoryHost::default();
+
+    let result = Interpreter::execute(&method, &[], &mut host, ExecutionConfig::default())?;
+    assert_eq!(result.value, VmValue::Int(77));
+    Ok(())
 }
