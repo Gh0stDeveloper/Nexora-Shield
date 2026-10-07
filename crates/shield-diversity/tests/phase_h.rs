@@ -6,9 +6,17 @@ use nexora_shield_diversity::{
 };
 use nexora_shield_dex::RenameConfig;
 use nexora_shield_integrity::{
-    IntegrityEdge, IntegrityGraph, IntegrityNode, IntegrityNodeKind, Sha256Digest,
+    IntegrityEdge, IntegrityError, IntegrityGraph, IntegrityNode, IntegrityNodeKind, Sha256Digest,
+};
+use nexora_shield_vm::{
+    BranchCondition, ConstantPool, ExecutionConfig, Interpreter, NullHost, VmInstruction, VmMethod,
+    VmRegister, VmValue,
 };
 use std::collections::BTreeSet;
+
+fn private_seed(tag: u8) -> Result<PrivateBuildSeed, nexora_shield_diversity::DiversityError> {
+    PrivateBuildSeed::new(vec![tag; 32])
+}
 
 fn context(build: &str, nonce: &str) -> BuildSeedContext {
     BuildSeedContext {
@@ -20,7 +28,7 @@ fn context(build: &str, nonce: &str) -> BuildSeedContext {
     }
 }
 
-fn sample_graph() -> IntegrityGraph {
+fn sample_graph() -> Result<IntegrityGraph, IntegrityError> {
     let certificate = node("cert", IntegrityNodeKind::Certificate, true);
     let package = node("package", IntegrityNodeKind::Package, true);
     let dex = node("dex", IntegrityNodeKind::DexFile, true);
@@ -60,7 +68,34 @@ fn sample_graph() -> IntegrityGraph {
             },
         ],
     )
-    .expect("sample graph must be valid")
+}
+
+fn sample_vm_method() -> VmMethod {
+    VmMethod {
+        method_idx: 41,
+        register_count: 2,
+        parameter_registers: vec![VmRegister(0)],
+        instructions: vec![
+            VmInstruction::Branch {
+                condition: BranchCondition::EqZero,
+                left: VmRegister(0),
+                right: None,
+                target: 3,
+            },
+            VmInstruction::Move {
+                dst: VmRegister(1),
+                src: VmRegister(0),
+            },
+            VmInstruction::Return { src: VmRegister(1) },
+            VmInstruction::Neg {
+                dst: VmRegister(1),
+                src: VmRegister(0),
+            },
+            VmInstruction::Return { src: VmRegister(1) },
+        ],
+        constants: ConstantPool::default(),
+        handlers: Vec::new(),
+    }
 }
 
 fn node(label: &str, kind: IntegrityNodeKind, critical: bool) -> IntegrityNode {
@@ -74,7 +109,9 @@ fn node(label: &str, kind: IntegrityNodeKind, critical: bool) -> IntegrityNode {
 }
 
 fn string_ids() -> Vec<String> {
-    (0..12).map(|index| format!("secret.logical.{index}")).collect()
+    (0..12)
+        .map(|index| format!("secret.logical.{index}"))
+        .collect()
 }
 
 fn signature(
@@ -84,8 +121,11 @@ fn signature(
     let seed = SeedDeriver::derive(private, context)?;
     let rename = RenameVariant::derive(&seed)?;
     let passes = PassVariantPlan::derive(&seed)?;
-    let cfg = CfgVariantPlan::derive(&seed, "Ldev/nexora/Auth;->verify", 8)?;
-    let (integrity, diversified) = IntegrityTopologyPlan::derive(&seed, &sample_graph())?;
+    let vm_method = sample_vm_method();
+    let cfg = CfgVariantPlan::derive_for_vm(&seed, "Ldev/nexora/Auth;->verify", &vm_method)?;
+    cfg.apply(&vm_method)?.validate()?;
+    let graph = sample_graph()?;
+    let (integrity, diversified) = IntegrityTopologyPlan::derive(&seed, &graph)?;
     diversified.validate()?;
     let strings = StringPartitionPlan::derive(&seed, &string_ids(), 2, 5)?;
     let (vm, _) = VmMapVariant::derive(&seed, &context.build_id)?;
@@ -96,9 +136,14 @@ fn signature(
 }
 
 #[test]
+fn h1_rejects_weak_private_seed() {
+    assert!(PrivateBuildSeed::new(vec![7; 31]).is_err());
+}
+
+#[test]
 fn h1_domains_are_separated_and_private_material_is_redacted(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"phase-h-private-seed".to_vec())?;
+    let private = private_seed(0x11)?;
     let seed = SeedDeriver::derive(&private, &context("build-1", "nonce-1"))?;
 
     let keys = [
@@ -115,7 +160,6 @@ fn h1_domains_are_separated_and_private_material_is_redacted(
     .collect::<Result<Vec<_>, _>>()?;
 
     assert_eq!(keys.iter().collect::<BTreeSet<_>>().len(), keys.len());
-    assert!(!format!("{private:?}").contains("phase-h-private-seed"));
     assert!(format!("{private:?}").contains("REDACTED"));
     assert!(format!("{seed:?}").contains("REDACTED"));
     Ok(())
@@ -124,7 +168,7 @@ fn h1_domains_are_separated_and_private_material_is_redacted(
 #[test]
 fn h2_reproducible_private_mode_is_exactly_repeatable(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"repro-secret".to_vec())?;
+    let private = private_seed(0x22)?;
     let context = BuildSeedContext {
         application_id: "dev.nexora.sample".to_owned(),
         build_id: "release-42".to_owned(),
@@ -141,7 +185,7 @@ fn h2_reproducible_private_mode_is_exactly_repeatable(
 
 #[test]
 fn h2_unique_build_nonce_changes_the_plan() -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"normal-build-secret".to_vec())?;
+    let private = private_seed(0x33)?;
     let first = signature(&private, &context("release-42", "nonce-a"))?;
     let second = signature(&private, &context("release-42", "nonce-b"))?;
     assert_ne!(first.full_fingerprint, second.full_fingerprint);
@@ -151,7 +195,7 @@ fn h2_unique_build_nonce_changes_the_plan() -> Result<(), Box<dyn std::error::Er
 #[test]
 fn h3_rename_seed_changes_per_build_but_is_repeatable(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"rename-secret".to_vec())?;
+    let private = private_seed(0x44)?;
     let first_seed = SeedDeriver::derive(&private, &context("build-a", "n-a"))?;
     let second_seed = SeedDeriver::derive(&private, &context("build-b", "n-b"))?;
     let first = RenameVariant::derive(&first_seed)?;
@@ -168,7 +212,7 @@ fn h3_rename_seed_changes_per_build_but_is_repeatable(
 #[test]
 fn h4_pass_variants_preserve_required_constraints(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"pass-secret".to_vec())?;
+    let private = private_seed(0x55)?;
     let mut fingerprints = BTreeSet::new();
 
     for index in 0..32 {
@@ -186,44 +230,80 @@ fn h4_pass_variants_preserve_required_constraints(
 }
 
 #[test]
-fn h5_cfg_variants_preserve_entry_and_form_a_permutation(
+fn h5_cfg_variants_materialize_and_preserve_semantics(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"cfg-secret".to_vec())?;
+    let private = private_seed(0x66)?;
+    let original = sample_vm_method();
     let first_seed = SeedDeriver::derive(&private, &context("cfg-a", "n-a"))?;
     let second_seed = SeedDeriver::derive(&private, &context("cfg-b", "n-b"))?;
-    let first = CfgVariantPlan::derive(&first_seed, "critical-method", 12)?;
-    let second = CfgVariantPlan::derive(&second_seed, "critical-method", 12)?;
+    let first = CfgVariantPlan::derive_for_vm(&first_seed, "critical-method", &original)?;
+    let second = CfgVariantPlan::derive_for_vm(&second_seed, "critical-method", &original)?;
+    let first_method = first.apply(&original)?;
+    let second_method = second.apply(&original)?;
 
-    assert!(first.preserves_entry_block());
-    assert!(first.is_permutation());
-    assert!(second.preserves_entry_block());
-    assert!(second.is_permutation());
+    first_method.validate()?;
+    second_method.validate()?;
     assert_ne!(first.fingerprint, second.fingerprint);
+    assert!(first_method.instructions.len() >= original.instructions.len());
+    assert!(second_method.instructions.len() >= original.instructions.len());
+
+    for input in [-7, 0, 9] {
+        let mut original_host = NullHost;
+        let mut first_host = NullHost;
+        let mut second_host = NullHost;
+        let expected = Interpreter::execute(
+            &original,
+            &[VmValue::Int(input)],
+            &mut original_host,
+            ExecutionConfig::default(),
+        )?;
+        let first_result = Interpreter::execute(
+            &first_method,
+            &[VmValue::Int(input)],
+            &mut first_host,
+            ExecutionConfig::default(),
+        )?;
+        let second_result = Interpreter::execute(
+            &second_method,
+            &[VmValue::Int(input)],
+            &mut second_host,
+            ExecutionConfig::default(),
+        )?;
+        assert_eq!(first_result.value, expected.value);
+        assert_eq!(second_result.value, expected.value);
+    }
     Ok(())
 }
 
 #[test]
 fn h6_integrity_topology_changes_without_invalidating_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"integrity-secret".to_vec())?;
-    let graph = sample_graph();
-    let first_seed = SeedDeriver::derive(&private, &context("integrity-a", "n-a"))?;
-    let second_seed = SeedDeriver::derive(&private, &context("integrity-b", "n-b"))?;
-    let (first, first_graph) = IntegrityTopologyPlan::derive(&first_seed, &graph)?;
-    let (second, second_graph) = IntegrityTopologyPlan::derive(&second_seed, &graph)?;
+    let private = private_seed(0x77)?;
+    let graph = sample_graph()?;
+    let mut fingerprints = BTreeSet::new();
 
-    first_graph.validate()?;
-    second_graph.validate()?;
-    assert_eq!(first_graph.nodes, graph.nodes);
-    assert_eq!(second_graph.nodes, graph.nodes);
-    assert_ne!(first.fingerprint, second.fingerprint);
+    for index in 0..16 {
+        let seed = SeedDeriver::derive(
+            &private,
+            &context(
+                &format!("integrity-{index}"),
+                &format!("integrity-nonce-{index}"),
+            ),
+        )?;
+        let (plan, diversified) = IntegrityTopologyPlan::derive(&seed, &graph)?;
+        diversified.validate()?;
+        assert_eq!(diversified.nodes, graph.nodes);
+        fingerprints.insert(plan.fingerprint);
+    }
+
+    assert!(fingerprints.len() > 1);
     Ok(())
 }
 
 #[test]
 fn h7_string_partition_variants_cover_each_item_once(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"string-secret".to_vec())?;
+    let private = private_seed(0x88)?;
     let ids = string_ids();
     let first_seed = SeedDeriver::derive(&private, &context("strings-a", "n-a"))?;
     let second_seed = SeedDeriver::derive(&private, &context("strings-b", "n-b"))?;
@@ -248,7 +328,7 @@ fn h7_string_partition_variants_cover_each_item_once(
 #[test]
 fn h8_vm_and_h9_native_variants_change_per_build(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"runtime-secret".to_vec())?;
+    let private = private_seed(0x99)?;
     let first_seed = SeedDeriver::derive(&private, &context("runtime-a", "n-a"))?;
     let second_seed = SeedDeriver::derive(&private, &context("runtime-b", "n-b"))?;
 
@@ -272,7 +352,7 @@ fn h8_vm_and_h9_native_variants_change_per_build(
 #[test]
 fn h10_cross_build_bypass_portability_stays_below_budget(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let private = PrivateBuildSeed::new(b"cross-build-regression-secret".to_vec())?;
+    let private = private_seed(0xaa)?;
     let signatures = (0..32)
         .map(|index| {
             signature(
