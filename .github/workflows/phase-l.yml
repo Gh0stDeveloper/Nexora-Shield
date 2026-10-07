@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - main
-      - feat/phase-l-shield-studio\n      - feat/phase-l-uiux-polish
+      - feat/phase-l-shield-studio
+      - feat/phase-l-uiux-polish
+      - feat/phase-m-security-lab
   pull_request:
     branches:
       - main
