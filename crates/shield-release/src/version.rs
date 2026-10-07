@@ -28,12 +28,11 @@ impl ReleaseVersion {
                 ));
             }
             (core, Some(number))
+        } else if value.contains('-') {
+            return Err(ReleaseError::InvalidVersion(
+                "only -rc.N prereleases are supported for 1.0".into(),
+            ));
         } else {
-            if value.contains('-') {
-                return Err(ReleaseError::InvalidVersion(
-                    "only -rc.N prereleases are supported for 1.0".into(),
-                ));
-            }
             (value, None)
         };
 
@@ -92,7 +91,9 @@ impl fmt::Display for ReleaseVersion {
 
 fn parse_component(value: Option<&str>, label: &str) -> Result<u32> {
     value
-        .ok_or_else(|| ReleaseError::InvalidVersion(format!("missing {label} version component")))?
+        .ok_or_else(|| {
+            ReleaseError::InvalidVersion(format!("missing {label} version component"))
+        })?
         .parse::<u32>()
         .map_err(|_| ReleaseError::InvalidVersion(format!("invalid {label} version component")))
 }

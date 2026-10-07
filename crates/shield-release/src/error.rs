@@ -16,9 +16,15 @@ pub enum ReleaseError {
 impl fmt::Display for ReleaseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidApiContract(message) => write!(formatter, "invalid API contract: {message}"),
-            Self::InvalidMigration(message) => write!(formatter, "invalid config migration: {message}"),
-            Self::InvalidVersion(message) => write!(formatter, "invalid release version: {message}"),
+            Self::InvalidApiContract(message) => {
+                write!(formatter, "invalid API contract: {message}")
+            }
+            Self::InvalidMigration(message) => {
+                write!(formatter, "invalid config migration: {message}")
+            }
+            Self::InvalidVersion(message) => {
+                write!(formatter, "invalid release version: {message}")
+            }
             Self::InvalidQualification(message) => {
                 write!(formatter, "invalid release qualification: {message}")
             }

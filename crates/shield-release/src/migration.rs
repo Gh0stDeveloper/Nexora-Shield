@@ -11,9 +11,9 @@ pub struct MigrationOutcome {
 }
 
 pub fn migrate_to_current(mut document: Value) -> Result<MigrationOutcome> {
-    let root = document
-        .as_object_mut()
-        .ok_or_else(|| ReleaseError::InvalidMigration("configuration root must be an object".into()))?;
+    let root = document.as_object_mut().ok_or_else(|| {
+        ReleaseError::InvalidMigration("configuration root must be an object".into())
+    })?;
 
     let declared = root
         .get("schema")
@@ -41,9 +41,9 @@ pub fn migrate_to_current(mut document: Value) -> Result<MigrationOutcome> {
 }
 
 fn migrate_legacy(mut document: Value, source_schema: u32) -> Result<MigrationOutcome> {
-    let root = document
-        .as_object_mut()
-        .ok_or_else(|| ReleaseError::InvalidMigration("configuration root must be an object".into()))?;
+    let root = document.as_object_mut().ok_or_else(|| {
+        ReleaseError::InvalidMigration("configuration root must be an object".into())
+    })?;
 
     if root.contains_key("application") {
         root.insert("schema".into(), Value::from(STABLE_CONFIG_SCHEMA));
@@ -134,7 +134,9 @@ fn valid_application_id(value: &str) -> bool {
     parts.len() >= 2
         && parts.iter().all(|part| {
             let mut chars = part.chars();
-            chars.next().is_some_and(|first| first.is_ascii_alphabetic())
+            chars
+                .next()
+                .is_some_and(|first| first.is_ascii_alphabetic())
                 && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
         })
 }

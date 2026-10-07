@@ -9,10 +9,9 @@ use serde_json::json;
 
 #[test]
 fn n1_api_freeze_contract_is_valid() {
-    let contract: ApiSurface = serde_json::from_str(include_str!(
-        "../../../release/api-surface-v1.json"
-    ))
-    .expect("API contract JSON");
+    let contract: ApiSurface =
+        serde_json::from_str(include_str!("../../../release/api-surface-v1.json"))
+            .expect("API contract JSON");
 
     contract.validate().expect("frozen API contract");
     assert_eq!(contract.contract_version, PUBLIC_API_CONTRACT_VERSION);
@@ -25,10 +24,9 @@ fn n2_schema_one_and_min_sdk_are_stable() {
     assert_eq!(STABLE_CONFIG_SCHEMA, 1);
     assert_eq!(MINIMUM_ANDROID_SDK, 24);
 
-    let active: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../schemas/nexora-shield.schema.json"
-    ))
-    .expect("active schema");
+    let active: serde_json::Value =
+        serde_json::from_str(include_str!("../../../schemas/nexora-shield.schema.json"))
+            .expect("active schema");
     let frozen: serde_json::Value = serde_json::from_str(include_str!(
         "../../../schemas/nexora-shield.schema.v1.json"
     ))
@@ -55,7 +53,9 @@ fn n3_legacy_config_migrates_without_dropping_unrelated_sections() {
     assert_eq!(migrated.document["application"]["id"], "dev.nexora.sample");
     assert_eq!(migrated.document["application"]["minSdk"], 24);
     assert_eq!(migrated.document["profile"], "hardened");
-    assert!(migrated.document["dex"]["rename"].as_bool().unwrap_or(false));
+    assert!(migrated.document["dex"]["rename"]
+        .as_bool()
+        .unwrap_or(false));
 }
 
 #[test]
@@ -88,16 +88,17 @@ fn n6_artifact_digest_is_deterministic() {
 
 #[test]
 fn n11_compatibility_matrix_covers_supported_release_surfaces() {
-    let matrix: CompatibilityMatrix = serde_json::from_str(include_str!(
-        "../../../release/compatibility-matrix.json"
-    ))
-    .expect("compatibility JSON");
+    let matrix: CompatibilityMatrix =
+        serde_json::from_str(include_str!("../../../release/compatibility-matrix.json"))
+            .expect("compatibility JSON");
 
     matrix.validate().expect("compatibility matrix");
     assert!(matrix.android_abis.contains(&"arm64-v8a".to_owned()));
     assert!(matrix.android_abis.contains(&"x86_64".to_owned()));
     assert!(matrix.artifact_types.contains(&"aab".to_owned()));
-    assert!(matrix.desktop_operating_systems.contains(&"windows".to_owned()));
+    assert!(matrix
+        .desktop_operating_systems
+        .contains(&"windows".to_owned()));
 }
 
 #[test]
@@ -116,16 +117,14 @@ fn n12_rc_version_is_explicit_and_stable_version_is_separate() {
 
 #[test]
 fn n13_n14_stable_is_blocked_without_real_external_feedback() {
-    let policy: QualificationPolicy = serde_json::from_str(include_str!(
-        "../../../release/qualification-policy.json"
-    ))
-    .expect("qualification policy");
+    let policy: QualificationPolicy =
+        serde_json::from_str(include_str!("../../../release/qualification-policy.json"))
+            .expect("qualification policy");
     policy.validate().expect("qualification policy");
 
-    let current: FeedbackStatus = serde_json::from_str(include_str!(
-        "../../../release/feedback-status.json"
-    ))
-    .expect("feedback status");
+    let current: FeedbackStatus =
+        serde_json::from_str(include_str!("../../../release/feedback-status.json"))
+            .expect("feedback status");
     assert!(!policy.stable_feedback_satisfied(&current));
 
     let accepted = FeedbackStatus {

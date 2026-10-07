@@ -16,9 +16,7 @@ mod provenance;
 mod qualification;
 mod version;
 
-pub use api::{
-    ApiSurface, MINIMUM_ANDROID_SDK, PUBLIC_API_CONTRACT_VERSION, STABLE_CONFIG_SCHEMA,
-};
+pub use api::{ApiSurface, MINIMUM_ANDROID_SDK, PUBLIC_API_CONTRACT_VERSION, STABLE_CONFIG_SCHEMA};
 pub use compatibility::CompatibilityMatrix;
 pub use error::{ReleaseError, Result};
 pub use migration::{migrate_to_current, MigrationOutcome};

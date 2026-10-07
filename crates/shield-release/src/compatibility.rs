@@ -45,11 +45,7 @@ impl CompatibilityMatrix {
                 "Gradle plugin release requires JDK 17".into(),
             ));
         }
-        require_values(
-            "Android ABI",
-            &self.android_abis,
-            &["arm64-v8a", "x86_64"],
-        )?;
+        require_values("Android ABI", &self.android_abis, &["arm64-v8a", "x86_64"])?;
         require_values(
             "artifact type",
             &self.artifact_types,

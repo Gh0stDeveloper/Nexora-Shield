@@ -42,10 +42,7 @@ impl QualificationPolicy {
         validate_gate_list("RC", &self.required_rc_gates)?;
         validate_gate_list("stable", &self.required_stable_gates)?;
 
-        let stable = self
-            .required_stable_gates
-            .iter()
-            .collect::<BTreeSet<_>>();
+        let stable = self.required_stable_gates.iter().collect::<BTreeSet<_>>();
         for gate in &self.required_rc_gates {
             if !stable.contains(gate) {
                 return Err(ReleaseError::InvalidQualification(format!(

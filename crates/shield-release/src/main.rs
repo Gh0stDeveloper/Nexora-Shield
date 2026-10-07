@@ -72,7 +72,8 @@ fn run_migration(args: &[String]) -> Result<(), String> {
         serde_json::from_slice(&std::fs::read(&input).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
     let migration = migrate_to_current(document).map_err(|error| error.to_string())?;
-    let encoded = serde_json::to_vec_pretty(&migration.document).map_err(|error| error.to_string())?;
+    let encoded =
+        serde_json::to_vec_pretty(&migration.document).map_err(|error| error.to_string())?;
     output
         .parent()
         .map(std::fs::create_dir_all)
