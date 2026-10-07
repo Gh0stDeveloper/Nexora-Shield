@@ -101,3 +101,22 @@ Confidential evidence cannot be exported as audit-ready unless it is explicitly 
 Every confirmed security bypass must become a regression-corpus case and a repeatable gate before the associated remediation is considered complete.
 
 Phase M is complete only when M.1–M.12 are implemented, the real repackage/re-sign integration tests pass, Rust 1.81 remains supported, Phase L/K regressions remain green, and the repository CI has no failures.
+
+
+## Closure status
+
+**COMPLETED**
+
+Validated implementation head: `f09e950c8269688e085e104f62531427fe58b736`.
+
+Final validation:
+- Phase M #47 (`37639187441`): **success** — 6/6 jobs.
+- Rust 1.81 MSRV: **success**.
+- Real M.2/M.3 repack and re-sign rejection: **success**.
+- Phase H/M.6 cross-build portability regression: **success**.
+- Phase L Studio regression: **success**.
+- Phase K package-model regression: **success**.
+- CI #1006 (`37639187513`): **success** — 24/24 jobs.
+- Failed jobs: **0**.
+
+Phase M exit criterion is satisfied: known bypass classes are represented in the versioned corpus and the validated gates execute on release CI.
