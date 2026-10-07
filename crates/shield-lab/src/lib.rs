@@ -31,7 +31,10 @@ pub use audit::{
     AuditReadinessReport, AuditRequirement,
 };
 pub use benchmark::{BenchmarkControl, ComparativeBenchmarkMethodology};
-pub use corpus::{RegressionCase, RegressionCategory, RegressionCorpus};
+pub use corpus::{
+    RegressionCase, RegressionCategory, RegressionCorpus, RegressionCoverage,
+    RegressionCoverageEntry,
+};
 pub use environment::{
     ModifiedEnvironmentCase, ModifiedEnvironmentLab, ModifiedEnvironmentReport,
     ModifiedEnvironmentResult,
