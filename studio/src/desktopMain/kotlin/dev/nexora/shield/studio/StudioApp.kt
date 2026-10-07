@@ -78,8 +78,8 @@ fun StudioApp(state: StudioState = remember { StudioState() }) {
         color = ShieldColors.Background,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val compactNavigation = maxWidth < 1180.dp
-            val compactContent = maxWidth < 1080.dp
+            val compactNavigation = StudioLayoutPolicy.useCompactNavigation(maxWidth.value)
+            val compactContent = StudioLayoutPolicy.useCompactContent(maxWidth.value)
 
             Row(Modifier.fillMaxSize()) {
                 StudioNavigation(
