@@ -26,6 +26,11 @@ android {
 }
 
 nexoraShield {
+    enabled.set(
+        providers.gradleProperty("nexoraShieldEnabled")
+            .map(String::toBoolean)
+            .orElse(true),
+    )
     cliExecutable.set(
         providers.environmentVariable("NEXORA_SHIELD_CLI").orElse("nexora-shield"),
     )
