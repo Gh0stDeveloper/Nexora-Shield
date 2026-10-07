@@ -153,13 +153,13 @@ impl VmMethod {
                 VmInstruction::LoadConst { constant, .. } => {
                     self.constants.get(*constant)?;
                 }
-                VmInstruction::Jump { target } | VmInstruction::Branch { target, .. } => {
-                    if *target >= self.instructions.len() {
-                        return Err(VmError::InvalidJump {
-                            from: pc,
-                            target: *target,
-                        });
-                    }
+                VmInstruction::Jump { target } | VmInstruction::Branch { target, .. }
+                    if *target >= self.instructions.len() =>
+                {
+                    return Err(VmError::InvalidJump {
+                        from: pc,
+                        target: *target,
+                    });
                 }
                 _ => {}
             }
