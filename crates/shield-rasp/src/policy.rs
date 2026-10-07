@@ -101,10 +101,7 @@ impl CompiledPolicy {
 pub enum PolicyError {
     InvalidThresholdOrder,
     MissingResponse(RiskLevel),
-    NonMonotonicResponse {
-        lower: RiskLevel,
-        higher: RiskLevel,
-    },
+    NonMonotonicResponse { lower: RiskLevel, higher: RiskLevel },
 }
 
 impl fmt::Display for PolicyError {
