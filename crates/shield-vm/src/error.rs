@@ -13,6 +13,7 @@ pub enum VmError {
     InvalidJump { from: usize, target: usize },
     InvalidHandler { target: usize },
     InvalidValueType(&'static str),
+    ArgumentCount { expected: usize, actual: usize },
     DivisionByZero,
     Host(String),
     UnhandledException { type_name: Option<String> },
@@ -45,6 +46,9 @@ impl fmt::Display for VmError {
             }
             Self::InvalidValueType(expected) => {
                 write!(formatter, "VM value does not match expected type {expected}")
+            }
+            Self::ArgumentCount { expected, actual } => {
+                write!(formatter, "VM expected {expected} arguments but received {actual}")
             }
             Self::DivisionByZero => formatter.write_str("VM integer division by zero"),
             Self::Host(message) => write!(formatter, "VM host error: {message}"),
