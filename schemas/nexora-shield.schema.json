@@ -35,7 +35,33 @@
       "properties": {
         "diversity": { "type": "boolean" },
         "reproducible": { "type": "boolean" },
-        "seedRef": { "type": "string", "minLength": 1 }
+        "seedRef": { "type": "string", "minLength": 1 },
+        "diversityMode": {
+          "type": "string",
+          "enum": ["unique_build", "reproducible_private"]
+        },
+        "buildNonceRef": { "type": "string", "minLength": 1 },
+        "reproductionId": { "type": "string", "minLength": 1 },
+        "renameDiversity": { "type": "boolean" },
+        "passVariants": { "type": "boolean" },
+        "cfgVariants": { "type": "boolean" },
+        "integrityTopologyVariants": { "type": "boolean" },
+        "stringPartitions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "max": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "vmMapVariants": { "type": "boolean" },
+        "nativeGeneratedConstants": { "type": "boolean" },
+        "maxCrossBuildTransferBasisPoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
       }
     },
     "selectors": {
