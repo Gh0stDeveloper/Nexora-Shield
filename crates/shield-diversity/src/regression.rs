@@ -59,7 +59,10 @@ impl BuildDiversitySignature {
         self.surfaces
             .iter()
             .filter(|(surface, fingerprint)| {
-                other.surfaces.get(surface).is_some_and(|other| other == *fingerprint)
+                other
+                    .surfaces
+                    .get(surface)
+                    .is_some_and(|other| other == *fingerprint)
             })
             .count()
     }
