@@ -254,9 +254,10 @@ impl<'a> BytecodeReader<'a> {
     }
 
     fn take<const N: usize>(&mut self) -> Result<[u8; N]> {
-        let end = self.position.checked_add(N).ok_or_else(|| {
-            VmError::MalformedBytecode("bytecode offset overflow".to_owned())
-        })?;
+        let end = self
+            .position
+            .checked_add(N)
+            .ok_or_else(|| VmError::MalformedBytecode("bytecode offset overflow".to_owned()))?;
         let slice = self
             .bytes
             .get(self.position..end)
@@ -316,11 +317,9 @@ fn encode_operands(writer: &mut BytecodeWriter, instruction: &VmInstruction) -> 
         VmInstruction::Call { dst, method, args } => {
             writer.optional_register(*dst);
             writer.u32(*method);
-            writer.u16(
-                u16::try_from(args.len()).map_err(|_| {
-                    VmError::MalformedBytecode("call argument count exceeds u16".to_owned())
-                })?,
-            );
+            writer.u16(u16::try_from(args.len()).map_err(|_| {
+                VmError::MalformedBytecode("call argument count exceeds u16".to_owned())
+            })?);
             for argument in args {
                 writer.register(*argument);
             }
@@ -496,17 +495,9 @@ fn allocation_selector(build_id: &str, seed: &[u8], index: usize) -> u16 {
             .to_le_bytes(),
     );
     hasher.update(build_id.as_bytes());
-    hasher.update(
-        u64::try_from(seed.len())
-            .unwrap_or(u64::MAX)
-            .to_le_bytes(),
-    );
+    hasher.update(u64::try_from(seed.len()).unwrap_or(u64::MAX).to_le_bytes());
     hasher.update(seed);
-    hasher.update(
-        u64::try_from(index)
-            .unwrap_or(u64::MAX)
-            .to_le_bytes(),
-    );
+    hasher.update(u64::try_from(index).unwrap_or(u64::MAX).to_le_bytes());
     let digest = hasher.finalize();
     u16::from_le_bytes([digest[0], digest[1]])
 }
