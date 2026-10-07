@@ -261,6 +261,8 @@ Estado actual: **COMPLETADA**. I.1–I.10 están implementadas en `nexora-shield
 Criterio:
 - una app Android puede activar Nexora Shield sin pipeline manual.
 
+Estado actual: **COMPLETADA**. J.1–J.10 están implementadas: plugin Gradle application-only basado en AGP 9.4.1 Variant API, transformación `SingleArtifact.APK` mediante `toTransformMany`, defaults release-only, schema estricto, proveedores de secretos, reportes por variante, mapping/retrace, estrategia de build cache, ejemplo CI y app Android de integración. GitHub Actions run #760 (`37581846372`) pasó los 24 jobs, incluyendo el `assembleRelease` real con APK protegido y las regresiones A–I.
+
 ---
 
 ## Fase K — AAB / AAR / Splits

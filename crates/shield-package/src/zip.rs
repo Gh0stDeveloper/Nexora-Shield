@@ -542,7 +542,17 @@ fn filter_extra_fields(extra: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(extra.len());
 
     while cursor < extra.len() {
-        ensure_len(&extra[cursor..], 4, "ZIP extra field header")?;
+        let remaining = &extra[cursor..];
+
+        // Android Zipflinger may use raw zero bytes in the local extra area
+        // purely as alignment padding. They are not ZIP extra-field TLVs.
+        // Accept and strip only an all-zero suffix; malformed non-zero
+        // trailing bytes remain a hard error.
+        if remaining.iter().all(|byte| *byte == 0) {
+            break;
+        }
+
+        ensure_len(remaining, 4, "ZIP extra field header")?;
         let identifier = read_u16_at(extra, cursor)?;
         let size = usize::from(read_u16_at(extra, cursor + 2)?);
         let end = cursor
@@ -646,7 +656,7 @@ fn write_u32(writer: &mut File, value: u32) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_legacy_signature_entry, validate_entry_name};
+    use super::{filter_extra_fields, is_legacy_signature_entry, validate_entry_name};
 
     #[test]
     fn signature_entries_are_detected_case_insensitively() {
@@ -664,5 +674,32 @@ mod tests {
         assert!(validate_entry_name("/classes.dex").is_err());
         assert!(validate_entry_name("dir\\classes.dex").is_err());
         assert!(validate_entry_name("classes.dex").is_ok());
+    }
+
+    #[test]
+    fn raw_zero_alignment_padding_is_accepted_and_removed() -> super::Result<()> {
+        assert_eq!(filter_extra_fields(&[0_u8; 1])?, Vec::<u8>::new());
+        assert_eq!(filter_extra_fields(&[0_u8; 7])?, Vec::<u8>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn structured_fields_can_be_followed_by_raw_zero_padding() -> super::Result<()> {
+        let extra = [
+            0x34, 0x12, // id 0x1234
+            0x02, 0x00, // payload size 2
+            0xaa, 0xbb, // payload
+            0x00, 0x00, 0x00, // Zipflinger alignment padding
+        ];
+        assert_eq!(
+            filter_extra_fields(&extra)?,
+            vec![0x34, 0x12, 0x02, 0x00, 0xaa, 0xbb]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn non_zero_truncated_extra_data_is_rejected() {
+        assert!(filter_extra_fields(&[0x01, 0x02, 0x03]).is_err());
     }
 }

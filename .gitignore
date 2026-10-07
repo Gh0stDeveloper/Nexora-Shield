@@ -30,6 +30,8 @@ Thumbs.db
 
 # Generated reports / samples
 /build/
+**/build/
+**/.gradle/
 dist/
 out/
 coverage/
