@@ -11,8 +11,7 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 ![Rust](https://img.shields.io/badge/Rust-1.81%2B-000000?style=flat-square&logo=rust&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-Application_Security-3DDC84?style=flat-square&logo=android&logoColor=white)
 
-![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
-![C++](https://img.shields.io/badge/C%2B%2B-Native_Hardening-00599C?style=flat-square&logo=cplusplus&logoColor=white)
+![Cargo](https://img.shields.io/badge/Cargo-Workspace-000000?style=flat-square&logo=rust&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 ![Security](https://img.shields.io/badge/Security-Defense_in_Depth-111827?style=flat-square)
 
