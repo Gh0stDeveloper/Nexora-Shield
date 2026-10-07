@@ -1,0 +1,19 @@
+[target.aarch64-linux-android]
+rustflags = [
+    "-C", "relocation-model=pic",
+    "-C", "strip=symbols",
+    "-C", "link-arg=-Wl,-z,relro,-z,now",
+    "-C", "link-arg=-Wl,--gc-sections",
+    "-C", "link-arg=-Wl,--exclude-libs,ALL",
+    "-C", "link-arg=-Wl,--build-id=none",
+]
+
+[target.x86_64-linux-android]
+rustflags = [
+    "-C", "relocation-model=pic",
+    "-C", "strip=symbols",
+    "-C", "link-arg=-Wl,-z,relro,-z,now",
+    "-C", "link-arg=-Wl,--gc-sections",
+    "-C", "link-arg=-Wl,--exclude-libs,ALL",
+    "-C", "link-arg=-Wl,--build-id=none",
+]
