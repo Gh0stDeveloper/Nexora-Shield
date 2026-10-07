@@ -6,7 +6,6 @@ use nexora_shield_release::{
     PUBLIC_API_CONTRACT_VERSION, STABLE_CONFIG_SCHEMA,
 };
 use serde_json::json;
-use std::path::PathBuf;
 
 #[test]
 fn n1_api_freeze_contract_is_valid() {
@@ -56,7 +55,7 @@ fn n3_legacy_config_migrates_without_dropping_unrelated_sections() {
     assert_eq!(migrated.document["application"]["id"], "dev.nexora.sample");
     assert_eq!(migrated.document["application"]["minSdk"], 24);
     assert_eq!(migrated.document["profile"], "hardened");
-    assert_eq!(migrated.document["dex"]["rename"], true);
+    assert!(migrated.document["dex"]["rename"].as_bool().unwrap_or(false));
 }
 
 #[test]
