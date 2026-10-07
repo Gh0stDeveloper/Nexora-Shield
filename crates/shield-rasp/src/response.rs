@@ -1,4 +1,4 @@
-use crate::policy::CompiledPolicy;
+use crate::policy::{CompiledPolicy, PolicyMode};
 use crate::risk::{RiskAssessment, RiskLevel};
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,9 @@ pub enum RaspResponse {
 pub struct ResponseDecision {
     pub risk_level: RiskLevel,
     pub score: u32,
-    pub response: RaspResponse,
+    pub configured_response: RaspResponse,
+    pub effective_response: RaspResponse,
+    pub policy_mode: PolicyMode,
     pub signals_evaluated: usize,
 }
 
@@ -25,10 +27,18 @@ pub struct ResponseEngine;
 impl ResponseEngine {
     #[must_use]
     pub fn decide(policy: &CompiledPolicy, assessment: &RiskAssessment) -> ResponseDecision {
+        let configured_response = policy.response_for(assessment.level);
+        let effective_response = match policy.mode() {
+            PolicyMode::Enforce => configured_response,
+            PolicyMode::ReportOnly => configured_response.min(RaspResponse::Report),
+        };
+
         ResponseDecision {
             risk_level: assessment.level,
             score: assessment.score,
-            response: policy.response_for(assessment.level),
+            configured_response,
+            effective_response,
+            policy_mode: policy.mode(),
             signals_evaluated: assessment.signals_evaluated,
         }
     }
