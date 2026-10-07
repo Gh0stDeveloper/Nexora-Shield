@@ -1,4 +1,4 @@
-use nexora_shield_dex::{DexFile, IrMethod};
+use nexora_shield_dex::{DexFile, IrMethod, RegisterType, TypeAnalyzer};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -36,7 +36,9 @@ pub enum EligibilityReason {
     WideMoveResultUnsupported { offset: u32 },
     OrphanMoveResult { offset: u32 },
     OrphanMoveException { offset: u32 },
+    WideValueUnsupported { block_start: u32 },
     MalformedIr(String),
+    TypeAnalysisFailed(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -152,6 +154,23 @@ impl EligibilityAnalyzer {
 
         if let Err(error) = IrMethod::build(dex, method_idx) {
             reasons.push(EligibilityReason::MalformedIr(error.to_string()));
+        }
+
+        match TypeAnalyzer::analyze(dex, method_idx) {
+            Ok(analysis) => {
+                if let Some(block) = analysis.blocks.iter().find(|block| {
+                    block
+                        .entry
+                        .iter()
+                        .chain(block.exit.iter())
+                        .any(|kind| *kind == RegisterType::Wide)
+                }) {
+                    reasons.push(EligibilityReason::WideValueUnsupported {
+                        block_start: block.block_start,
+                    });
+                }
+            }
+            Err(error) => reasons.push(EligibilityReason::TypeAnalysisFailed(error.to_string())),
         }
 
         let mut features = BTreeSet::new();
