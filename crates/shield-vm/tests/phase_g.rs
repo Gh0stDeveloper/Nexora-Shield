@@ -46,8 +46,12 @@ fn lowering_and_interpreter_preserve_add_semantics() -> Result<(), Box<dyn std::
 
     for left in [-2_147_483_648_i32, -100, -1, 0, 1, 99, 2_147_483_647] {
         for right in [-100_i32, -1, 0, 1, 100] {
-            let result = Interpreter::execute(
+            let allocation = OpcodeAllocation::derive("execute-build", b"execute-seed")?;
+            let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
+            let result = Interpreter::execute_stream(
                 &method,
+                &stream,
+                &allocation,
                 &[VmValue::Int(left), VmValue::Int(right)],
                 &mut host,
                 ExecutionConfig::default(),
@@ -69,6 +73,8 @@ fn opcode_allocation_changes_per_build_without_changing_semantics(
 
     assert_ne!(first.fingerprint(), second.fingerprint());
     assert_ne!(first_stream, second_stream);
+    assert_eq!(first_stream.decode(&first)?, method.instructions);
+    assert_eq!(second_stream.decode(&second)?, method.instructions);
     assert_eq!(
         first_stream.semantics(&first)?,
         second_stream.semantics(&second)?
@@ -82,11 +88,27 @@ fn metadata_seal_rejects_tampering() -> Result<(), Box<dyn std::error::Error>> {
     let allocation = OpcodeAllocation::derive("seal-build", b"seed")?;
     let metadata = nexora_shield_vm::VmMetadata::from_method(&method, &allocation)?;
     let sealed = MetadataSealer::seal(&metadata, b"metadata-key")?;
-    assert_eq!(MetadataSealer::verify(&sealed, b"metadata-key")?, metadata);
+    let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
+    assert_eq!(
+        MetadataSealer::verify_program(&sealed, b"metadata-key", &stream, &allocation)?,
+        metadata
+    );
 
-    let mut tampered = sealed;
-    tampered.payload[0] ^= 1;
-    assert!(MetadataSealer::verify(&tampered, b"metadata-key").is_err());
+    let mut tampered_metadata = sealed.clone();
+    tampered_metadata.payload[0] ^= 1;
+    assert!(MetadataSealer::verify(&tampered_metadata, b"metadata-key").is_err());
+
+    let mut tampered_stream = stream;
+    tampered_stream.bytes[0] ^= 1;
+    assert_eq!(
+        MetadataSealer::verify_program(
+            &sealed,
+            b"metadata-key",
+            &tampered_stream,
+            &allocation
+        ),
+        Err(VmError::BytecodeDigestMismatch)
+    );
     Ok(())
 }
 
