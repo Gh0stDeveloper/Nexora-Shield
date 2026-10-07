@@ -33,13 +33,32 @@
 - [x] Independent-cause tests
 
 ## E.5 Modified-system evidence
-- [ ] Pending
+- [x] Bootloader-state evidence
+- [x] Verified-boot evidence
+- [x] SELinux-state evidence
+- [x] Writable-system evidence
+- [x] Root-management artifact evidence
+- [x] Privileged-binary artifact evidence
+- [x] Clean-observation test
 
 ## E.6 Emulator evidence
-- [ ] Pending
+- [x] Generic-build weak evidence
+- [x] Emulator device-profile evidence
+- [x] QEMU transport evidence
+- [x] Hypervisor artifact evidence
+- [x] Sparse-sensor weak evidence
+- [x] Missing-telephony weak evidence
+- [x] Weak/strong separation tests
+- [x] Clean-observation test
 
 ## E.7 Integrity evidence fusion
-- [ ] Pending
+- [x] Phase D verdict adapter
+- [x] Clean-verdict path
+- [x] Independent failure preservation
+- [x] Severity translation
+- [x] Missing-evidence handling
+- [x] Integrity source attribution
+- [x] No digest leakage into RASP details
 
 ## E.8 Risk Engine
 - [ ] Pending
@@ -58,4 +77,4 @@
 
 ## Closure state
 
-Phase E is **IN PROGRESS**. Part 1 implements E.1–E.4 only. The phase must not be marked complete until E.5–E.12, full CI, documentation and the final false-positive acceptance gate are complete.
+Phase E is **IN PROGRESS**. E.1–E.7 are implemented. The phase must not be marked complete until E.8–E.12, full CI, documentation and the final false-positive acceptance gate are complete.
