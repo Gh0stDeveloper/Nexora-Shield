@@ -24,6 +24,7 @@ fn wrong_metadata_key_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
         handler_count: 1,
         constant_pool_digest: [3; 32],
         opcode_fingerprint: allocation.fingerprint(),
+        bytecode_digest: [4; 32],
     };
     let sealed = MetadataSealer::seal(&metadata, b"key-a")?;
     assert!(MetadataSealer::verify(&sealed, b"key-b").is_err());
