@@ -430,3 +430,25 @@ fn typed_handler_uses_host_assignability_rules() -> Result<(), Box<dyn std::erro
     assert_eq!(result.value, VmValue::Int(77));
     Ok(())
 }
+
+
+#[test]
+fn sealed_execution_debug_redacts_key() -> Result<(), Box<dyn std::error::Error>> {
+    let method = DexLowerer::lower(&add_dex(), 0, EligibilityPolicy::default())?;
+    let allocation = OpcodeAllocation::derive("debug-redaction", b"seed")?;
+    let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
+    let metadata = nexora_shield_vm::VmMetadata::from_method(&method, &allocation)?;
+    let sealed = MetadataSealer::seal(&metadata, b"super-secret-vm-key")?;
+    let protected = SealedExecution::new(
+        &method,
+        &stream,
+        &allocation,
+        &sealed,
+        b"super-secret-vm-key",
+    );
+
+    let debug = format!("{protected:?}");
+    assert!(debug.contains("[redacted]"));
+    assert!(!debug.contains("super-secret-vm-key"));
+    Ok(())
+}
