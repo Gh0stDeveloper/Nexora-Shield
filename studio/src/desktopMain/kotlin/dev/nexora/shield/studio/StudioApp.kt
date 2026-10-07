@@ -32,8 +32,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -235,35 +233,53 @@ private fun NavigationGroup(
             )
         }
 
-        NavigationRail(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = ShieldColors.SurfaceMuted,
-        ) {
-            items.forEach { item ->
-                NavigationRailItem(
-                    selected = item == selected,
-                    onClick = { onSelect(item) },
-                    icon = {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.title,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    label = if (compact) {
-                        null
+        items.forEach { item ->
+            val active = item == selected
+            Surface(
+                onClick = { onSelect(item) },
+                modifier = Modifier.fillMaxWidth(),
+                color = if (active) {
+                    ShieldColors.Primary.copy(alpha = 0.12f)
+                } else {
+                    ShieldColors.SurfaceMuted
+                },
+                contentColor = if (active) {
+                    ShieldColors.PrimaryStrong
+                } else {
+                    ShieldColors.TextSecondary
+                },
+                shape = RoundedCornerShape(11.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = if (compact) 0.dp else 12.dp,
+                            vertical = 10.dp,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (compact) {
+                        Arrangement.Center
                     } else {
-                        {
-                            Text(
-                                item.title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        Arrangement.spacedBy(11.dp)
                     },
-                    alwaysShowLabel = !compact,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                ) {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.title,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    if (!compact) {
+                        Text(
+                            item.title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
