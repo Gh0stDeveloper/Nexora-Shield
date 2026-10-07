@@ -236,8 +236,34 @@ jobs:
             -PnexoraShieldEnabled=true \
             --no-daemon --stacktrace
           PROTECTED="$(find samples/gradle-plugin/basic-app/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          REPORT="$(find samples/gradle-plugin/basic-app/app/build/reports/nexora-shield/release -type f -name '*.json' ! -name 'variant-summary.json' | head -n 1)"
           test -f "$PROTECTED"
+          test -f "$REPORT"
           cp "$PROTECTED" build/phase-n/android-perf/protected-unsigned.apk
+          cp "$REPORT" build/phase-n/android-perf/protected-public-report.json
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          apk = Path("build/phase-n/android-perf/protected-unsigned.apk")
+          report = json.loads(
+              Path("build/phase-n/android-perf/protected-public-report.json").read_text()
+          )
+          digest = hashlib.sha256(apk.read_bytes()).hexdigest()
+          if digest != report["output_sha256"]:
+              raise SystemExit(
+                  "protected APK does not match Nexora Shield public report output_sha256"
+              )
+          if report["input_sha256"] == report["output_sha256"]:
+              raise SystemExit(
+                  "Nexora Shield protected output is byte-identical to its input"
+              )
+          print(
+              "Protected artifact identity: OK | "
+              f"input={report['input_sha256'][:12]} output={report['output_sha256'][:12]}"
+          )
+          PY
 
       - name: Create common benchmark signing key
         run: |
@@ -410,6 +436,7 @@ jobs:
             build/phase-n/android-perf/baseline.json
             build/phase-n/android-perf/protected.json
             build/phase-n/android-perf/comparison.json
+            build/phase-n/android-perf/protected-public-report.json
             build/phase-n/android-perf/emulator.log
             build/phase-n/android-perf/avd-list.txt
           if-no-files-found: warn
