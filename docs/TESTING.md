@@ -264,3 +264,26 @@ Cada CI release guarda:
 - shield version.
 
 Material privado se almacena en un canal separado.
+
+
+## Phase H — Cross-build diversification
+
+Phase H adds deterministic cross-build regression tests over 32 build contexts.
+
+The corpus verifies:
+
+- private seed/debug redaction;
+- exact reproducible-private rebuilds;
+- unique-build nonce divergence;
+- rename-seed diversity;
+- constrained pass-order diversity;
+- CFG permutation invariants;
+- valid but different integrity graph topologies;
+- complete non-empty string partitioning;
+- VM opcode-map diversity;
+- native generated-constant diversity;
+- pairwise bypass-portability metrics.
+
+The acceptance gate requires every full build fingerprint to be unique and the maximum shared-surface ratio between any two builds to remain at or below 3000 basis points.
+
+A failed portability gate blocks Phase H closure.
