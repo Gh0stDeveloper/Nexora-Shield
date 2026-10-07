@@ -151,7 +151,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test release crate on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-release --all-targets

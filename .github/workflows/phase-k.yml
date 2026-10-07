@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@1.81.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - name: Test Phase K on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-package --test phase_k
 

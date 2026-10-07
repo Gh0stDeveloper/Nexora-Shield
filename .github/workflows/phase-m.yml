@@ -68,7 +68,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test Security Lab on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-lab --all-targets
@@ -221,7 +221,7 @@ jobs:
         run: cargo clippy --locked -p nexora-shield-package -p nexora-shield --all-targets -- -D warnings
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Verify Phase K package models on MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-package --test phase_k
