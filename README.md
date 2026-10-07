@@ -7,7 +7,7 @@
 A modular Android hardening platform designed to raise the cost of reverse engineering, tampering, repackaging, runtime instrumentation, and extraction of sensitive application logic.
 
 [![CI](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml)
-![Phase](https://img.shields.io/badge/Phase_J-Gradle_Plugin_complete-22c55e?style=flat-square)
+![Phase](https://img.shields.io/badge/Phase_N-1.0_RC_hardening-f59e0b?style=flat-square)
 ![Rust](https://img.shields.io/badge/Rust-1.81%2B-000000?style=flat-square&logo=rust&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-Application_Security-3DDC84?style=flat-square&logo=android&logoColor=white)
 
@@ -15,7 +15,7 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 ![Security](https://img.shields.io/badge/Security-Defense_in_Depth-111827?style=flat-square)
 
-[Vision](docs/VISION.md) · [Architecture](docs/ARCHITECTURE.md) · [Threat Model](docs/THREAT-MODEL.md) · [Security Design](docs/SECURITY-DESIGN.md) · [Configuration](docs/CONFIGURATION.md) · [Testing](docs/TESTING.md) · [Roadmap](docs/ROADMAP.md) · [Security Policy](SECURITY.md)
+[Vision](docs/VISION.md) · [Architecture](docs/ARCHITECTURE.md) · [Threat Model](docs/THREAT-MODEL.md) · [Security Design](docs/SECURITY-DESIGN.md) · [Configuration](docs/CONFIGURATION.md) · [Testing](docs/TESTING.md) · [API Stability](docs/API-STABILITY.md) · [Release Process](docs/RELEASE-PROCESS.md) · [Roadmap](docs/ROADMAP.md) · [Security Policy](SECURITY.md)
 
 </div>
 
@@ -27,11 +27,11 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 
 Its goal is not to claim that protected software is "unbreakable". Software executing on an attacker-controlled device can ultimately be inspected. The objective is to make analysis and modification substantially more expensive, reduce reusable bypasses, detect defined integrity violations, and keep defensive behavior measurable through repeatable tests.
 
-The current stable implementation covers the protection pipeline through **Phase J — Gradle Plugin**.
+The current **1.0 release candidate line** covers the protection platform through **Phase M — Security Lab**. Phase N is the production-hardening and release-qualification stage.
 
 | Area | Current state |
 | --- | --- |
-| Workspace version | **0.1.0** |
+| Workspace version | **1.0.0-rc.1** |
 | Rust MSRV | **1.81** |
 | Foundation | Completed |
 | APK packaging pipeline | Completed |
@@ -44,7 +44,11 @@ The current stable implementation covers the protection pipeline through **Phase
 | Per-Build Diversification | Completed |
 | Attestation & Remote Policy | Completed |
 | Gradle Plugin | Completed |
-| Next milestone | **Phase K — AAB / AAR / Splits** |
+| AAB / AAR / Splits | Completed |
+| Shield Studio | Completed |
+| Security Lab | Completed |
+| Production hardening | **1.0 RC qualification** |
+| Stable 1.0 | Blocked pending external RC feedback + device performance evidence |
 
 ## Implemented Protection Layers
 
@@ -149,7 +153,7 @@ flowchart TD
     OUTPUT --> REPORT["Security build report"]
 ```
 
-The architecture is intentionally modular so that future native hardening, VM protection, diversification, attestation, and Gradle integration can evolve independently.
+The architecture is intentionally modular so packaging, DEX, data protection, integrity, RASP, native hardening, VM protection, diversification, attestation, Gradle integration, Shield Studio and Security Lab can evolve without duplicating protection semantics.
 
 ## Rust Workspace
 
@@ -163,9 +167,15 @@ The current workspace contains:
 | `shield-crypto` | Cryptographic containers, derivation, and protected data |
 | `shield-integrity` | Certificate/package/content integrity and Integrity Graph |
 | `shield-rasp` | Runtime signals, risk scoring, policy compilation, and responses |
+| `shield-native` | Native runtime helpers and Android ABI hardening |
+| `shield-vm` | Selective VM Shield and execution model |
+| `shield-diversity` | Per-build diversification and portability regression |
+| `shield-attestation` | Optional attestation and remote-policy contracts |
+| `shield-lab` | Security Lab corpus, fuzz, tamper and release regressions |
+| `shield-release` | 1.0 API/schema/release qualification contracts |
 | `shield-cli` | Command-line interface |
 
-Future roadmap components such as Native Shield, VM Shield, the Gradle Plugin, and Shield Studio are tracked separately and are **not presented as completed features**.
+The Gradle Plugin and Shield Studio remain separate JVM/Compose projects that consume the same protection contracts.
 
 ## Security Principles
 
