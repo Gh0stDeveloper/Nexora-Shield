@@ -412,7 +412,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test crypto crate on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-crypto --all-targets
@@ -647,7 +647,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test integrity crate on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-integrity --all-targets
@@ -687,7 +687,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test RASP evidence crate on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-rasp --all-targets
@@ -730,7 +730,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test native runtime on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-native --all-targets
@@ -854,7 +854,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test VM Shield on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-vm --all-targets
@@ -908,7 +908,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test diversification engine on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-diversity --all-targets
@@ -959,7 +959,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Rust 1.81
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.120.0
 
       - name: Test attestation engine on declared MSRV
         run: cargo +1.81.0 test --locked -p nexora-shield-attestation --all-targets
