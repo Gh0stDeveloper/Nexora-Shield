@@ -37,6 +37,83 @@ pub struct RegressionCorpus {
     pub cases: Vec<RegressionCase>,
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegressionCoverageEntry {
+    pub case_id: String,
+    pub gate: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegressionCoverage {
+    pub schema: u32,
+    pub entries: Vec<RegressionCoverageEntry>,
+}
+
+impl RegressionCoverage {
+    pub fn load(path: &Path) -> Result<Self> {
+        let bytes = std::fs::read(path)?;
+        let coverage: Self = serde_json::from_slice(&bytes)?;
+        if coverage.schema != 1 {
+            return Err(LabError::InvalidCorpus(format!(
+                "unsupported coverage schema {}",
+                coverage.schema
+            )));
+        }
+        Ok(coverage)
+    }
+
+    pub fn validate_against(&self, corpus: &RegressionCorpus) -> Result<()> {
+        corpus.validate()?;
+        if self.schema != 1 {
+            return Err(LabError::InvalidCorpus(format!(
+                "unsupported coverage schema {}",
+                self.schema
+            )));
+        }
+
+        let corpus_ids = corpus
+            .cases
+            .iter()
+            .map(|case| case.id.as_str())
+            .collect::<BTreeSet<_>>();
+        let mut covered_ids = BTreeSet::new();
+
+        for entry in &self.entries {
+            if entry.gate.trim().is_empty() {
+                return Err(LabError::InvalidCorpus(format!(
+                    "coverage for '{}' has an empty gate",
+                    entry.case_id
+                )));
+            }
+            if !corpus_ids.contains(entry.case_id.as_str()) {
+                return Err(LabError::InvalidCorpus(format!(
+                    "coverage references unknown case '{}'",
+                    entry.case_id
+                )));
+            }
+            if !covered_ids.insert(entry.case_id.as_str()) {
+                return Err(LabError::InvalidCorpus(format!(
+                    "duplicate coverage for case '{}'",
+                    entry.case_id
+                )));
+            }
+        }
+
+        let missing = corpus_ids
+            .difference(&covered_ids)
+            .copied()
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(LabError::InvalidCorpus(format!(
+                "corpus cases without CI coverage: {}",
+                missing.join(", ")
+            )));
+        }
+        Ok(())
+    }
+}
+
 impl RegressionCorpus {
     pub fn load(path: &Path) -> Result<Self> {
         let bytes = std::fs::read(path)?;
