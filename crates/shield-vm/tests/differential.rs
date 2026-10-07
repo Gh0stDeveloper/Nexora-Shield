@@ -3,7 +3,7 @@ mod common;
 use common::{add_dex, branch_dex};
 use nexora_shield_vm::{
     DexLowerer, EligibilityPolicy, ExecutionConfig, Interpreter, MetadataSealer, NullHost,
-    OpcodeAllocation, OpcodeStream, VmMetadata, VmValue,
+    OpcodeAllocation, OpcodeStream, SealedExecution, VmMetadata, VmValue,
 };
 
 #[test]
@@ -13,6 +13,13 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
     let metadata = VmMetadata::from_method(&method, &allocation)?;
     let sealed = MetadataSealer::seal(&metadata, b"differential-key")?;
+    let protected = SealedExecution::new(
+        &method,
+        &stream,
+        &allocation,
+        &sealed,
+        b"differential-key",
+    );
     let mut host = NullHost;
     let mut state = 0x4e45_584f_5241_4744_u64;
 
@@ -36,11 +43,7 @@ fn differential_add_matches_reference_for_4096_cases() -> Result<(), Box<dyn std
 
         let expected = left.wrapping_add(right);
         let actual = Interpreter::execute_sealed(
-            &method,
-            &stream,
-            &allocation,
-            &sealed,
-            b"differential-key",
+            &protected,
             &[VmValue::Int(left), VmValue::Int(right)],
             &mut host,
             ExecutionConfig::default(),
@@ -59,6 +62,13 @@ fn differential_branch_matches_reference_for_boundary_values(
     let stream = OpcodeStream::encode(&method.instructions, &allocation)?;
     let metadata = VmMetadata::from_method(&method, &allocation)?;
     let sealed = MetadataSealer::seal(&metadata, b"differential-key")?;
+    let protected = SealedExecution::new(
+        &method,
+        &stream,
+        &allocation,
+        &sealed,
+        b"differential-key",
+    );
     let mut host = NullHost;
 
     for condition in [i32::MIN, -1, 0, 1, i32::MAX] {
@@ -70,11 +80,7 @@ fn differential_branch_matches_reference_for_boundary_values(
             when_nonzero
         };
         let actual = Interpreter::execute_sealed(
-            &method,
-            &stream,
-            &allocation,
-            &sealed,
-            b"differential-key",
+            &protected,
             &[
                 VmValue::Int(condition),
                 VmValue::Int(when_nonzero),
