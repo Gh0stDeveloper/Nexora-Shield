@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "dev.nexora.shield"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 
 kotlin {
     jvm("desktop") {
@@ -46,7 +46,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Nexora Shield Studio"
-            packageVersion = "0.1.0"
+            packageVersion = "1.0.0"
             description = "Desktop control surface for Nexora Shield."
             vendor = "Gh0stDeveloper"
         }
