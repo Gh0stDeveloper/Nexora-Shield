@@ -1,6 +1,6 @@
 use nexora_shield_rasp::{
     CompiledPolicy, HookInjectionEvaluator, HookInjectionObservation, InstrumentationEvaluator,
-    InstrumentationObservation, ResponseEngine, RiskEngine, RiskLevel, RaspResponse, SignalSet,
+    InstrumentationObservation, RaspResponse, ResponseEngine, RiskEngine, RiskLevel, SignalSet,
 };
 use serde::{Deserialize, Serialize};
 
@@ -45,8 +45,18 @@ impl RuntimeInstrumentationLab {
 
         for case in cases {
             let mut signals = SignalSet::default();
-            signals.extend(InstrumentationEvaluator::evaluate(&case.instrumentation).signals().iter().cloned());
-            signals.extend(HookInjectionEvaluator::evaluate(&case.hooks).signals().iter().cloned());
+            signals.extend(
+                InstrumentationEvaluator::evaluate(&case.instrumentation)
+                    .signals()
+                    .iter()
+                    .cloned(),
+            );
+            signals.extend(
+                HookInjectionEvaluator::evaluate(&case.hooks)
+                    .signals()
+                    .iter()
+                    .cloned(),
+            );
             let assessment = risk_engine.evaluate(&signals);
             let decision = ResponseEngine::decide(policy, &assessment);
             let passed = assessment.level >= case.minimum_risk
