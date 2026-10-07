@@ -71,8 +71,7 @@ impl SelectionPlanner {
 
         let mut selected_by_config = BTreeSet::new();
         for selector in &config.selectors {
-            if selector.class_pattern.trim().is_empty()
-                || selector.method_pattern.trim().is_empty()
+            if selector.class_pattern.trim().is_empty() || selector.method_pattern.trim().is_empty()
             {
                 return Err(VmError::InvalidSelector(
                     "class and method patterns must not be empty".to_owned(),
