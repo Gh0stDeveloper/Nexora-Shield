@@ -17,7 +17,7 @@ The JNI surface is intentionally minimal and dependency-free:
 - `nativeRuntimeApiVersion`;
 - `nativeAbiCode`.
 
-The boundary uses only FFI-safe raw opaque JNI handles and primitive return types. It never dereferences JNI pointers inside Rust and therefore requires no local `unsafe` block. The workspace continues to enforce `unsafe_code = "forbid"`.
+The boundary uses only FFI-safe raw opaque JNI handles and primitive return types. It never dereferences JNI pointers and contains no `unsafe { ... }` block. Rust's `unsafe_code` lint also covers symbol-export attributes such as `#[no_mangle]`, so the native crate uses `deny(unsafe_code)` globally with a narrow per-function lint exception only for the two required JNI export attributes. CI separately rejects any actual unsafe block in the native source.
 
 ## F.3 / F.4 — arm64-v8a and x86_64
 
