@@ -1,229 +1,279 @@
+<div align="center">
+
 # Nexora Shield
 
-Nexora Shield es una plataforma de protección avanzada para aplicaciones Android. Su objetivo es elevar de forma drástica el coste de ingeniería inversa, manipulación, reempaquetado, instrumentación y extracción de lógica sensible mediante una defensa multicapa: transformación DEX, cifrado selectivo, integridad, RASP, protección nativa, diversificación por compilación y, para métodos de alto valor, virtualización.
+### Defense-in-depth Android application protection
 
-> Estado: **Fase D — Integrity / Anti-Tamper completada y validada por CI**. Nexora Shield ya dispone de certificate/package binding, integridad regional DEX, recursos y bibliotecas nativas, Integrity Graph determinista, checks distribuidos, respuestas no destructivas y pruebas reales de re-firma/patch/repack. La siguiente fase es **Fase E — RASP**. El proyecto todavía no debe anunciarse como "imposible de romper": ninguna protección ejecutada en un dispositivo controlado por un atacante puede garantizar invulnerabilidad absoluta.
+A modular Android hardening platform designed to raise the cost of reverse engineering, tampering, repackaging, runtime instrumentation, and extraction of sensitive application logic.
 
-## Objetivos
+[![CI](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml)
+![Phase](https://img.shields.io/badge/Phase_E-RASP_complete-22c55e?style=flat-square)
+![Rust](https://img.shields.io/badge/Rust-1.81%2B-000000?style=flat-square&logo=rust&logoColor=white)
+![Android](https://img.shields.io/badge/Android-Application_Security-3DDC84?style=flat-square&logo=android&logoColor=white)
 
-- Proteger APK, AAB y AAR sin exigir cambios invasivos en la aplicación.
-- Integrarse mediante CLI y Gradle Plugin.
-- Mantener compatibilidad con Android 7+ y con las políticas modernas de Android.
-- Aplicar protección selectiva según sensibilidad y presupuesto de rendimiento.
-- Diversificar cada build para evitar firmas y bypasses reutilizables.
-- Proteger DEX, strings, constantes, recursos seleccionados y bibliotecas nativas.
-- Detectar reempaquetado, re-firma, modificación de código e instrumentación runtime.
-- Incorporar un motor RASP basado en señales y riesgo, no en una única detección.
-- Ofrecer virtualización de métodos críticos mediante una VM por compilación.
-- Permitir attestation y políticas remotas para aplicaciones con backend.
-- Generar reportes, mapas privados y artefactos de retrace para mantener observabilidad.
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
+![C++](https://img.shields.io/badge/C%2B%2B-Native_Hardening-00599C?style=flat-square&logo=cplusplus&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+![Security](https://img.shields.io/badge/Security-Defense_in_Depth-111827?style=flat-square)
 
-## Principios de seguridad
+[Vision](docs/VISION.md) · [Architecture](docs/ARCHITECTURE.md) · [Threat Model](docs/THREAT-MODEL.md) · [Security Design](docs/SECURITY-DESIGN.md) · [Configuration](docs/CONFIGURATION.md) · [Testing](docs/TESTING.md) · [Roadmap](docs/ROADMAP.md) · [Security Policy](SECURITY.md)
 
-1. Defense in depth: ninguna capa se considera suficiente por sí sola.
-2. Per-build diversity: el mismo input debe producir protecciones estructuralmente diferentes.
-3. Selective hardening: la máxima protección se concentra en lógica crítica.
-4. Fail safe: una incompatibilidad no debe producir una falsa sensación de seguridad.
-5. Measured security: cada release se valida con un laboratorio adversarial automatizado.
-6. No secret-in-APK fallacy: secretos de alto valor no se consideran seguros solo por cifrarlos dentro del APK.
-7. Runtime evidence: múltiples señales se correlacionan antes de aplicar una respuesta.
-8. Update resilience: cambios internos del protector no deben romper el contrato público del Gradle Plugin ni la configuración.
+</div>
 
-## Componentes
+---
 
-| Componente | Responsabilidad |
-|---|---|
-| shield-core | Pipeline principal, BuildPlan, transacciones, reportes y orquestación |
-| shield-package | Normalización APK/ZIP, inspección estructural y Android Build Tools |
-| shield-dex | Parser/IR DEX, CFG/SSA y pases de transformación |
-| shield-crypto | Primitivas, derivación de claves y protección de constantes |
-| shield-integrity | Grafo de integridad, firma, certificado y verificaciones de contenido |
-| shield-rasp | Señales runtime, scoring y políticas de respuesta |
-| shield-native | Runtime nativo y hardening JNI |
-| shield-vm | Virtualización selectiva de métodos críticos |
-| shield-diversify | Semillas, mutaciones y variación por compilación |
-| shield-gradle-plugin | Integración con Android Gradle Plugin |
-| shield-cli | CLI multiplataforma |
-| shield-studio | Interfaz de escritorio opcional |
-| shield-lab | Pruebas adversariales y regresión de seguridad |
+## Overview
 
-## Arquitectura resumida
+**Nexora Shield** is an Android application-protection platform built around layered defensive controls rather than a single obfuscation pass.
 
-    Android project / APK / AAB / AAR
-                    |
-                    v
-          Input normalization
-                    |
-                    v
-              DEX analysis
-                    |
-        +-----------+-----------+
-        |           |           |
-        v           v           v
-    Obfuscation   Crypto    VM selection
-        |           |           |
-        +-----------+-----------+
-                    |
-                    v
-          Resource protection
-                    |
-                    v
-       Native runtime injection
-                    |
-                    v
-      Integrity graph generation
-                    |
-                    v
-       RASP policy embedding
-                    |
-                    v
-           Package rebuild
-                    |
-                    v
-      Validate -> Align -> Sign
-                    |
-                    v
-           Protected artifact
-                    |
-                    v
-        Security build report
+Its goal is not to claim that protected software is "unbreakable". Software executing on an attacker-controlled device can ultimately be inspected. The objective is to make analysis and modification substantially more expensive, reduce reusable bypasses, detect defined integrity violations, and keep defensive behavior measurable through repeatable tests.
 
-## Stack propuesto
+The current implementation covers the protection pipeline through **Phase E — RASP**.
 
-- Rust: motor principal, parser/IR, CLI, crypto orchestration y componentes nativos donde sea apropiado.
-- Kotlin: Gradle Plugin, SDK Android y APIs de integración.
-- Rust/C++ JNI: runtime nativo para comprobaciones de integridad y capas de alto coste.
-- Compose Multiplatform: Shield Studio cuando se implemente la UI.
-- Android Build Tools: zipalign/apksigner para firma APK en las primeras versiones.
-- bundletool y herramientas oficiales: validación de AAB y APK splits.
-- Cargo fuzz/libFuzzer y property tests: fuzzing de parsers y transformaciones.
-- GitHub Actions: CI, matrices Android, fuzz smoke tests y publicación de artefactos.
+| Area | Current state |
+| --- | --- |
+| Workspace version | **0.1.0** |
+| Rust MSRV | **1.81** |
+| Foundation | Completed |
+| APK packaging pipeline | Completed |
+| DEX engine | Completed |
+| Data protection | Completed |
+| Integrity / anti-tamper | Completed |
+| RASP / risk engine | Completed |
+| Next milestone | **Phase F — Native Shield** |
 
-## Modos de protección
+## Implemented Protection Layers
 
-### Standard
-Ofuscación segura, cifrado de strings seleccionadas, integridad de certificado/contenido, RASP básico y diversificación.
+### Core packaging
 
-### Hardened
-Añade transformaciones de control de flujo, cifrado ampliado, runtime nativo, grafo de integridad distribuido y políticas RASP avanzadas.
+The packaging layer provides the reproducible foundation used by later protection stages:
 
-### Maximum
-Añade virtualización selectiva, diversificación agresiva, attestation opcional y controles de integridad redundantes. Solo debe aplicarse a superficies críticas debido al coste de tamaño, arranque y CPU.
+- APK/ZIP normalization;
+- Android manifest inspection;
+- multi-DEX discovery;
+- deterministic build planning;
+- transactional protection pipeline;
+- public/private build reports;
+- `zipalign` and `apksigner` integration;
+- inspect, protect, and verify CLI workflows.
 
-## Motor RASP
+### DEX engine
 
-Nexora Shield no dependerá de una comprobación única. El runtime combinará señales como:
+The DEX subsystem provides structured analysis and rewriting instead of byte-level blind patching:
 
-- debugger e instrumentation;
-- procesos/bibliotecas inyectadas y hooking;
-- frameworks de modificación;
-- entorno root/modificado;
-- emuladores y entornos de análisis;
-- firma/certificado inesperados;
-- cambios de DEX, recursos o bibliotecas;
-- inconsistencias en memoria;
-- attestation remota opcional.
+- DEX parsing and writing;
+- validation and round-trip tests;
+- control-flow graph analysis;
+- type analysis;
+- SSA/IR foundations;
+- reference graph construction;
+- selector resolution;
+- compatible renaming;
+- metadata reduction;
+- reflection/JNI compatibility analysis;
+- multidex rewriting.
 
-Las señales alimentan un risk score configurable. Las respuestas disponibles serán: log local, telemetría opt-in, bloquear solo una operación sensible, solicitar reautenticación/attestation o finalizar de forma controlada. El bloqueo ciego de dispositivos root no será la política predeterminada.
+### Data protection
 
-## Virtualización selectiva
+Sensitive application data can be selected and protected using authenticated containers and per-build material:
 
-Los métodos marcados como de alto valor podrán transformarse a un bytecode interno interpretado por una VM de Nexora Shield. Cada build podrá cambiar:
+- sensitive-string classification;
+- authenticated encrypted containers;
+- per-build key derivation;
+- decrypt-on-use runtime model;
+- constant protection;
+- selected resource protection;
+- caching/lifetime policies;
+- private protection metadata;
+- exposure and overhead benchmarks.
 
-- mapa de opcodes;
-- codificación de operandos;
-- layout de tablas;
-- claves derivadas;
-- orden de handlers;
-- seeds y constantes.
+### Integrity / anti-tamper
 
-La virtualización nunca será global por defecto. Se medirá el impacto y se impondrán presupuestos de rendimiento.
+Phase D adds distributed integrity evidence across multiple application surfaces:
 
-## Diversificación por compilación
+- certificate binding;
+- package identity checks;
+- DEX region integrity;
+- resource integrity;
+- native-library integrity;
+- deterministic Integrity Graph;
+- distributed checks;
+- typed response API;
+- re-signing regression tests;
+- patch/repack regression tests.
 
-Cada protección genera un Build Protection Manifest privado con:
+### RASP and risk engine
 
-- build id;
-- semilla criptográfica;
-- versión del pipeline;
-- transformaciones aplicadas;
-- mapping/retrace;
-- políticas RASP;
-- hashes esperados;
-- información necesaria para reproducibilidad controlada.
+Phase E adds runtime evidence collection and policy-driven decisions.
 
-La semilla no se publicará con el APK. CI podrá custodiarla como artefacto privado o secret material.
+Current signal families include:
 
-## Integración prevista
+- debugger/JDWP evidence;
+- runtime instrumentation evidence;
+- hook and injection evidence;
+- writable/executable mapping evidence;
+- code-page mismatch evidence;
+- modified-system evidence;
+- bootloader / verified-boot / SELinux evidence;
+- root-management and privileged-binary artifacts;
+- emulator and hypervisor evidence;
+- Phase D integrity verdict fusion.
 
-CLI:
+Signals are correlated by a deterministic weighted **Risk Engine**. Policies are compiled and validated before use, and response severity is monotonic.
 
-    nexora-shield protect app.apk --config nexora-shield.yml --output app-protected.apk
-    nexora-shield inspect app-protected.apk
-    nexora-shield verify app-protected.apk
-    nexora-shield retrace --mapping mapping.nshield crash.txt
+Supported response classes include:
 
-Gradle:
+- continue;
+- report;
+- require re-verification;
+- deny a sensitive operation.
 
-    plugins {
-        id("dev.nexora.shield")
-    }
+A dedicated **report-only mode** keeps detection observable without enforcing blocking decisions, which is useful during rollout and false-positive tuning.
 
-    nexoraShield {
-        profile.set("hardened")
-        configFile.set(layout.projectDirectory.file("nexora-shield.yml"))
-    }
+## Architecture
 
-## Documentación
+```mermaid
+flowchart TD
+    INPUT["Android project / APK"] --> NORMALIZE["Package normalization"]
+    NORMALIZE --> DEX["DEX analysis + transformation"]
+    DEX --> DATA["Selective data protection"]
+    DATA --> INTEGRITY["Integrity Graph"]
+    INTEGRITY --> RASP["RASP evidence + Risk Engine"]
+    RASP --> REBUILD["Package rebuild"]
+    REBUILD --> SIGN["Align + sign + verify"]
+    SIGN --> OUTPUT["Protected artifact"]
+    OUTPUT --> REPORT["Security build report"]
+```
 
-- docs/ARCHITECTURE.md — arquitectura y límites entre módulos.
-- docs/PHASE-A.md — implementación y contrato de Core Packaging.
-- docs/APK-PACKAGING.md — invariantes de reconstrucción, alineación y firma APK.
-- docs/PHASE-B.md — implementación del DEX Engine.
-- docs/PHASE-B-CHECKLIST.md — evidencia de cierre B.1–B.12.
-- docs/PHASE-D.md — diseño e implementación de Integrity / Anti-Tamper.
-- docs/PHASE-D-CHECKLIST.md — evidencia de cierre D.1–D.10.
-- docs/THREAT-MODEL.md — activos, atacantes, escenarios y no-objetivos.
-- docs/SECURITY-DESIGN.md — capas de protección y decisiones de diseño.
-- docs/CONFIGURATION.md — modelo de configuración.
-- docs/TESTING.md — estrategia de pruebas funcionales, rendimiento y seguridad.
-- docs/ROADMAP.md — fases de implementación y criterios de salida.
-- SECURITY.md — política de reporte de vulnerabilidades.
+The architecture is intentionally modular so that future native hardening, VM protection, diversification, attestation, and Gradle integration can evolve independently.
 
-## Roadmap resumido
+## Rust Workspace
 
-0. Foundation y especificación.
-A. Core packaging y pipeline reproducible.
-B. DEX IR y ofuscación segura.
-C. Cifrado de strings/constantes/recursos.
-D. Integrity/anti-tamper.
-E. RASP y motor de riesgo.
-F. Native Shield.
-G. VM Shield.
-H. Diversificación polimórfica.
-I. Attestation/políticas remotas opcionales.
-J. Gradle Plugin y CI/CD.
-K. AAB/AAR/splits.
-L. Shield Studio.
-M. Security Lab, fuzzing y red-team regression.
-N. Production hardening y 1.0.
+The current workspace contains:
 
-## Criterio de éxito
+| Crate | Responsibility |
+| --- | --- |
+| `shield-core` | Build plan, orchestration, reports, and pipeline contracts |
+| `shield-package` | APK/ZIP normalization and Android package handling |
+| `shield-dex` | DEX parser, IR/analysis, selectors, and rewrite passes |
+| `shield-crypto` | Cryptographic containers, derivation, and protected data |
+| `shield-integrity` | Certificate/package/content integrity and Integrity Graph |
+| `shield-rasp` | Runtime signals, risk scoring, policy compilation, and responses |
+| `shield-cli` | Command-line interface |
 
-Nexora Shield no se considerará exitoso porque una app de inspección muestre "Protección detectada". El criterio real será que:
+Future roadmap components such as Native Shield, VM Shield, the Gradle Plugin, and Shield Studio are tracked separately and are **not presented as completed features**.
 
-- la aplicación protegida continúe funcionando;
-- modificaciones y re-firmado sean detectados;
-- strings y lógica crítica no aparezcan de forma trivial;
-- bypasses de una compilación no se trasladen automáticamente a otra;
-- el overhead permanezca dentro de presupuestos definidos;
-- el laboratorio de regresión adversarial no encuentre degradaciones conocidas;
-- los resultados sean repetibles cuando se conserve la semilla privada.
+## Security Principles
 
-## Alcance ético
+Nexora Shield follows several design rules:
 
-Nexora Shield está diseñado para proteger software propio o software para el que se cuenta con autorización. El proyecto no debe incorporar funciones de persistencia maliciosa, evasión de controles del sistema, explotación de dispositivos ni comportamiento que oculte malware.
+1. **Defense in depth** — no individual layer is treated as sufficient.
+2. **Selective hardening** — expensive protections are reserved for high-value surfaces.
+3. **Per-build diversity** — reusable signatures and fixed bypasses should become less effective across builds.
+4. **Fail-safe behavior** — compatibility failures must not silently create false confidence.
+5. **Measured security** — protection changes require tests and adversarial regression evidence.
+6. **No secret-in-APK fallacy** — high-value secrets are not considered secure merely because they are encrypted inside an APK.
+7. **Evidence correlation** — runtime decisions are based on multiple signals rather than a single binary check.
+8. **Update resilience** — internal implementation changes should not destabilize public configuration contracts.
+
+## Protection Profiles
+
+The configuration model is designed around three protection levels:
+
+| Profile | Intended use |
+| --- | --- |
+| **Standard** | Lower-overhead protection for broad application coverage |
+| **Hardened** | Stronger data, integrity, and runtime controls for sensitive applications |
+| **Maximum** | Selective high-cost protection for critical surfaces where additional overhead is acceptable |
+
+Maximum protection is intentionally not the default for an entire application.
+
+## CLI Direction
+
+The CLI is the primary automation surface.
+
+```bash
+nexora-shield protect app.apk --config nexora-shield.yml --output app-protected.apk
+nexora-shield inspect app-protected.apk
+nexora-shield verify app-protected.apk
+nexora-shield retrace --mapping mapping.nshield crash.txt
+```
+
+For development and validation:
+
+```bash
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets --all-features
+```
+
+## CI and Validation
+
+The GitHub Actions pipeline validates the project continuously with gates covering:
+
+- Rust formatting and linting;
+- workspace tests;
+- dependency/security auditing;
+- Rust 1.81 MSRV compatibility;
+- APK packaging and signing regression;
+- DEX round-trip and transformation regression;
+- protected-data tamper rejection;
+- integrity / re-sign / patch / repack tests;
+- RASP signal, risk-engine, policy, response, and false-positive regression tests.
+
+A phase is only considered complete when its implementation, tests, documentation, CI evidence, and exit criteria are all satisfied.
+
+## Roadmap
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| **0** | Foundation / threat model / architecture | ✅ Complete |
+| **A** | Core packaging | ✅ Complete |
+| **B** | DEX engine | ✅ Complete |
+| **C** | Data protection | ✅ Complete |
+| **D** | Integrity / anti-tamper | ✅ Complete |
+| **E** | RASP / risk engine | ✅ Complete |
+| **F** | Native Shield | Next |
+| **G** | VM Shield | Planned |
+| **H** | Per-build diversification | Planned |
+| **I** | Attestation / remote policy | Planned |
+| **J** | Gradle Plugin | Planned |
+| **K** | AAB / AAR / splits | Planned |
+| **L** | Shield Studio | Planned |
+| **M** | Security Lab | Planned |
+| **N** | Production hardening / 1.0 | Planned |
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the complete exit criteria and subphases.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [APK Packaging](docs/APK-PACKAGING.md)
+- [Threat Model](docs/THREAT-MODEL.md)
+- [Security Design](docs/SECURITY-DESIGN.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Testing Strategy](docs/TESTING.md)
+- [Phase E — RASP](docs/PHASE-E.md)
+- [Phase E Checklist](docs/PHASE-E-CHECKLIST.md)
+- [CI](docs/CI.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+
+## Responsible Use
+
+Nexora Shield is intended to protect software you own or are explicitly authorized to protect.
+
+The project is not intended to provide malware persistence, hide malicious payloads, exploit devices, or bypass platform security controls for unauthorized purposes.
 
 ## License
 
-Licencia pendiente de decisión del propietario del repositorio.
+A final repository license has not yet been selected.
+
+---
+
+<div align="center">
+
+**Nexora Shield — measurable Android hardening through layered defensive engineering.**
+
+</div>
