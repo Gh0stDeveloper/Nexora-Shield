@@ -65,3 +65,23 @@ The native crate includes unit/regression tests, deterministic mutation fuzz-smo
 Native code raises reverse-engineering and tampering cost but is not assumed to be unbreakable. It remains one layer in Nexora Shield's defense-in-depth model.
 
 No destructive anti-analysis behavior is implemented.
+
+
+## Closure
+
+Phase F was closed by GitHub Actions run **#416** (ID `37562562437`).
+
+The run validated the complete workspace quality/security matrix plus:
+
+- Phase F host tests and deterministic fuzz-smoke;
+- Rust 1.81 MSRV;
+- pinned Android NDK cross-linking for arm64-v8a and x86_64;
+- ELF architecture;
+- GNU RELRO;
+- immediate binding / NOW;
+- disabled ELF build-id;
+- exactly the required JNI dynamic exports;
+- absence of leaked Rust-mangled dynamic exports;
+- byte-for-byte reproducibility across a clean rebuild.
+
+No known critical Phase F error remains at closure.
