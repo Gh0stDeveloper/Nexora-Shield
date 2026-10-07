@@ -49,8 +49,8 @@ impl ConstantPool {
     }
 
     pub fn digest(&self) -> Result<[u8; 32]> {
-        let encoded =
-            serde_json::to_vec(&self.values).map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
+        let encoded = serde_json::to_vec(&self.values)
+            .map_err(|error| VmError::MetadataEncoding(error.to_string()))?;
         Ok(Sha256::digest(encoded).into())
     }
 }
