@@ -57,8 +57,8 @@ fn critical_definitive_evidence_is_critical_without_extra_signals() {
 }
 
 #[test]
-fn default_policy_is_monotonic_and_non_destructive() {
-    let policy = CompiledPolicy::compile(PolicySpec::default()).expect("default policy");
+fn default_policy_is_monotonic_and_non_destructive() -> Result<(), PolicyError> {
+    let policy = CompiledPolicy::compile(PolicySpec::default())?;
     assert_eq!(policy.response_for(RiskLevel::Clean), RaspResponse::Continue);
     assert_eq!(
         policy.response_for(RiskLevel::Elevated),
@@ -68,6 +68,7 @@ fn default_policy_is_monotonic_and_non_destructive() {
         policy.response_for(RiskLevel::Critical),
         RaspResponse::DenySensitiveOperation
     );
+    Ok(())
 }
 
 #[test]
@@ -99,8 +100,8 @@ fn less_restrictive_high_risk_response_is_rejected() {
 }
 
 #[test]
-fn response_engine_applies_compiled_policy() {
-    let policy = CompiledPolicy::compile(PolicySpec::default()).expect("default policy");
+fn response_engine_applies_compiled_policy() -> Result<(), PolicyError> {
+    let policy = CompiledPolicy::compile(PolicySpec::default())?;
     let signals = DebugEvaluator::evaluate(&DebugObservation {
         tracer_pid: Some(77),
         ..DebugObservation::default()
@@ -110,4 +111,5 @@ fn response_engine_applies_compiled_policy() {
 
     assert_eq!(decision.risk_level, RiskLevel::Critical);
     assert_eq!(decision.response, RaspResponse::DenySensitiveOperation);
+    Ok(())
 }
