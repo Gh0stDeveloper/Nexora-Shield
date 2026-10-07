@@ -5,7 +5,7 @@
 - [x] Structured navigation for all Studio capabilities
 - [x] Dark professional desktop shell
 - [x] JVM 17 toolchain target
-- [ ] Final compile/test gate
+- [x] Final compile/test gate
 
 ## L.2 Project import
 - [x] Safe directory import
@@ -13,7 +13,7 @@
 - [x] Existing Nexora Shield configuration discovery
 - [x] Artifact/report/mapping discovery
 - [x] Bounded project traversal
-- [ ] Final project-import tests
+- [x] Final project-import tests
 
 ## L.3 Profile editor
 - [x] standard/hardened/maximum profile editing
@@ -21,7 +21,7 @@
 - [x] schema-aware configuration load/save
 - [x] unknown configuration sections preserved
 - [x] validation before write
-- [ ] Final configuration round-trip tests
+- [x] Final configuration round-trip tests
 
 ## L.4 Selector editor
 - [x] Named selector groups
@@ -29,14 +29,14 @@
 - [x] exclude patterns
 - [x] duplicate/blank normalization
 - [x] persisted YAML representation
-- [ ] Final selector tests
+- [x] Final selector tests
 
 ## L.5 Security report
 - [x] Public report loader
 - [x] build/profile/hash/signing summary
 - [x] pipeline-stage presentation
 - [x] malformed/private report rejection boundary
-- [ ] Final report parsing tests
+- [x] Final report parsing tests
 
 ## L.6 Performance budget UI
 - [x] APK growth budget
@@ -46,7 +46,7 @@
 - [x] build-time budget
 - [x] fail/warn/adaptive policy selection
 - [x] measured APK growth evaluation
-- [ ] Final budget tests
+- [x] Final budget tests
 
 ## L.7 Build console
 - [x] Direct ProcessBuilder execution without shell interpolation
@@ -54,7 +54,7 @@
 - [x] Gradle task execution
 - [x] Nexora Shield CLI smoke execution
 - [x] asynchronous UI execution
-- [ ] Final command runner tests
+- [x] Final command runner tests
 
 ## L.8 Artifact verification
 - [x] APK verification
@@ -62,14 +62,14 @@
 - [x] AAR verification
 - [x] APK Set verification
 - [x] unsupported artifact rejection
-- [ ] Final verification-routing tests
+- [x] Final verification-routing tests
 
 ## L.9 Mapping/retrace UI
 - [x] mapping.txt selection
 - [x] stacktrace selection
 - [x] direct retrace execution
 - [x] retraced output viewer
-- [ ] Final retrace routing tests
+- [x] Final retrace routing tests
 
 ## L.10 Secure secret-provider integration
 - [x] environment references
@@ -77,8 +77,15 @@
 - [x] external-provider status
 - [x] secret values never rendered
 - [x] raw secret entry intentionally absent
-- [ ] Final secret-reference tests
+- [x] Final secret-reference tests
 
 ## Closure state
 
-Phase L is **IN PROGRESS** until Studio compilation, service tests and the repository regression CI pass on the final branch head.
+Phase L is **COMPLETED**. L.1–L.10 are implemented and their acceptance gates passed on the validated implementation head.
+
+Validated by GitHub Actions:
+- Phase L run #18 (`37591538497`): **success**
+- CI run #889 (`37591538479`): **success**
+- Phase K regression run #35 (`37591538494`): **success**
+
+The validated implementation head is `cae761c471deb8284c111927380ca9b4b55b5b1f`.
