@@ -199,6 +199,7 @@ name = "nexora-shield-diversity"
 version = "0.1.0"
 dependencies = [
  "hmac",
+ "nexora-shield-crypto",
  "nexora-shield-dex",
  "nexora-shield-integrity",
  "nexora-shield-native",
