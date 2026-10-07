@@ -12,9 +12,7 @@ type HmacSha256 = Hmac<Sha256>;
 pub const DEFAULT_CHALLENGE_TTL_MS: u64 = 120_000;
 pub const MAX_CHALLENGE_TTL_MS: u64 = 10 * 60_000;
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SessionId(pub [u8; 16]);
 
@@ -204,11 +202,7 @@ impl ReplayGuard {
         }
     }
 
-    pub fn register(
-        &mut self,
-        challenge: AttestationChallenge,
-        now_unix_ms: u64,
-    ) -> Result<()> {
+    pub fn register(&mut self, challenge: AttestationChallenge, now_unix_ms: u64) -> Result<()> {
         challenge.validate_at(now_unix_ms)?;
         self.prune_expired(now_unix_ms);
 
@@ -229,11 +223,7 @@ impl ReplayGuard {
         Ok(())
     }
 
-    pub fn consume(
-        &mut self,
-        challenge: &AttestationChallenge,
-        now_unix_ms: u64,
-    ) -> Result<()> {
+    pub fn consume(&mut self, challenge: &AttestationChallenge, now_unix_ms: u64) -> Result<()> {
         challenge.validate_at(now_unix_ms)?;
         self.prune_expired(now_unix_ms);
 
