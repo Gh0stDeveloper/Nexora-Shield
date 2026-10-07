@@ -297,6 +297,8 @@ Estado actual: **COMPLETADA**. K.1–K.10 quedaron integradas y validadas con AA
 
 Studio nunca reemplaza la CLI; es una capa de UX.
 
+Estado actual: **COMPLETADA**. L.1–L.10 están implementadas en Shield Studio sobre Compose Multiplatform: importación segura de proyectos, edición de perfiles/selectores, reportes públicos, presupuestos, consola de build, verificación APK/AAB/AAR/APKS, retrace y referencias seguras de secretos. GitHub Actions Phase L run #20 (`37591941642`), CI run #891 (`37591941514`) y la regresión Phase K #36 (`37591941555`) finalizaron correctamente sobre el head validado `7e9d149e72885263b183f71e907d3ef6482a4e4a`.
+
 ---
 
 ## Fase M — Security Lab
