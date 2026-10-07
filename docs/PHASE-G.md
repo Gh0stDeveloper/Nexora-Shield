@@ -140,7 +140,9 @@ Sealed metadata binds:
 - opcode-map fingerprint;
 - encoded VM bytecode digest.
 
-`verify_program` rejects both a mismatched opcode allocation and any change to the encoded bytecode stream.
+`verify_program` rejects both a mismatched opcode allocation and any change to the encoded bytecode stream. `verify_executable` additionally authenticates parameter-register mapping and exception-handler metadata before execution.
+
+The protected runtime path is represented by `SealedExecution`. Its debug representation explicitly redacts the seal key.
 
 This is authenticity/integrity protection, not an encryption claim.
 
@@ -162,7 +164,7 @@ The test suite compares **encoded VM bytecode execution** against reference sema
 - conditional branch behavior;
 - arithmetic-exception behavior.
 
-The phase exit criterion requires these tests to remain green.
+The phase exit criterion requires these tests to remain green. Differential tests execute through the sealed bytecode path rather than bypassing it with direct IR execution.
 
 ## G.13 — Selective annotations/config
 
