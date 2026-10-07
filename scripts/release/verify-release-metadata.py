@@ -41,13 +41,17 @@ def main() -> int:
             raise SystemExit(
                 "stable release blocked: representative device performance measurements are incomplete"
             )
-        minimum = int(policy.get("minimumExternalReviewers", 1))
-        if int(feedback.get("externalReviewers", 0)) < minimum:
+        minimum = int(policy.get("minimumExternalAssessments", 1))
+        assessments = int(feedback.get("externalAssessments", 0))
+        providers = feedback.get("assessmentProviders", [])
+        if assessments < minimum:
             raise SystemExit(
-                f"stable release blocked: external reviewers={feedback.get('externalReviewers', 0)} required={minimum}"
+                f"stable release blocked: external assessments={assessments} required={minimum}"
             )
+        if len(providers) < minimum or any(not str(provider).strip() for provider in providers):
+            raise SystemExit("stable release blocked: external assessment provider evidence is incomplete")
         if int(feedback.get("blockingFindingsOpen", 0)) != 0:
-            raise SystemExit("stable release blocked: external feedback has blocking findings")
+            raise SystemExit("stable release blocked: external assessment/feedback has blocking findings")
 
     print(f"Release metadata: OK | channel={channel}")
     return 0
