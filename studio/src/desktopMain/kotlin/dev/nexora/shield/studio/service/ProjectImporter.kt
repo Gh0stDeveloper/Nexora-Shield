@@ -31,7 +31,7 @@ class ProjectImporter(
 
         val modules = discovered
             .filter { it.isRegularFile() && (it.name == "build.gradle.kts" || it.name == "build.gradle") }
-            .mapNotNull(Path::getParent)
+            .mapNotNull { it.parent }
             .distinct()
             .sorted()
 
