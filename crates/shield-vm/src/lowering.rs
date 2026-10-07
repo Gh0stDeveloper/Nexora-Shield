@@ -1,9 +1,7 @@
 use crate::constant_pool::{ConstantPool, VmConstant};
 use crate::eligibility::{EligibilityAnalyzer, EligibilityPolicy};
 use crate::error::{Result, VmError};
-use crate::ir::{
-    BranchCondition, VmExceptionHandler, VmInstruction, VmMethod, VmRegister,
-};
+use crate::ir::{BranchCondition, VmExceptionHandler, VmInstruction, VmMethod, VmRegister};
 use nexora_shield_dex::{CodeItem, DexFile, Instruction, IrMethod, ReferenceKind};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -17,11 +15,7 @@ struct CompoundInstructionMetadata {
 }
 
 impl DexLowerer {
-    pub fn lower(
-        dex: &DexFile,
-        method_idx: u32,
-        policy: EligibilityPolicy,
-    ) -> Result<VmMethod> {
+    pub fn lower(dex: &DexFile, method_idx: u32, policy: EligibilityPolicy) -> Result<VmMethod> {
         let report = EligibilityAnalyzer::analyze(dex, method_idx, policy);
         if !report.eligible {
             return Err(VmError::IneligibleMethod {
@@ -48,8 +42,7 @@ impl DexLowerer {
             .filter(|instruction| !instruction.is_payload())
             .collect::<Vec<_>>();
         let handler_targets = exception_handler_targets(code);
-        let compound =
-            collect_compound_instruction_metadata(code, &executable, &handler_targets)?;
+        let compound = collect_compound_instruction_metadata(code, &executable, &handler_targets)?;
 
         let mut offset_to_pc = BTreeMap::<u32, usize>::new();
         let mut pc = 0_usize;
@@ -126,7 +119,9 @@ fn collect_compound_instruction_metadata(
             }
             _ => None,
         };
-        metadata.call_destinations.insert(instruction.offset, destination);
+        metadata
+            .call_destinations
+            .insert(instruction.offset, destination);
     }
 
     Ok(metadata)
@@ -147,10 +142,7 @@ fn lower_instruction(
 
     match instruction.opcode {
         0x00 => Ok(VmInstruction::Nop),
-        0x01 | 0x07 => Ok(VmInstruction::Move {
-            dst: a4,
-            src: b4,
-        }),
+        0x01 | 0x07 => Ok(VmInstruction::Move { dst: a4, src: b4 }),
         0x02 | 0x08 => Ok(VmInstruction::Move {
             dst: a8,
             src: VmRegister(code_unit(code, instruction.offset + 1)?),
@@ -164,7 +156,10 @@ fn lower_instruction(
         0x12..=0x15 => {
             let value = decode_int_constant(code, instruction)?;
             let constant = constants.intern(VmConstant::Int(value))?;
-            Ok(VmInstruction::LoadConst { dst: a8_or_a4(instruction.opcode, a8, a4), constant })
+            Ok(VmInstruction::LoadConst {
+                dst: a8_or_a4(instruction.opcode, a8, a4),
+                constant,
+            })
         }
         0x1a | 0x1b => {
             let index = reference_index(instruction, ReferenceKind::String, "string")?;
@@ -238,10 +233,7 @@ fn lower_instruction(
             method: reference_index(instruction, ReferenceKind::Method, "method")?,
             args: invoke_range_registers(code, instruction.offset)?,
         }),
-        0x7b => Ok(VmInstruction::Neg {
-            dst: a4,
-            src: b4,
-        }),
+        0x7b => Ok(VmInstruction::Neg { dst: a4, src: b4 }),
         0x90..=0x97 => {
             let second = code_unit(code, instruction.offset + 1)?;
             let left = VmRegister(second & 0x00ff);
@@ -277,10 +269,7 @@ fn lower_binary(
         0x96 => VmInstruction::Or { dst, left, right },
         0x97 => VmInstruction::Xor { dst, left, right },
         _ => {
-            return Err(VmError::UnsupportedDexOpcode {
-                offset: 0,
-                opcode,
-            });
+            return Err(VmError::UnsupportedDexOpcode { offset: 0, opcode });
         }
     };
     Ok(instruction)
@@ -415,10 +404,7 @@ fn reference_index(
     }
 }
 
-fn branch_target(
-    instruction: &Instruction,
-    offset_to_pc: &BTreeMap<u32, usize>,
-) -> Result<usize> {
+fn branch_target(instruction: &Instruction, offset_to_pc: &BTreeMap<u32, usize>) -> Result<usize> {
     let target = instruction
         .branch_targets
         .first()
@@ -430,11 +416,7 @@ fn branch_target(
     pc_for_offset(offset_to_pc, target, instruction.offset)
 }
 
-fn pc_for_offset(
-    offset_to_pc: &BTreeMap<u32, usize>,
-    target: u32,
-    from: u32,
-) -> Result<usize> {
+fn pc_for_offset(offset_to_pc: &BTreeMap<u32, usize>, target: u32, from: u32) -> Result<usize> {
     offset_to_pc
         .get(&target)
         .copied()
