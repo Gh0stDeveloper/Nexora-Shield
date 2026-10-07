@@ -116,7 +116,7 @@ fn n12_rc_version_is_explicit_and_stable_version_is_separate() {
 }
 
 #[test]
-fn n13_n14_stable_is_blocked_without_real_external_feedback() {
+fn n13_n14_stable_requires_independent_external_assessment() {
     let policy: QualificationPolicy =
         serde_json::from_str(include_str!("../../../release/qualification-policy.json"))
             .expect("qualification policy");
@@ -129,9 +129,11 @@ fn n13_n14_stable_is_blocked_without_real_external_feedback() {
 
     let accepted = FeedbackStatus {
         schema: 1,
-        external_reviewers: policy.minimum_external_reviewers,
-        accepted_feedback_items: 1,
+        external_assessments: policy.minimum_external_assessments,
+        human_reviewers: 0,
+        accepted_feedback_items: 0,
         blocking_findings_open: 0,
+        assessment_providers: vec!["github-codeql".to_owned()],
     };
     assert!(policy.stable_feedback_satisfied(&accepted));
 }
