@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github/workflows"
-ALLOWED_ACTION_OWNERS = {"actions", "dtolnay", "gradle", "Swatinem", "taiki-e"}
+ALLOWED_ACTION_OWNERS = {"actions", "dtolnay", "gradle", "Swatinem", "taiki-e", "github"}
 FORBIDDEN = {
     "pull_request_target": "pull_request_target is forbidden for release hardening",
     "@main": "mutable action ref @main is forbidden",
