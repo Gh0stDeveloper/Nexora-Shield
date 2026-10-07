@@ -39,8 +39,9 @@ impl VmSecurityBenchmark {
         }
 
         let denominator = ALL_SEMANTIC_OPCODES.len().max(1);
-        let numerator =
-            u64::try_from(maximum_shared_assignments).unwrap_or(u64::MAX).saturating_mul(10_000);
+        let numerator = u64::try_from(maximum_shared_assignments)
+            .unwrap_or(u64::MAX)
+            .saturating_mul(10_000);
         let denominator = u64::try_from(denominator).unwrap_or(u64::MAX);
         let transfer = numerator.checked_div(denominator).unwrap_or(u64::MAX);
 
