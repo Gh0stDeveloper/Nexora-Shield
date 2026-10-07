@@ -1,0 +1,24 @@
+[package]
+name = "nexora-shield-diversity"
+description = "Per-build diversification planning and cross-build bypass portability regression for Nexora Shield."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+hmac = "0.12.1"
+nexora-shield-dex = { path = "../shield-dex" }
+nexora-shield-crypto = { path = "../shield-crypto" }
+nexora-shield-integrity = { path = "../shield-integrity" }
+nexora-shield-native = { path = "../shield-native" }
+nexora-shield-vm = { path = "../shield-vm" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10.9"
+zeroize = "1.8.1"
+
+[lints]
+workspace = true

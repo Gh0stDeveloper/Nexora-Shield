@@ -195,6 +195,22 @@ name = "nexora-shield-dex"
 version = "0.1.0"
 
 [[package]]
+name = "nexora-shield-diversity"
+version = "0.1.0"
+dependencies = [
+ "hmac",
+ "nexora-shield-crypto",
+ "nexora-shield-dex",
+ "nexora-shield-integrity",
+ "nexora-shield-native",
+ "nexora-shield-vm",
+ "serde",
+ "serde_json",
+ "sha2",
+ "zeroize",
+]
+
+[[package]]
 name = "nexora-shield-integrity"
 version = "0.1.0"
 dependencies = [

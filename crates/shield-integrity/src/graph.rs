@@ -137,6 +137,21 @@ impl IntegrityGraph {
         Ok(Self { nodes, edges, root })
     }
 
+    pub fn from_parts(
+        mut nodes: Vec<IntegrityNode>,
+        mut edges: Vec<IntegrityEdge>,
+    ) -> Result<Self> {
+        nodes.sort_by_key(|entry| entry.id);
+        edges.sort();
+        validate_graph(&nodes, &edges)?;
+        let root = graph_root(&nodes, &edges);
+        Ok(Self { nodes, edges, root })
+    }
+
+    pub fn with_edges(&self, edges: Vec<IntegrityEdge>) -> Result<Self> {
+        Self::from_parts(self.nodes.clone(), edges)
+    }
+
     pub fn validate(&self) -> Result<()> {
         validate_graph(&self.nodes, &self.edges)?;
         let observed = graph_root(&self.nodes, &self.edges);
@@ -207,6 +222,13 @@ fn validate_graph(nodes: &[IntegrityNode], edges: &[IntegrityEdge]) -> Result<()
             "graph contains duplicate labels".into(),
         ));
     }
+    let unique_edges = edges.iter().collect::<BTreeSet<_>>();
+    if unique_edges.len() != edges.len() {
+        return Err(IntegrityError::InvalidGraph(
+            "graph contains duplicate edges".into(),
+        ));
+    }
+
     for edge in edges {
         if edge.from == edge.to || !ids.contains(&edge.from) || !ids.contains(&edge.to) {
             return Err(IntegrityError::InvalidGraph(

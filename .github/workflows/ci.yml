@@ -876,3 +876,54 @@ jobs:
 
       - name: VM security benchmark
         run: cargo test --locked -p nexora-shield-vm --test security
+
+
+  phase-h-diversity:
+    name: Phase H Diversification H.1-H.10
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test diversification engine
+        run: cargo test --locked -p nexora-shield-diversity --all-targets
+
+      - name: Clippy diversification engine
+        run: cargo clippy --locked -p nexora-shield-diversity --all-targets -- -D warnings
+
+  phase-h-diversity-msrv:
+    name: Phase H Diversification Rust 1.81 MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Test diversification engine on declared MSRV
+        run: cargo +1.81.0 test --locked -p nexora-shield-diversity --all-targets
+
+  phase-h-cross-build:
+    name: Phase H 32-build bypass portability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run cross-build portability regression
+        run: cargo test --locked -p nexora-shield-diversity --test phase_h h10_cross_build_bypass_portability_stays_below_budget -- --exact

@@ -4,6 +4,7 @@ members = [
     "crates/shield-core",
     "crates/shield-package",
     "crates/shield-dex",
+    "crates/shield-diversity",
     "crates/shield-crypto",
     "crates/shield-integrity",
     "crates/shield-native",

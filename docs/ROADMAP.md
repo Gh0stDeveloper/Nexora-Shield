@@ -219,6 +219,8 @@ Estado actual: **COMPLETADA**. G.1–G.14 están implementadas en `nexora-shield
 Criterio:
 - bypasses/patches basados en offsets/patrones de un build no transfieren de forma trivial.
 
+Estado actual: **COMPLETADA**. H.1–H.10 están implementadas en `nexora-shield-diversity`: seed privada de mínimo 32 bytes con separación HMAC por dominio y zeroization, modo reproducible privado, diversidad de rename, orden de pases, CFG materializado sobre VM IR, topologías válidas de integridad, shards opacos de strings de Phase C, mapas VM, constantes nativas y regresión pairwise de portabilidad entre 32 builds. GitHub Actions run #665 (`37574529544`) validó Rust quality, RustSec, regresiones A–G, H.1–H.10, Rust 1.81 y el gate de portabilidad sin errores.
+
 ---
 
 ## Fase I — Attestation & Remote Policy
