@@ -294,10 +294,15 @@ Estado actual: **COMPLETADA**. K.1–K.10 quedaron integradas y validadas con AA
 ### L.8 Artifact verification
 ### L.9 Mapping/retrace UI
 ### L.10 Secure secret-provider integration
+### L.11 Nexora Shield design system & visual identity
+### L.12 Dashboard & information architecture
+### L.13 End-user workflow UX
+### L.14 Responsive desktop & accessibility
+### L.15 Final polish & distribution presentation
 
 Studio nunca reemplaza la CLI; es una capa de UX.
 
-Estado actual: **COMPLETADA**. L.1–L.10 están implementadas en Shield Studio sobre Compose Multiplatform: importación segura de proyectos, edición de perfiles/selectores, reportes públicos, presupuestos, consola de build, verificación APK/AAB/AAR/APKS, retrace y referencias seguras de secretos. GitHub Actions Phase L run #20 (`37591941642`), CI run #891 (`37591941514`) y la regresión Phase K #36 (`37591941555`) finalizaron correctamente sobre el head validado `7e9d149e72885263b183f71e907d3ef6482a4e4a`.
+Estado actual: **L.1–L.10 COMPLETADAS; L.11–L.15 EN VALIDACIÓN**. El núcleo funcional quedó validado por Phase L run #20 (`37591941642`), CI #891 (`37591941514`) y Phase K regression #36 (`37591941555`). La extensión L.11–L.15 eleva Shield Studio a calidad de producto final con design system propio, dashboard, navegación jerárquica, estados semánticos, ergonomía responsive, accesibilidad y presentación desktop.
 
 ---
 
