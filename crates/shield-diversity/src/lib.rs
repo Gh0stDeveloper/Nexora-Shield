@@ -37,5 +37,8 @@ pub use rename::RenameVariant;
 pub use seed::{
     BuildSeedContext, DiversityDomain, DiversityMode, PrivateBuildSeed, SeedDeriver,
 };
-pub use strings::{StringPartitionPlan, StringShard};
+pub use strings::{
+    PublicStringShard, StringPartitionBuild, StringPartitionPlan, StringShard, StringShardEntry,
+    StringShardLocation,
+};
 pub use vm::VmMapVariant;
