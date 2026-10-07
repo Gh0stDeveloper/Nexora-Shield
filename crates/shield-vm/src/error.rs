@@ -22,7 +22,9 @@ pub enum VmError {
     StepLimitExceeded { limit: u64 },
     MissingReturn,
     InvalidOpcode(u8),
+    MalformedBytecode(String),
     MetadataSealMismatch,
+    BytecodeDigestMismatch,
     MetadataEncoding(String),
     InvalidSelector(String),
 }
@@ -84,7 +86,13 @@ impl fmt::Display for VmError {
             Self::InvalidOpcode(opcode) => {
                 write!(formatter, "unknown allocated VM opcode {opcode}")
             }
+            Self::MalformedBytecode(message) => {
+                write!(formatter, "malformed VM bytecode: {message}")
+            }
             Self::MetadataSealMismatch => formatter.write_str("VM metadata authentication failed"),
+            Self::BytecodeDigestMismatch => {
+                formatter.write_str("VM bytecode digest does not match sealed metadata")
+            }
             Self::MetadataEncoding(message) => {
                 write!(formatter, "VM metadata encoding error: {message}")
             }
