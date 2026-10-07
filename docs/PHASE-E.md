@@ -6,7 +6,7 @@ Phase E adds a portable Runtime Application Self-Protection evidence layer on to
 
 The design is evidence-first. Platform-specific adapters observe runtime state and submit normalized observations. The portable Rust core converts those observations into deterministic, auditable signals. Response policy and risk correlation are intentionally separate so a single detector cannot become a fragile central kill switch.
 
-## Implemented scope — E.1 to E.10
+## Implemented scope — E.1 to E.12
 
 ### E.1 — Signal API
 
@@ -135,13 +135,34 @@ Supported responses are deliberately non-destructive:
 
 The RASP core does not terminate processes, corrupt data, delete files or perform stealth/destructive countermeasures.
 
+### E.11 — Report-only mode
+
+`PolicyMode::ReportOnly` preserves the configured policy decision for audit while constraining the effective response to at most `report`.
+
+That means:
+
+- clean/observed flows remain unchanged;
+- elevated/high/critical risk is still calculated normally;
+- configured blocking responses remain visible in the decision record;
+- the effective runtime action never exceeds `report`.
+
+This allows teams to deploy RASP telemetry before enforcement without silently changing risk semantics.
+
+### E.12 — False-positive lab
+
+`FalsePositiveLab` runs deterministic acceptance cases against a compiled policy and verifies two independent ceilings:
+
+- maximum acceptable risk level;
+- maximum acceptable effective response.
+
+The baseline matrix covers clean production, debuggable-only, weak emulator hints, unlocked-bootloader-only, root-artifact-only and QEMU-only profiles. A dedicated regression test also verifies that the lab fails when a case exceeds its declared ceiling.
+
+This is a portable Phase E false-positive gate. Broader physical-device, modified-environment and performance matrices remain part of Phase M Security Lab.
+
 ## Security boundary
 
 RASP signals are evidence, not proof that client-side software is impossible to bypass. The system raises attack cost through multiple independent signals, later risk fusion, policy compilation and per-build diversity.
 
-## Remaining Phase E work
+## Closure state
 
-E.11–E.12 remain open:
-
-- report-only mode;
-- false-positive lab.
+E.1–E.12 are implemented. Final closure requires the complete GitHub Actions acceptance matrix to pass on the final branch head, including Rust quality, RustSec, Phase A–D regressions, Phase E tests and Rust 1.81 MSRV validation.
