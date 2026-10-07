@@ -17,7 +17,8 @@
 ## G.3 Opcode model
 - [x] Semantic opcode model
 - [x] Forward/reverse mapping
-- [x] Opcode stream
+- [x] Full operand-bearing opcode stream
+- [x] Stream decoder
 - [x] Allocation fingerprint
 
 ## G.4 Lowering
@@ -36,6 +37,7 @@
 - [x] 32-bit wrapping arithmetic
 - [x] Branch execution
 - [x] Return semantics
+- [x] Allocated bytecode execution
 - [x] Step limit
 - [x] Method validation before execution
 
@@ -47,6 +49,8 @@
 - [x] Typed handlers
 - [x] Catch-all handlers
 - [x] Exception-register transfer
+- [x] Host exception construction
+- [x] Host subtype/assignability matching
 
 ## G.7 Calls/fields
 - [x] VmHost boundary
@@ -73,7 +77,9 @@
 - [x] Versioned metadata
 - [x] Pool digest binding
 - [x] Opcode fingerprint binding
-- [x] Tamper rejection
+- [x] Encoded bytecode digest binding
+- [x] Wrong-allocation rejection path
+- [x] Bytecode tamper rejection
 - [x] Wrong-key rejection
 
 ## G.11 Performance estimator
