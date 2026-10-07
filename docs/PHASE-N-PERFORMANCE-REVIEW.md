@@ -1,5 +1,7 @@
 # Nexora Shield 1.0 RC — performance review
 
+> **Post-Phase-N audit clarification:** these measurements are valid for the production `protect` path that existed during Phase N. The later Phase O audit found that this path did not yet orchestrate the complete B–I protection stack into the final artifact. O.11 must therefore repeat performance qualification after the O.1–O.5 production integration is complete.
+
 ## RC scope
 
 RC qualification validates deterministic budget logic and protection-overhead accounting through Phase M.
