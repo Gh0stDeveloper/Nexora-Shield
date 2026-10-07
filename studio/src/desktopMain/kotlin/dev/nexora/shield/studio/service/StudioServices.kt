@@ -98,7 +98,7 @@ class CommandRunner(
     suspend fun run(
         command: List<String>,
         workingDirectory: Path,
-        environment: Map<String, String> = emptyMap(),
+        environmentOverrides: Map<String, String> = emptyMap(),
     ): CommandResult = withContext(Dispatchers.IO) {
         require(command.isNotEmpty()) { "Command must not be empty." }
         require(workingDirectory.toFile().isDirectory) { "Working directory does not exist." }
@@ -107,7 +107,7 @@ class CommandRunner(
         val process = ProcessBuilder(command)
             .directory(workingDirectory.toFile())
             .redirectErrorStream(true)
-            .apply { environment().putAll(environment) }
+            .apply { environment().putAll(environmentOverrides) }
             .start()
 
         val readerExecutor = Executors.newSingleThreadExecutor()
@@ -188,7 +188,7 @@ class ArtifactVerifier(
             "apks" -> "apks-verify"
             else -> error("Unsupported artifact type '.${artifact.extension}'.")
         }
-        return listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString())
+        return if (action == "verify") {\n            listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString(), "--signature")\n        } else {\n            listOf(cliExecutable, action, artifact.toAbsolutePath().normalize().toString())\n        }
     }
 
     suspend fun verify(
@@ -246,12 +246,12 @@ class SecretReferenceInspector {
         val reference = rawReference?.trim()?.takeIf(String::isNotEmpty) ?: return null
         val explicitPrefix = reference.substringBefore(':', missingDelimiterValue = "")
         val explicitValue = reference.substringAfter(':', missingDelimiterValue = "")
-        val provider = if (explicitPrefix in setOf("env", "file") && explicitValue.isNotEmpty()) {
-            explicitPrefix
+        val provider = if (explicitPrefix.isNotEmpty() && explicitValue.isNotEmpty()) {
+            explicitPrefix.lowercase()
         } else {
             configuredProvider.ifEmpty { "external" }
         }
-        val value = if (provider == explicitPrefix && explicitValue.isNotEmpty()) explicitValue else reference
+        val value = if (explicitPrefix.isNotEmpty() && explicitValue.isNotEmpty()) explicitValue else reference
 
         return when (provider) {
             "env" -> SecretReferenceStatus(
