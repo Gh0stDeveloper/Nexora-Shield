@@ -27,7 +27,7 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 
 Its goal is not to claim that protected software is "unbreakable". Software executing on an attacker-controlled device can ultimately be inspected. The objective is to make analysis and modification substantially more expensive, reduce reusable bypasses, detect defined integrity violations, and keep defensive behavior measurable through repeatable tests.
 
-The protection platform through **Phase M — Security Lab** is complete. Phase N has completed RC qualification and is in the final **1.0.0 stable qualification** stage.
+The protection platform through **Phase N — Production Hardening** is complete. The source contract is finalized at **1.0.0** and validated for stable publication.
 
 | Area | Current state |
 | --- | --- |
@@ -48,7 +48,7 @@ The protection platform through **Phase M — Security Lab** is complete. Phase 
 | Shield Studio | Completed |
 | Security Lab | Completed |
 | Production hardening | **1.0 RC qualification** |
-| Stable 1.0 | Final N.14 qualification/publication in progress; N.10 performance and N.13 external assessment are satisfied |
+| Stable 1.0 | **Qualified — source finalized at 1.0.0; release tag must be created from validated main** |
 
 ## Implemented Protection Layers
 
