@@ -134,10 +134,7 @@ pub struct OpcodeStream {
 }
 
 impl OpcodeStream {
-    pub fn encode(
-        instructions: &[VmInstruction],
-        allocation: &OpcodeAllocation,
-    ) -> Result<Self> {
+    pub fn encode(instructions: &[VmInstruction], allocation: &OpcodeAllocation) -> Result<Self> {
         let bytes = instructions
             .iter()
             .map(|instruction| allocation.encode(semantic_opcode(instruction)))
