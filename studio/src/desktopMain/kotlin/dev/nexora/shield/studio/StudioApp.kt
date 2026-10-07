@@ -78,6 +78,7 @@ fun StudioApp(state: StudioState = remember { StudioState() }) {
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val compactNavigation = maxWidth < 1180.dp
+            val compactContent = maxWidth < 1080.dp
 
             Row(Modifier.fillMaxSize()) {
                 StudioNavigation(
@@ -104,7 +105,7 @@ fun StudioApp(state: StudioState = remember { StudioState() }) {
                         StudioScreen(
                             section = selected,
                             state = state,
-                            compact = maxWidth < 1080.dp,
+                            compact = compactContent,
                             onNavigate = { section = it },
                         )
                     }
