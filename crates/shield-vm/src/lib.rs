@@ -30,7 +30,8 @@ mod value;
 
 pub use constant_pool::{ConstantPool, VmConstant};
 pub use eligibility::{
-    EligibilityAnalyzer, EligibilityPolicy, EligibilityReason, EligibilityReport,
+    EligibilityAnalyzer, EligibilityFeature, EligibilityPolicy, EligibilityReason,
+    EligibilityReport,
 };
 pub use error::{Result, VmError};
 pub use host::{NullHost, VmHost};
