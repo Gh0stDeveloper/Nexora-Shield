@@ -383,7 +383,74 @@
     },
     "attestation": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "provider": {
+          "type": "string",
+          "enum": ["play_integrity", "custom"]
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challengeTtlMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["signatureAlgorithm", "keyId", "minSequence"],
+          "properties": {
+            "signatureAlgorithm": {
+              "type": "string",
+              "enum": ["ed25519", "es256"]
+            },
+            "keyId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "minSequence": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "offline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxPolicyStalenessMs", "defaultAction"],
+          "properties": {
+            "maxPolicyStalenessMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2592000000
+            },
+            "defaultAction": {
+              "type": "string",
+              "enum": ["allow", "degrade", "deny"]
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sendNormalizedLocalRisk",
+            "retainRawAttestationToken",
+            "includeStableDeviceIdentifiers"
+          ],
+          "properties": {
+            "sendNormalizedLocalRisk": { "type": "boolean" },
+            "retainRawAttestationToken": { "const": false },
+            "includeStableDeviceIdentifiers": { "const": false }
+          }
+        }
+      }
     },
     "budgets": {
       "type": "object",

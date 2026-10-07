@@ -7,7 +7,7 @@
 A modular Android hardening platform designed to raise the cost of reverse engineering, tampering, repackaging, runtime instrumentation, and extraction of sensitive application logic.
 
 [![CI](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml)
-![Phase](https://img.shields.io/badge/Phase_H-Diversification_complete-22c55e?style=flat-square)
+![Phase](https://img.shields.io/badge/Phase_I-Attestation_complete-22c55e?style=flat-square)
 ![Rust](https://img.shields.io/badge/Rust-1.81%2B-000000?style=flat-square&logo=rust&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-Application_Security-3DDC84?style=flat-square&logo=android&logoColor=white)
 
@@ -27,7 +27,7 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 
 Its goal is not to claim that protected software is "unbreakable". Software executing on an attacker-controlled device can ultimately be inspected. The objective is to make analysis and modification substantially more expensive, reduce reusable bypasses, detect defined integrity violations, and keep defensive behavior measurable through repeatable tests.
 
-The current stable implementation covers the protection pipeline through **Phase H — Per-Build Diversification**.
+The current stable implementation covers the protection pipeline through **Phase I — Attestation & Remote Policy**.
 
 | Area | Current state |
 | --- | --- |
@@ -42,7 +42,8 @@ The current stable implementation covers the protection pipeline through **Phase
 | Native Shield | Completed |
 | VM Shield | Completed |
 | Per-Build Diversification | Completed |
-| Next milestone | **Phase I — Attestation & Remote Policy** |
+| Attestation & Remote Policy | Completed |
+| Next milestone | **Phase J — Gradle Plugin** |
 
 ## Implemented Protection Layers
 

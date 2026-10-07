@@ -241,6 +241,8 @@ Opcional; no necesaria para apps totalmente offline.
 Criterio:
 - decisiones sensibles pueden incorporar evidencia de servidor sin hacer la app inutilizable offline cuando no corresponda.
 
+Estado actual: **COMPLETADA**. I.1–I.10 están implementadas en `nexora-shield-attestation`: abstracción proveedor/verificador, challenge session/nonce con anti-replay de consumo único, ejemplo compilable de verificación servidor, política firmada con anti-rollback, revocación de builds, umbrales por feature, degradación offline acotada, contrato de privacidad y pruebas integrales. GitHub Actions run #709 (`37576325958`) validó Rust quality, RustSec, regresiones A–H, I.1–I.10, integración de protocolo/ejemplo servidor y Rust 1.81 sin errores.
+
 ---
 
 ## Fase J — Gradle Plugin

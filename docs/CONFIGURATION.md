@@ -108,6 +108,20 @@ vm:
 
 attestation:
   enabled: false
+  provider: play_integrity
+  endpoint: https://security.example.com/v1/attestation
+  challengeTtlMs: 120000
+  policy:
+    signatureAlgorithm: ed25519
+    keyId: release-policy-1
+    minSequence: 1
+  offline:
+    maxPolicyStalenessMs: 86400000
+    defaultAction: degrade
+  privacy:
+    sendNormalizedLocalRisk: true
+    retainRawAttestationToken: false
+    includeStableDeviceIdentifiers: false
 
 budgets:
   apkGrowthPercent: 20
@@ -454,3 +468,43 @@ Después:
 ## 17. Config schema
 
 El proyecto mantendrá un JSON Schema generado para IDE completion y validación. Cambios breaking incrementan schema version.
+
+
+## 18. Attestation & Remote Policy
+
+Phase I es opcional. Una aplicación totalmente offline puede dejar `attestation.enabled: false`.
+
+Cuando está habilitada, el cliente solicita un challenge corto al servidor, obtiene evidencia del proveedor configurado y la devuelve ligada a `application_id`, `build_id`, purpose, session id y nonce.
+
+~~~yaml
+attestation:
+  enabled: true
+  provider: play_integrity
+  endpoint: https://security.example.com/v1/attestation
+  challengeTtlMs: 120000
+  policy:
+    signatureAlgorithm: ed25519
+    keyId: release-policy-1
+    minSequence: 42
+  offline:
+    maxPolicyStalenessMs: 86400000
+    defaultAction: degrade
+  privacy:
+    sendNormalizedLocalRisk: true
+    retainRawAttestationToken: false
+    includeStableDeviceIdentifiers: false
+~~~
+
+`challengeTtlMs` no puede superar 600000 ms.
+
+El cliente de producción solo acepta políticas firmadas con una clave pública confiable, con `sequence` no menor al último mínimo persistido. El ejemplo HMAC del crate existe únicamente para pruebas deterministas y no debe utilizarse como verificador compartido embebido en Android.
+
+Las reglas por feature llegan dentro de la política firmada remota. Cada regla puede definir:
+
+- máximo `RiskLevel` local aceptado;
+- si requiere attestation verificada;
+- comportamiento offline propio: allow, degrade o deny.
+
+Las revocaciones de build tienen prioridad sobre cualquier fallback offline.
+
+El protocolo tipado no incorpora identificadores estables de dispositivo ni metadata libre. Véase `docs/PHASE-I-PRIVACY.md`.

@@ -171,6 +171,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexora-shield-attestation"
+version = "0.1.0"
+dependencies = [
+ "hmac",
+ "nexora-shield-rasp",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "nexora-shield-core"
 version = "0.1.0"
 dependencies = [
