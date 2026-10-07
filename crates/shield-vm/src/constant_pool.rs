@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum VmConstant {
-    Int(i64),
+    Int(i32),
     String(String),
     Type(String),
 }
