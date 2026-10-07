@@ -9,6 +9,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+nexora-shield-integrity = { path = "../shield-integrity" }
 serde = { version = "1.0", features = ["derive"] }
 
 [lints]
