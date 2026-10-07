@@ -1,6 +1,6 @@
 use nexora_shield_package::{
     inspect_aab, inspect_aar, inspect_apk_set, verify_aab_structure, verify_aar_structure,
-    verify_apk_set_structure, ApkSetMode, Bundletool, BundletoolSigningConfig,
+    verify_apk_set_structure, AarMarker, ApkSetMode, Bundletool, BundletoolSigningConfig,
 };
 use std::path::PathBuf;
 
@@ -26,7 +26,7 @@ pub fn run_aab_inspect(args: &[String]) -> Result<(), String> {
             module.resource_entries,
             module.asset_entries,
             module.native_abis.len(),
-            module.baseline_profile_present
+            module.baseline_profile.binary_present
         );
     }
     println!("Dynamic features: {}", inspection.dynamic_features.len());
@@ -61,12 +61,24 @@ pub fn run_aar_inspect(args: &[String]) -> Result<(), String> {
     println!("AAR: {}", path.display());
     println!("SHA-256: {}", inspection.sha256);
     println!("Entries: {}", inspection.entry_count);
-    println!("Manifest: {}", inspection.manifest_present);
-    println!("classes.jar: {}", inspection.classes_jar_present);
-    println!("AAR metadata: {}", inspection.aar_metadata_present);
+    println!(
+        "Manifest: {}",
+        inspection.has_marker(AarMarker::Manifest)
+    );
+    println!(
+        "classes.jar: {}",
+        inspection.has_marker(AarMarker::ClassesJar)
+    );
+    println!(
+        "AAR metadata: {}",
+        inspection.has_marker(AarMarker::AarMetadata)
+    );
     println!("Consumer rules: {}", inspection.consumer_rule_entries.len());
     println!("Resources: {}", inspection.resource_entries);
-    println!("R.txt: {}", inspection.resource_symbols_present);
+    println!(
+        "R.txt: {}",
+        inspection.has_marker(AarMarker::ResourceSymbols)
+    );
     println!("Baseline profiles: {}", inspection.baseline_profile_entries.len());
     Ok(())
 }
