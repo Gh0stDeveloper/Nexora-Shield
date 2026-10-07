@@ -175,6 +175,8 @@ Estado actual: **COMPLETADA**. Las subfases E.1–E.12 están implementadas en `
 Criterio:
 - runtime nativo reproducible, estable y modular.
 
+Estado actual: **COMPLETADA**. F.1–F.10 están implementadas. GitHub Actions run #425 (`37562726466`) validó Rust quality, RustSec, regresiones A–E, Phase F host, Rust 1.81 MSRV, enlace Android real para arm64-v8a/x86_64, RELRO/NOW, ausencia de build-id, superficie JNI mínima y reproducibilidad byte a byte.
+
 ---
 
 ## Fase G — VM Shield
