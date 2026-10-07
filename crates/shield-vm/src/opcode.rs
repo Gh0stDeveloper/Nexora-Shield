@@ -81,7 +81,7 @@ impl OpcodeAllocation {
 
         let mut encode = BTreeMap::new();
         let mut decode = BTreeMap::new();
-        for (semantic, encoded) in ALL_SEMANTIC_OPCODES.iter().copied().zip(pool.into_iter()) {
+        for (semantic, encoded) in ALL_SEMANTIC_OPCODES.iter().copied().zip(pool) {
             encode.insert(semantic, encoded);
             decode.insert(encoded, semantic);
         }
