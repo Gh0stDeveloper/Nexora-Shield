@@ -9,16 +9,21 @@ pub struct QualificationPolicy {
     pub schema: u32,
     pub required_rc_gates: Vec<String>,
     pub required_stable_gates: Vec<String>,
-    pub minimum_external_reviewers: usize,
+    pub minimum_external_assessments: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeedbackStatus {
     pub schema: u32,
-    pub external_reviewers: usize,
+    pub external_assessments: usize,
+    #[serde(default)]
+    pub human_reviewers: usize,
+    #[serde(default)]
     pub accepted_feedback_items: usize,
     pub blocking_findings_open: usize,
+    #[serde(default)]
+    pub assessment_providers: Vec<String>,
 }
 
 impl QualificationPolicy {
@@ -34,9 +39,9 @@ impl QualificationPolicy {
                 "qualification policy schema must be 1".into(),
             ));
         }
-        if self.minimum_external_reviewers == 0 {
+        if self.minimum_external_assessments == 0 {
             return Err(ReleaseError::InvalidQualification(
-                "stable release requires at least one external reviewer".into(),
+                "stable release requires at least one independent external assessment".into(),
             ));
         }
         validate_gate_list("RC", &self.required_rc_gates)?;
@@ -56,8 +61,9 @@ impl QualificationPolicy {
     #[must_use]
     pub fn stable_feedback_satisfied(&self, feedback: &FeedbackStatus) -> bool {
         feedback.schema == 1
-            && feedback.external_reviewers >= self.minimum_external_reviewers
+            && feedback.external_assessments >= self.minimum_external_assessments
             && feedback.blocking_findings_open == 0
+            && unique_nonblank(&feedback.assessment_providers)
     }
 }
 
@@ -69,8 +75,23 @@ impl FeedbackStatus {
                 "feedback status schema must be 1".into(),
             ));
         }
+        if value.external_assessments > 0 && !unique_nonblank(&value.assessment_providers) {
+            return Err(ReleaseError::InvalidQualification(
+                "external assessments require unique non-empty provider identifiers".into(),
+            ));
+        }
         Ok(value)
     }
+}
+
+fn unique_nonblank(values: &[String]) -> bool {
+    if values.is_empty() {
+        return false;
+    }
+    let mut seen = BTreeSet::new();
+    values
+        .iter()
+        .all(|value| !value.trim().is_empty() && seen.insert(value.as_str()))
 }
 
 fn validate_gate_list(label: &str, gates: &[String]) -> Result<()> {
