@@ -140,8 +140,7 @@ impl MultiDexSet {
                     // Shared seeds formerly generated equal one-letter class
                     // descriptors across classes.dex/classes2.dex.
                     let mut unique_rename = rename.clone();
-                    unique_rename.seed ^= u64::from(unit.index)
-                        .wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                    unique_rename.seed ^= u64::from(unit.index).wrapping_mul(0x9e37_79b9_7f4a_7c15);
                     let result = RenamePass::apply(&parsed, &unique_rename)?;
                     current = result.bytes;
                     rename_report = Some(result.report);
