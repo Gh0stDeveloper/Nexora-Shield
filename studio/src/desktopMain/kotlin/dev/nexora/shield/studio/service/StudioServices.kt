@@ -51,6 +51,8 @@ class SecurityReportLoader {
             signed = root.requiredBoolean("signed"),
             strippedSignatureEntries = root.requiredInt("stripped_signature_entries"),
             stages = root["stages"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList(),
+            productionProtected = root["production_protected"]?.jsonPrimitive?.content == "true",
+            protectionScope = root["protection_scope"]?.jsonPrimitive?.content ?: "unverified-legacy",
         )
     }
 
