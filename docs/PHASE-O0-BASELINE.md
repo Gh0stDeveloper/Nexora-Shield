@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS — release freeze active**
+**COMPLETED — release freeze active**
 
 Phase O.0 establishes the immutable starting point for all subsequent Phase O remediation.
 
@@ -95,9 +95,20 @@ the release workflow must reject stable channel publication before any build/pub
 
 RC publication may remain available for controlled Phase O testing, but an RC does not close Phase O or authorize stable.
 
+## O.0 validation evidence
+
+- workflow: **Phase O #9**
+- run id: `37710584139`
+- validated head: `21711b57220b19a8c534607b1027e7ededaff666`
+- job: `O.0 release freeze and audit baseline`
+- conclusion: **success**
+- stable channel rejection: verified
+- controlled RC channel: verified
+- documentation audit: verified
+
 ## O.0 exit criteria
 
-O.0 closes only when:
+O.0 is **COMPLETED** because:
 
 - baselines are machine-readable;
 - all findings are inventoried;
