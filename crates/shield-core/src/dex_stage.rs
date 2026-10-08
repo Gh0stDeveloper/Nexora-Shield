@@ -1,13 +1,11 @@
-//! Preliminary Phase O.1 DEX transformation and ZIP reconstruction.
-//!
-//! This API emits a **staging artifact**, not a production protected APK. It
-//! intentionally does not perform final runtime binding, signing or release.
+//! Phase O.1 diagnostic DEX transformation and verified ZIP32 reconstruction.
+//! This unsigned staging artifact is never a production protection result.
 
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
 use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
     crc32_ieee, is_legacy_signature_entry, read_stored_entry, read_zip_directory,
-    rewrite_stored_entries, verify_apk_structure,
+    rewrite_stored_entries, verify_apk_structure, ZipDirectory,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -25,14 +23,12 @@ pub struct StagedDexResult {
 }
 
 impl ProductionBuildContext {
-    /// Reconstructs a **diagnostic** APK containing rewritten DEX. The
-    /// destination must be a private, previously nonexistent staging file.
-    /// It is NOT an implementation of the release production orchestrator.
+    /// Rebuilds an unsigned diagnostic APK, not a production-protected APK.
     ///
     /// # Errors
     ///
-    /// Refuses unsafe paths, corrupt/stale inputs, unsupported DEX compression,
-    /// no-op transformations, invalid output ZIP metadata or invalid final DEX.
+    /// Rejects unsafe destinations, changed input, invalid DEX data, no-op
+    /// transformations and reconstructed artifacts that fail final checks.
     pub fn stage_dex_rewrite(
         &self,
         destination: &Path,
@@ -45,18 +41,75 @@ impl ProductionBuildContext {
         }
         if destination.exists() || destination == self.input() || destination == self.output() {
             return Err(CoreError::InvalidRequest(
-                "DEX staging destination must be new and separate from all source/output paths"
-                    .into(),
+                "DEX staging destination must be new and separate from source/output".into(),
             ));
         }
-        // Verify exact source identity and semantic compatibility before
-        // processing. The public preflight enforces cross-DEX uniqueness.
+        // The preflight enforces conservative compatibility and class ownership.
         let _ = self.inspect_dex()?;
         let directory = read_zip_directory(self.input())?;
+        let (inputs, originals) = self.load_dex_inputs(&directory)?;
+        let set = MultiDexSet::parse(inputs).map_err(|error| {
+            CoreError::InvalidRequest(format!("DEX staging validation: {error}"))
+        })?;
+        let outputs = set.rewrite(config).map_err(|error| {
+            CoreError::InvalidRequest(format!("DEX transform refused: {error}"))
+        })?;
+        let mut result = StagedDexResult {
+            dex_units: outputs.len(),
+            changed_dex_units: 0,
+            skipped_cross_dex_rename_units: 0,
+            source_files_removed: 0,
+            debug_info_detached: 0,
+            name_records: 0,
+            output_sha256: String::new(),
+        };
+        let mut replacements = BTreeMap::new();
+        for unit in outputs {
+            if unit.rename_skipped_for_cross_dex_reflection {
+                result.skipped_cross_dex_rename_units += 1;
+            }
+            if let Some(report) = unit.rename_report {
+                result.name_records += report.records.len();
+            }
+            if let Some(report) = unit.metadata_report {
+                result.source_files_removed += report.source_files_removed;
+                result.debug_info_detached += report.debug_info_detached;
+            }
+            if originals.get(&unit.name) != Some(&unit.bytes) {
+                result.changed_dex_units += 1;
+            }
+            replacements.insert(unit.name, unit.bytes);
+        }
+        if result.changed_dex_units == 0 {
+            return Err(CoreError::InvalidRequest(
+                "requested DEX rewrite changed no bytes; no protection claimed".into(),
+            ));
+        }
+        self.verify_input_unchanged()?;
+        let reconstruction = (|| -> Result<String> {
+            rewrite_stored_entries(self.input(), destination, &replacements)?;
+            self.verify_staged_apk(destination, &directory, &replacements)
+        })();
+        match reconstruction {
+            Ok(output_hash) => {
+                result.output_sha256 = output_hash;
+                Ok(result)
+            }
+            Err(error) => {
+                let _ = fs::remove_file(destination);
+                Err(error)
+            }
+        }
+    }
+
+    fn load_dex_inputs(
+        &self,
+        directory: &ZipDirectory,
+    ) -> Result<(Vec<DexInput>, BTreeMap<String, Vec<u8>>)> {
         let mut inputs = Vec::new();
         let mut originals = BTreeMap::new();
         let mut total = 0_usize;
-        for entry in directory.entries.iter() {
+        for entry in &directory.entries {
             if canonical_dex_index(&entry.name).is_none() {
                 continue;
             }
@@ -91,147 +144,100 @@ impl ProductionBuildContext {
             });
         }
         self.verify_input_unchanged()?;
-        let set = MultiDexSet::parse(inputs).map_err(|error| {
-            CoreError::InvalidRequest(format!("DEX staging validation: {error}"))
-        })?;
-        let mut replacements = BTreeMap::new();
-        let mut changed = 0_usize;
-        let mut skipped = 0_usize;
-        let mut removed = 0_usize;
-        let mut detached = 0_usize;
-        let mut renamed = 0_usize;
-        let outputs = set.rewrite(config).map_err(|error| {
-            CoreError::InvalidRequest(format!("DEX transform refused: {error}"))
-        })?;
-        for unit in &outputs {
-            if unit.rename_skipped_for_cross_dex_reflection {
-                skipped += 1;
-            }
-            if let Some(report) = &unit.rename_report {
-                renamed += report.records.len();
-            }
-            if let Some(report) = &unit.metadata_report {
-                removed += report.source_files_removed;
-                detached += report.debug_info_detached;
-            }
-            if originals.get(&unit.name) != Some(&unit.bytes) {
-                changed += 1;
-            }
-            replacements.insert(unit.name.clone(), unit.bytes.clone());
+        Ok((inputs, originals))
+    }
+
+    fn verify_staged_apk(
+        &self,
+        destination: &Path,
+        source: &ZipDirectory,
+        replacements: &BTreeMap<String, Vec<u8>>,
+    ) -> Result<String> {
+        let inspection = verify_apk_structure(destination)?;
+        if inspection.dex_files.len() != self.dex_count() {
+            return Err(CoreError::InvalidRequest("staged APK lost a DEX unit".into()));
         }
-        if changed == 0 {
+        let built = read_zip_directory(destination)?;
+        verify_rebuilt_zip(source, &built, destination, replacements)?;
+        let decoded = built
+            .entries
+            .iter()
+            .filter(|entry| replacements.contains_key(&entry.name))
+            .map(|entry| {
+                read_stored_entry(destination, entry, MAX_DEX_BYTES)?
+                    .ok_or_else(|| CoreError::InvalidRequest("DEX extraction failed".into()))
+                    .map(|bytes| DexInput {
+                        name: entry.name.clone(),
+                        bytes,
+                    })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let reparsed = MultiDexSet::parse(decoded).map_err(|error| {
+            CoreError::InvalidRequest(format!("staged APK DEX verification: {error}"))
+        })?;
+        if reparsed.units.len() != replacements.len() {
+            return Err(CoreError::InvalidRequest("staged DEX count mismatch".into()));
+        }
+        self.verify_input_unchanged()?;
+        Ok(inspection.sha256)
+    }
+}
+
+fn verify_rebuilt_zip(
+    source: &ZipDirectory,
+    built: &ZipDirectory,
+    destination: &Path,
+    replacements: &BTreeMap<String, Vec<u8>>,
+) -> Result<()> {
+    let mut observed = BTreeSet::new();
+    for entry in &built.entries {
+        if is_legacy_signature_entry(&entry.name) {
             return Err(CoreError::InvalidRequest(
-                "requested DEX rewrite changed no bytes; no protection claimed".into(),
+                "staged APK contains stale signature data".into(),
             ));
         }
-
-        // A second check closes the common input-substitution window before
-        // reconstruction. Runtime signing and final publication still require
-        // their own independent source-snapshot contract.
-        self.verify_input_unchanged()?;
-        let reconstruction = (|| -> Result<StagedDexResult> {
-            rewrite_stored_entries(self.input(), destination, &replacements)?;
-            let inspection = verify_apk_structure(destination)?;
-            if inspection.dex_files.len() != self.dex_count() {
-                return Err(CoreError::InvalidRequest(
-                    "staged APK lost a DEX unit".into(),
-                ));
+        if let Some(expected) = replacements.get(&entry.name) {
+            let actual =
+                read_stored_entry(destination, entry, MAX_DEX_BYTES)?.ok_or_else(|| {
+                    CoreError::InvalidRequest("staged DEX is not stored".into())
+                })?;
+            if actual != *expected || crc32_ieee(&actual) != entry.crc32 {
+                return Err(CoreError::InvalidRequest(format!(
+                    "staged DEX '{}' differs from validated rewrite",
+                    entry.name
+                )));
             }
-            let built = read_zip_directory(destination)?;
-            let mut observed = BTreeSet::new();
-            for entry in &built.entries {
-                if is_legacy_signature_entry(&entry.name) {
-                    return Err(CoreError::InvalidRequest(
-                        "staged APK contains stale signature data".into(),
-                    ));
-                }
-                if let Some(expected) = replacements.get(&entry.name) {
-                    let actual =
-                        read_stored_entry(destination, entry, MAX_DEX_BYTES)?.ok_or_else(|| {
-                            CoreError::InvalidRequest("staged DEX is not stored".into())
-                        })?;
-                    if actual != *expected || crc32_ieee(&actual) != entry.crc32 {
-                        return Err(CoreError::InvalidRequest(format!(
-                            "staged DEX '{}' differs from validated rewrite",
-                            entry.name
-                        )));
-                    }
-                    observed.insert(entry.name.clone());
-                } else {
-                    let source = directory
-                        .entries
-                        .iter()
-                        .find(|candidate| candidate.name == entry.name)
-                        .ok_or_else(|| {
-                            CoreError::InvalidRequest(format!(
-                                "unexpected APK entry '{}'",
-                                entry.name
-                            ))
-                        })?;
-                    if source.crc32 != entry.crc32
-                        || source.uncompressed_size != entry.uncompressed_size
-                        || source.compression_method != entry.compression_method
-                    {
-                        return Err(CoreError::InvalidRequest(format!(
-                            "unmodified APK entry '{}' changed",
-                            entry.name
-                        )));
-                    }
-                }
-            }
-            if observed.len() != replacements.len()
-                || built.entries.len()
-                    != directory
-                        .entries
-                        .iter()
-                        .filter(|entry| !is_legacy_signature_entry(&entry.name))
-                        .count()
+            observed.insert(entry.name.clone());
+        } else {
+            let original = source
+                .entries
+                .iter()
+                .find(|candidate| candidate.name == entry.name)
+                .ok_or_else(|| {
+                    CoreError::InvalidRequest(format!("unexpected APK entry '{}'", entry.name))
+                })?;
+            if original.crc32 != entry.crc32
+                || original.uncompressed_size != entry.uncompressed_size
+                || original.compression_method != entry.compression_method
             {
-                return Err(CoreError::InvalidRequest(
-                    "staged APK entry inventory mismatch".into(),
-                ));
+                return Err(CoreError::InvalidRequest(format!(
+                    "unmodified APK entry '{}' changed",
+                    entry.name
+                )));
             }
-            let verified = MultiDexSet::parse(
-                built
-                    .entries
-                    .iter()
-                    .filter(|entry| replacements.contains_key(&entry.name))
-                    .map(|entry| {
-                        read_stored_entry(destination, entry, MAX_DEX_BYTES)
-                            .map_err(CoreError::from)
-                            .and_then(|value| {
-                                value.ok_or_else(|| {
-                                    CoreError::InvalidRequest("DEX extraction failed".into())
-                                })
-                            })
-                            .map(|bytes| DexInput {
-                                name: entry.name.clone(),
-                                bytes,
-                            })
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-            )
-            .map_err(|error| {
-                CoreError::InvalidRequest(format!("staged APK DEX verification: {error}"))
-            })?;
-            if verified.units.len() != replacements.len() {
-                return Err(CoreError::InvalidRequest(
-                    "staged DEX count mismatch".into(),
-                ));
-            }
-            Ok(StagedDexResult {
-                dex_units: outputs.len(),
-                changed_dex_units: changed,
-                skipped_cross_dex_rename_units: skipped,
-                source_files_removed: removed,
-                debug_info_detached: detached,
-                name_records: renamed,
-                output_sha256: inspection.sha256,
-            })
-        })();
-        if reconstruction.is_err() {
-            let _ = fs::remove_file(destination);
         }
-        reconstruction
     }
+    if observed.len() != replacements.len()
+        || built.entries.len()
+            != source
+                .entries
+                .iter()
+                .filter(|entry| !is_legacy_signature_entry(&entry.name))
+                .count()
+    {
+        return Err(CoreError::InvalidRequest(
+            "staged APK entry inventory mismatch".into(),
+        ));
+    }
+    Ok(())
 }
