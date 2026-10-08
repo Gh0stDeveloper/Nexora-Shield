@@ -60,6 +60,42 @@ jobs:
           grep -q 'Stage native-shield: Required, NotIntegrated' build/phase-o1/plan-maximum.txt
           grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan-maximum.txt
 
+      - name: O.1.1 resolved policy rejects downgrade and unsupported production
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk \
+            --output build/phase-o1/o11-not-created.apk \
+            --profile standard --unsigned --no-align --plan-only \
+            --enable-control vm-shield --enable-control attestation \
+            > build/phase-o1/o11-selected.txt
+          grep -q 'Effective control vm-shield: true' build/phase-o1/o11-selected.txt
+          grep -q 'Effective control attestation: true' build/phase-o1/o11-selected.txt
+          grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/o11-selected.txt
+          grep -q 'Stage attestation: Required, NotIntegrated' build/phase-o1/o11-selected.txt
+          grep -q 'Production ready: false' build/phase-o1/o11-selected.txt
+          test ! -e build/phase-o1/o11-not-created.apk
+          if cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk --output build/phase-o1/o11-forbidden.apk \
+            --profile maximum --unsigned --no-align --plan-only \
+            --disable-control native-shield > build/phase-o1/o11-rejected.txt 2>&1; then
+            echo 'Maximum profile downgrade was accepted' >&2
+            exit 1
+          fi
+          grep -q "native-shield" build/phase-o1/o11-rejected.txt
+          if cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk --output build/phase-o1/o11-forbidden.apk \
+            --profile standard --unsigned --no-align --plan-only \
+            --enable-control attestation --disable-control attestation \
+            > build/phase-o1/o11-duplicate.txt 2>&1; then
+            echo 'Duplicate control override was accepted' >&2
+            exit 1
+          fi
+          grep -q 'duplicate production control override' build/phase-o1/o11-duplicate.txt
+          test ! -e build/phase-o1/o11-forbidden.apk
+          cargo test --locked -p nexora-shield-core policy::tests
+
       - name: Production protect must never return a Phase A packaging-only APK
         shell: bash
         run: |

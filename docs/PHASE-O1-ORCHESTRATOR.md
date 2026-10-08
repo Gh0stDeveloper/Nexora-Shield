@@ -182,3 +182,37 @@ are not installable Android app tests. DEFLATE support is a necessary staging
 feature, **not** evidence of B–I protection, signing, runtime injection or an
 approved stable release. O.1 remains **OPEN**; final production executor and
 runtime installation proof are still required.
+
+## Subphase O.1.1 — Frozen request policy and collision-proof planning
+
+The production request now resolves `EffectiveProductionPolicy` before APK
+parsing, transformations, report writes, alignment or signing. The typed
+`ProductionOverrides` set is explicit; duplicate CLI overrides are rejected.
+All selected optional controls become **required**, not silently best-effort.
+A request attempting to disable a profile-mandatory control is rejected before
+opening the input APK.
+
+Current minimum mandatory set:
+- Standard: integrity graph plus the core inspect/configure/DEX/rebuild/verify/evidence stages.
+- Hardened: adds data protection, per-build diversity and RASP runtime.
+- Maximum: adds Native Shield and VM Shield to the hardened requirements.
+- Optional native/VM/attestation/data/diversity/RASP controls are promoted to
+  mandatory if explicitly enabled; required controls never accept disable.
+
+`protect --plan-only --enable-control vm-shield` prints the immutable
+effective selections and mandatory-stage graph. Both production entry points
+use the same resolver. `package-apk` refuses production-control overrides.
+No new output is created by policy planning; the incomplete production
+executor continues to fail closed.
+
+Filesystem planning also rejects clobber aliases involving source, output,
+reports, signing keystore and explicitly supplied Build Tools. This includes
+canonicalized paths and Unix hardlinks, along with directory destinations.
+Configured signing is validated for usable v2/v3 policy, supported minSdk and
+non-secret keystore/password-reference availability.
+
+**Scope boundary:** The canonical YAML schema and `examples/nexora-shield.yml`
+are not yet bound to the Rust planner. File-backed YAML parsing, versioned
+migration, budget and behavioral policy enforcement remain tracked for O.5.
+This subphase establishes the **typed request-to-effective-policy contract**,
+not a claim of implemented runtime protections or complete YAML support.

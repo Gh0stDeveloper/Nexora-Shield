@@ -16,7 +16,7 @@ The checklist is intentionally strict. A checked implementation item is not enou
 ## O.1 Production Protection Orchestrator
 - [x] Define authoritative production stage graph
 - [x] Add typed production build context
-- [ ] Resolve configuration before mutation
+- [x] Resolve typed request configuration before mutation (O.1.1; YAML file binding remains O.5)
 - [x] Resolve effective protection profile
 - [ ] Integrate DEX parse/validation
 - [ ] Integrate compatibility analysis
