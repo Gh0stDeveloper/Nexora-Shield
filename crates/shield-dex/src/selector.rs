@@ -24,10 +24,9 @@ impl Selector {
         member_pattern: Option<String>,
     ) -> Result<Self> {
         let class_pattern = class_pattern.into();
-        if class_pattern.is_empty() {
-            return Err(DexError::InvalidSelector(
-                "class pattern must not be empty".into(),
-            ));
+        validate_selector_pattern(&class_pattern, "class")?;
+        if let Some(pattern) = member_pattern.as_deref() {
+            validate_selector_pattern(pattern, "member")?;
         }
         if matches!(kind, SelectorKind::Method | SelectorKind::Field)
             && matches!(member_pattern.as_deref(), None | Some(""))
@@ -42,6 +41,20 @@ impl Selector {
             member_pattern,
         })
     }
+}
+
+const MAX_SELECTOR_PATTERN_BYTES: usize = 256;
+
+fn validate_selector_pattern(pattern: &str, label: &str) -> Result<()> {
+    if pattern.is_empty()
+        || pattern.len() > MAX_SELECTOR_PATTERN_BYTES
+        || pattern.bytes().any(|byte| byte == 0 || byte.is_ascii_control())
+    {
+        return Err(DexError::InvalidSelector(format!(
+            "{label} selector pattern must be 1..=256 bytes and contain no control characters"
+        )));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -61,6 +74,13 @@ impl Selection {
         self.classes.extend(other.classes.iter().copied());
         self.methods.extend(other.methods.iter().copied());
         self.fields.extend(other.fields.iter().copied());
+    }
+
+    /// Remove excluded targets from this deterministic per-DEX selection.
+    pub fn subtract(&mut self, other: &Self) {
+        self.classes.retain(|idx| !other.classes.contains(idx));
+        self.methods.retain(|idx| !other.methods.contains(idx));
+        self.fields.retain(|idx| !other.fields.contains(idx));
     }
 }
 
@@ -90,38 +110,35 @@ impl SelectorResolver {
                     selection.classes.insert(class.class_idx);
                 }
 
-                if matches!(selector.kind, SelectorKind::Any | SelectorKind::Method) {
-                    for (index, method) in dex.methods.iter().enumerate() {
-                        if u32::from(method.class_idx) != class.class_idx {
-                            continue;
-                        }
-                        let name = dex.string(method.name_idx).ok_or(DexError::InvalidIndex {
-                            kind: "string",
-                            index: method.name_idx,
-                        })?;
-                        if match selector.member_pattern.as_deref() {
-                            None => true,
-                            Some(pattern) => glob_match(pattern, name),
-                        } {
-                            selection.methods.insert(index as u32);
+                if let Some(data) = dex.class_data.get(&class.class_idx) {
+                    if matches!(selector.kind, SelectorKind::Any | SelectorKind::Method) {
+                        for encoded in data.methods() {
+                            let name = dex.method_name(encoded.method_idx).ok_or(
+                                DexError::InvalidIndex {
+                                    kind: "method",
+                                    index: encoded.method_idx,
+                                },
+                            )?;
+                            if selector.member_pattern.as_deref().is_none_or(|pattern| {
+                                glob_match(pattern, name)
+                            }) {
+                                selection.methods.insert(encoded.method_idx);
+                            }
                         }
                     }
-                }
-
-                if matches!(selector.kind, SelectorKind::Any | SelectorKind::Field) {
-                    for (index, field) in dex.fields.iter().enumerate() {
-                        if u32::from(field.class_idx) != class.class_idx {
-                            continue;
-                        }
-                        let name = dex.string(field.name_idx).ok_or(DexError::InvalidIndex {
-                            kind: "string",
-                            index: field.name_idx,
-                        })?;
-                        if match selector.member_pattern.as_deref() {
-                            None => true,
-                            Some(pattern) => glob_match(pattern, name),
-                        } {
-                            selection.fields.insert(index as u32);
+                    if matches!(selector.kind, SelectorKind::Any | SelectorKind::Field) {
+                        for encoded in data.static_fields.iter().chain(&data.instance_fields) {
+                            let name = dex.field_name(encoded.field_idx).ok_or(
+                                DexError::InvalidIndex {
+                                    kind: "field",
+                                    index: encoded.field_idx,
+                                },
+                            )?;
+                            if selector.member_pattern.as_deref().is_none_or(|pattern| {
+                                glob_match(pattern, name)
+                            }) {
+                                selection.fields.insert(encoded.field_idx);
+                            }
                         }
                     }
                 }
@@ -134,42 +151,55 @@ impl SelectorResolver {
 fn select_all(dex: &DexFile) -> Selection {
     Selection {
         classes: dex.classes.iter().map(|class| class.class_idx).collect(),
-        methods: (0..dex.methods.len()).map(|index| index as u32).collect(),
-        fields: (0..dex.fields.len()).map(|index| index as u32).collect(),
+        methods: dex
+            .class_data
+            .values()
+            .flat_map(|data| data.methods().map(|method| method.method_idx))
+            .collect(),
+        fields: dex
+            .class_data
+            .values()
+            .flat_map(|data| data.static_fields.iter().chain(&data.instance_fields))
+            .map(|field| field.field_idx)
+            .collect(),
     }
 }
 
+/// Match '*' and '?' without a quadratic dynamic-programming table.
+/// Matching is byte-oriented, consistent with DEX identifier names.
 #[must_use]
 pub fn glob_match(pattern: &str, value: &str) -> bool {
     let pattern = pattern.as_bytes();
     let value = value.as_bytes();
-    let mut table = vec![vec![false; value.len() + 1]; pattern.len() + 1];
-    table[0][0] = true;
-
-    for index in 1..=pattern.len() {
-        if pattern[index - 1] == b'*' {
-            table[index][0] = table[index - 1][0];
+    let mut pi = 0_usize;
+    let mut vi = 0_usize;
+    let mut last_star = None;
+    let mut retry_value = 0_usize;
+    while vi < value.len() {
+        if pi < pattern.len() && (pattern[pi] == b'?' || pattern[pi] == value[vi]) {
+            pi += 1;
+            vi += 1;
+        } else if pi < pattern.len() && pattern[pi] == b'*' {
+            last_star = Some(pi);
+            pi += 1;
+            retry_value = vi;
+        } else if let Some(star) = last_star {
+            pi = star + 1;
+            retry_value += 1;
+            vi = retry_value;
+        } else {
+            return false;
         }
     }
-
-    for pattern_index in 1..=pattern.len() {
-        for value_index in 1..=value.len() {
-            table[pattern_index][value_index] = match pattern[pattern_index - 1] {
-                b'*' => {
-                    table[pattern_index - 1][value_index] || table[pattern_index][value_index - 1]
-                }
-                b'?' => table[pattern_index - 1][value_index - 1],
-                byte => byte == value[value_index - 1] && table[pattern_index - 1][value_index - 1],
-            };
-        }
+    while pi < pattern.len() && pattern[pi] == b'*' {
+        pi += 1;
     }
-
-    table[pattern.len()][value.len()]
+    pi == pattern.len()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::glob_match;
+    use super::{glob_match, Selector, SelectorKind};
 
     #[test]
     fn glob_matching_is_deterministic() {
@@ -177,5 +207,16 @@ mod tests {
         assert!(glob_match("*Service;", "Lx/y/SyncService;"));
         assert!(glob_match("get?ser", "getUser"));
         assert!(!glob_match("set*", "getUser"));
+        assert!(glob_match("*", &"x".repeat(1_000_000)));
+        assert!(!glob_match("*Impossible", &"x".repeat(1_000_000)));
+    }
+
+    #[test]
+    fn reject_malformed_or_unbounded_selector_patterns() {
+        assert!(Selector::new(SelectorKind::Class, "", None).is_err());
+        assert!(Selector::new(SelectorKind::Class, "a".repeat(257), None).is_err());
+        assert!(Selector::new(SelectorKind::Class, "Lfoo;\\0", None).is_err());
+        assert!(Selector::new(SelectorKind::Method, "Lcom/*;", Some("m".repeat(257))).is_err());
+        assert!(Selector::new(SelectorKind::Method, "Lcom/*;", None).is_err());
     }
 }
