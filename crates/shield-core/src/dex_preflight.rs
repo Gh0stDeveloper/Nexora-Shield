@@ -172,7 +172,7 @@ fn resolve_effective_selection(
             }
         }
         for selector in policy.includes() {
-            let matches = resolve_selector_across_dex(&set, selector)?;
+            let matches = resolve_selector_across_dex(set, selector)?;
             if matches.iter().all(Selection::is_empty) {
                 return Err(CoreError::InvalidRequest(format!(
                     "include selector matched no defined DEX symbols: {}",
@@ -184,7 +184,7 @@ fn resolve_effective_selection(
             }
         }
         for selector in policy.excludes() {
-            let matches = resolve_selector_across_dex(&set, selector)?;
+            let matches = resolve_selector_across_dex(set, selector)?;
             if matches.iter().all(Selection::is_empty) {
                 return Err(CoreError::InvalidRequest(format!(
                     "exclude selector matched no defined DEX symbols: {}",
