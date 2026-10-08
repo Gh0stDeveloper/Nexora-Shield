@@ -150,6 +150,9 @@ jobs:
           public = json.loads(Path("build/phase-a/public-report.json").read_text())
           private = json.loads(Path("build/phase-a/private-report.json").read_text())
 
+          assert public["production_protected"] is False
+          assert public["protection_scope"] == "phase-a-packaging-only"
+          assert private["production_protected"] is False
           assert public["signed"] is True
           assert public["aligned"] is True
           assert public["dex_count"] == 2
