@@ -67,6 +67,49 @@ fn unsigned_no_align_pipeline_is_transactional_and_reports_are_written() {
     cleanup(&directory);
 }
 
+#[test]
+fn report_destinations_cannot_clobber_source_or_output() {
+    let directory = test_directory("report-alias");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("classes.dex", b"dex-one"),
+            ("AndroidManifest.xml", b"<manifest/>"),
+        ],
+    );
+    let before = fs::read(&input).expect("read source");
+    let base = ProtectionRequest {
+        input: input.clone(),
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let source_collision = ProtectionRequest {
+        public_report: Some(directory.join(".").join("input.apk")),
+        ..base.clone()
+    };
+    assert!(protect_apk(&source_collision).is_err());
+    assert_eq!(fs::read(&input).expect("source unchanged"), before);
+    assert!(!output.exists());
+
+    let output_collision = ProtectionRequest {
+        private_report: Some(directory.join(".").join("output.apk")),
+        ..base
+    };
+    assert!(protect_apk(&output_collision).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
 fn test_directory(label: &str) -> PathBuf {
     let counter = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
