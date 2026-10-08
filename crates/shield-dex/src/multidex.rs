@@ -197,8 +197,7 @@ impl MultiDexSet {
             .units
             .iter()
             .flat_map(|unit| {
-                (0..unit.dex.types.len())
-                    .filter_map(|index| unit.dex.type_descriptor(index as u32))
+                (0..unit.dex.types.len()).filter_map(|index| unit.dex.type_descriptor(index as u32))
             })
             .collect::<std::collections::BTreeSet<_>>();
         for (original, rewritten) in self.units.iter().zip(&rewritten_set.units) {
@@ -232,26 +231,31 @@ impl MultiDexSet {
         let mut owners = std::collections::BTreeMap::new();
         for unit in &self.units {
             for class in &unit.dex.classes {
-                let descriptor = unit.dex.type_descriptor(class.class_idx).ok_or(
-                    DexError::InvalidIndex {
-                        kind: "type",
-                        index: class.class_idx,
-                    },
-                )?;
+                let descriptor =
+                    unit.dex
+                        .type_descriptor(class.class_idx)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "type",
+                            index: class.class_idx,
+                        })?;
                 owners.insert(descriptor, unit.index);
             }
         }
         for unit in &self.units {
             for index in 0..unit.dex.types.len() {
-                let descriptor = unit.dex.type_descriptor(index as u32).ok_or(
-                    DexError::InvalidIndex {
-                        kind: "type",
-                        index: index as u32,
-                    },
-                )?;
+                let descriptor =
+                    unit.dex
+                        .type_descriptor(index as u32)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "type",
+                            index: index as u32,
+                        })?;
                 // Also recognize array forms referencing another unit's class.
                 let component = descriptor.trim_start_matches('[');
-                if owners.get(component).is_some_and(|owner| *owner != unit.index) {
+                if owners
+                    .get(component)
+                    .is_some_and(|owner| *owner != unit.index)
+                {
                     return Ok(true);
                 }
             }

@@ -36,7 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("DEX units: {}", summary.dex_units);
     println!("Changed DEX units: {}", summary.changed_dex_units);
     println!("Renamed strings: {}", summary.name_records);
-    println!("Verified unchanged code items: {}", summary.verified_code_items);
+    println!(
+        "Verified unchanged code items: {}",
+        summary.verified_code_items
+    );
     println!("Removed source files: {}", summary.source_files_removed);
     println!("Staged SHA-256: {}", summary.output_sha256);
     Ok(())

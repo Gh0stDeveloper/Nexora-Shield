@@ -167,9 +167,7 @@ impl DexRewriteVerifier {
             let mut reported_indices = BTreeSet::new();
             for record in &report.records {
                 if !reported_indices.insert(record.string_idx) {
-                    return Err(DexError::UnsafeRename(
-                        "duplicate rename record".into(),
-                    ));
+                    return Err(DexError::UnsafeRename("duplicate rename record".into()));
                 }
                 let source = original.strings.get(record.string_idx as usize).ok_or(
                     DexError::InvalidIndex {
@@ -203,12 +201,7 @@ impl DexRewriteVerifier {
             }
         }
         let mut source_files_removed = 0_usize;
-        for (index, (before, after)) in original
-            .classes
-            .iter()
-            .zip(&parsed.classes)
-            .enumerate()
-        {
+        for (index, (before, after)) in original.classes.iter().zip(&parsed.classes).enumerate() {
             if before.source_file_idx != after.source_file_idx {
                 if metadata.is_none()
                     || before.source_file_idx == NO_INDEX
@@ -225,9 +218,10 @@ impl DexRewriteVerifier {
         }
         let mut debug_info_detached = 0_usize;
         for (offset, before) in &original.code_items {
-            let after = parsed.code_items.get(offset).ok_or_else(|| {
-                DexError::UnsafeRename("rewritten DEX lost a code item".into())
-            })?;
+            let after = parsed
+                .code_items
+                .get(offset)
+                .ok_or_else(|| DexError::UnsafeRename("rewritten DEX lost a code item".into()))?;
             if before.insns != after.insns
                 || before.instructions != after.instructions
                 || before.tries != after.tries
@@ -261,9 +255,13 @@ impl DexRewriteVerifier {
                 ));
             }
         }
-        if original.bytes.iter().zip(rewritten).enumerate().any(
-            |(index, (before, after))| before != after && !allowed[index],
-        ) {
+        if original
+            .bytes
+            .iter()
+            .zip(rewritten)
+            .enumerate()
+            .any(|(index, (before, after))| before != after && !allowed[index])
+        {
             return Err(DexError::UnsafeRename(
                 "unreported DEX byte mutation outside declared transform regions".into(),
             ));

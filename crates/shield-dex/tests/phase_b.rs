@@ -2,10 +2,9 @@
 
 use nexora_shield_dex::{
     refresh_integrity, ControlFlowGraph, DexInput, DexParser, DexRewriteVerifier, DexValidator,
-    DexWriter, IrMethod, ReferenceKind,
-    MetadataReducer, MultiDexRewriteConfig, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass,
-    Selector, SelectorKind, SelectorResolver, TypeAnalyzer, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE,
-    NO_INDEX,
+    DexWriter, IrMethod, MetadataReducer, MultiDexRewriteConfig, MultiDexSet, ReferenceGraph,
+    ReferenceKind, RenameConfig, RenamePass, Selector, SelectorKind, SelectorResolver,
+    TypeAnalyzer, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE, NO_INDEX,
 };
 
 #[test]
@@ -119,17 +118,18 @@ fn canonical_multidex_round_trip_rewrites_every_unit() {
 fn o13_rewrite_audit_proves_only_declared_bytes_changed() {
     let bytes = build_test_dex("Lcom/test/A;", "run");
     let original = DexParser::parse(&bytes).expect("original DEX");
-    let transformed = RenamePass::apply(&original, &RenameConfig::default())
-        .expect("fixed-layout rename");
+    let transformed =
+        RenamePass::apply(&original, &RenameConfig::default()).expect("fixed-layout rename");
     let renamed = DexParser::parse(&transformed.bytes).expect("renamed DEX");
-    let (final_bytes, metadata) = MetadataReducer::strip_debug_metadata(&renamed)
-        .expect("real metadata removal");
+    let (final_bytes, metadata) =
+        MetadataReducer::strip_debug_metadata(&renamed).expect("real metadata removal");
     let audit = DexRewriteVerifier::verify(
         &original,
         &final_bytes,
         Some(&transformed.report),
         Some(&metadata),
-    ).expect("every changed byte accounted for");
+    )
+    .expect("every changed byte accounted for");
     assert!(audit.changed_symbol_strings > 0);
     assert_eq!(audit.source_files_removed, 1);
     assert_eq!(audit.preserved_code_items, 1);
@@ -142,12 +142,16 @@ fn o13_symbol_rename_preserves_const_string_literals() {
     let name_index = parsed.methods[0].name_idx;
     let code = parsed.code_items.values_mut().next().expect("test code");
     code.instructions[0].reference = Some((ReferenceKind::String, name_index));
-    let transformed = RenamePass::apply(&parsed, &RenameConfig {
-        rename_classes: false,
-        rename_methods: true,
-        rename_fields: false,
-        ..RenameConfig::default()
-    }).expect("conservatively retain runtime literal");
+    let transformed = RenamePass::apply(
+        &parsed,
+        &RenameConfig {
+            rename_classes: false,
+            rename_methods: true,
+            rename_fields: false,
+            ..RenameConfig::default()
+        },
+    )
+    .expect("conservatively retain runtime literal");
     assert!(transformed.report.records.is_empty());
     assert!(transformed.report.skipped_protected.contains(&name_index));
     assert_eq!(transformed.bytes, bytes);
@@ -158,8 +162,14 @@ fn o13_rewrite_audit_rejects_unreported_executable_mutation() {
     let bytes = build_test_dex("Lcom/test/A;", "run");
     let original = DexParser::parse(&bytes).expect("original DEX");
     let code_offset = usize::try_from(
-        original.code_items.values().next().expect("test method").offset,
-    ).expect("host offset");
+        original
+            .code_items
+            .values()
+            .next()
+            .expect("test method")
+            .offset,
+    )
+    .expect("host offset");
     let mut corrupted = bytes;
     corrupted[code_offset + 16] = 0; // Replace return-void with NOP.
     refresh_integrity(&mut corrupted).expect("refresh tampered DEX checksum");
@@ -172,19 +182,18 @@ fn o13_multidex_refuses_class_name_collisions_with_foreign_types() {
     let solo = MultiDexSet::parse(vec![DexInput {
         name: "classes.dex".into(),
         bytes: primary.clone(),
-    }]).expect("single valid DEX");
-    let renamed = solo.rewrite(&MultiDexRewriteConfig {
-        rename: Some(RenameConfig::default()),
-        ..MultiDexRewriteConfig::default()
-    }).expect("derive a deterministic class name");
+    }])
+    .expect("single valid DEX");
+    let renamed = solo
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig::default()),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("derive a deterministic class name");
     let renamed_dex = DexParser::parse(&renamed[0].bytes).expect("rewritten");
     let future_name = renamed_dex.type_descriptor(0).expect("class descriptor");
     assert_ne!(future_name, "Lcom/test/Owner;");
-    let secondary = build_test_dex_with_superclass(
-        "Lcom/test/Other;",
-        "go",
-        future_name,
-    );
+    let secondary = build_test_dex_with_superclass("Lcom/test/Other;", "go", future_name);
     let linked = MultiDexSet::parse(vec![
         DexInput {
             name: "classes.dex".into(),
@@ -194,23 +203,22 @@ fn o13_multidex_refuses_class_name_collisions_with_foreign_types() {
             name: "classes2.dex".into(),
             bytes: secondary,
         },
-    ]).expect("original DEX inputs valid");
+    ])
+    .expect("original DEX inputs valid");
     let result = linked.rewrite(&MultiDexRewriteConfig {
         rename: Some(RenameConfig::default()),
         ..MultiDexRewriteConfig::default()
     });
-    assert!(result.expect_err("must not capture foreign DEX type")
-        .to_string().contains("collides with an existing DEX type reference"));
+    assert!(result
+        .expect_err("must not capture foreign DEX type")
+        .to_string()
+        .contains("collides with an existing DEX type reference"));
 }
 
 #[test]
 fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
     let primary = build_test_dex("Lcom/test/Owner;", "run");
-    let secondary = build_test_dex_with_superclass(
-        "Lcom/test/Other;",
-        "go",
-        "Lcom/test/Owner;",
-    );
+    let secondary = build_test_dex_with_superclass("Lcom/test/Other;", "go", "Lcom/test/Owner;");
     let set = MultiDexSet::parse(vec![
         DexInput {
             name: "classes.dex".into(),
@@ -220,21 +228,28 @@ fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
             name: "classes2.dex".into(),
             bytes: secondary,
         },
-    ]).expect("valid cross-unit link");
+    ])
+    .expect("valid cross-unit link");
     let rejected = set.rewrite(&MultiDexRewriteConfig {
         rename: Some(RenameConfig::default()),
         strip_metadata: true,
         ..MultiDexRewriteConfig::default()
     });
-    assert!(rejected.expect_err("unsafe remapping must be rejected")
-        .to_string().contains("cross-DEX symbol references"));
-    let metadata_only = set.rewrite(&MultiDexRewriteConfig {
-        rename: None,
-        strip_metadata: true,
-        ..MultiDexRewriteConfig::default()
-    }).expect("metadata-only transformation preserves link");
+    assert!(rejected
+        .expect_err("unsafe remapping must be rejected")
+        .to_string()
+        .contains("cross-DEX symbol references"));
+    let metadata_only = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: None,
+            strip_metadata: true,
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("metadata-only transformation preserves link");
     assert_eq!(metadata_only.len(), 2);
-    assert!(metadata_only.iter().all(|item| item.audit.source_files_removed == 1));
+    assert!(metadata_only
+        .iter()
+        .all(|item| item.audit.source_files_removed == 1));
 }
 
 #[test]
@@ -318,13 +333,7 @@ fn build_test_dex_with_superclass(
     method_name: &str,
     superclass: &str,
 ) -> Vec<u8> {
-    let strings = [
-        class_descriptor,
-        superclass,
-        "V",
-        method_name,
-        "A.java",
-    ];
+    let strings = [class_descriptor, superclass, "V", method_name, "A.java"];
 
     let string_ids_off = DEX_HEADER_SIZE;
     let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
