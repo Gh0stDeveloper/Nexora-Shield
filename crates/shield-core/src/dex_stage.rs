@@ -89,10 +89,10 @@ impl ProductionBuildContext {
             ));
         }
         self.verify_input_unchanged()?;
-        let reconstruction = (|| -> Result<String> {
-            rewrite_stored_entries(self.input(), destination, &replacements)?;
-            self.verify_staged_apk(destination, &directory, &replacements)
-        })();
+        // The ZIP writer exclusively owns the new path and cleans its own
+        // partial files; never remove a concurrently created path on refusal.
+        rewrite_stored_entries(self.input(), destination, &replacements)?;
+        let reconstruction = self.verify_staged_apk(destination, &directory, &replacements);
         match reconstruction {
             Ok(output_hash) => {
                 result.output_sha256 = output_hash;
