@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "phase": "O",
+  "status": "open",
+  "releaseDecision": "no-go",
+  "stableTag": "v1.0.0",
+  "stablePublicationBlocked": true,
+  "auditDiscoveryBaseline": {
+    "branch": "main",
+    "sha": "5ece01dfd2f07ebe1b6f5d67b845e0f1df5913aa"
+  },
+  "phaseOBaseline": {
+    "branch": "main",
+    "sha": "d8e436d3d49efad417f501e229d8cd57b0e86b95"
+  },
+  "sourceVersion": "1.0.0",
+  "o0": {
+    "status": "in-progress",
+    "owner": "repository-maintainers",
+    "closureAuthority": "Phase O final production audit",
+    "finalApprovalPhase": "O.14",
+    "publicationPhase": "O.15"
+  },
+  "phaseNHistoricalEvidence": {
+    "preserved": true,
+    "mergeCommit": "5ece01dfd2f07ebe1b6f5d67b845e0f1df5913aa",
+    "note": "Phase N remains historical evidence for the controls it validated and does not override Phase O release blockers."
+  }
+}
