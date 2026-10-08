@@ -18,8 +18,9 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, protect_production_apk, ProductionBuildContext,
-    ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, protect_production_apk_with_overrides, ProductionBuildContext,
+    ProductionControl, ProductionOverrides, ProtectionProfile, ProtectionRequest,
+    CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -446,6 +447,7 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     let mut public_report = None;
     let mut private_report = None;
     let mut plan_only = false;
+    let mut overrides = ProductionOverrides::default();
     let mut index = 1_usize;
 
     while index < args.len() {
@@ -471,6 +473,14 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
             "--plan-only" => {
                 plan_only = true;
                 index += 1;
+            }
+            "--enable-control" | "--disable-control" => {
+                let enable = args[index] == "--enable-control";
+                let name = require_value(args, index, args[index].as_str())?;
+                let control = ProductionControl::from_str(name)
+                    .map_err(|error| error.to_string())?;
+                overrides.set(control, enable).map_err(|error| error.to_string())?;
+                index += 2;
             }
             "--force" => {
                 overwrite = true;
@@ -570,14 +580,32 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     if plan_only && phase_a_only {
         return Err("package-apk does not support --plan-only; use protect --plan-only".into());
     }
+    if phase_a_only && overrides != ProductionOverrides::default() {
+        return Err("package-apk cannot accept production protection control overrides".into());
+    }
 
     if plan_only {
-        let context =
-            ProductionBuildContext::prepare(&request).map_err(|error| error.to_string())?;
+        let context = ProductionBuildContext::prepare_with_overrides(&request, &overrides)
+            .map_err(|error| error.to_string())?;
         let dex = context.inspect_dex().map_err(|error| error.to_string())?;
         println!("Phase O.1 production plan: READ-ONLY, NOT PROTECTED");
         println!("Input SHA-256: {}", dex.inspected_input_sha256);
         println!("Profile: {}", context.profile());
+        for control in [
+            ProductionControl::DataProtection,
+            ProductionControl::NativeShield,
+            ProductionControl::VmShield,
+            ProductionControl::Diversity,
+            ProductionControl::IntegrityGraph,
+            ProductionControl::RaspRuntime,
+            ProductionControl::Attestation,
+        ] {
+            println!(
+                "Effective control {}: {}",
+                control.as_str(),
+                context.policy().enabled(control)
+            );
+        }
         println!("DEX units: {}", dex.units.len());
         println!("Total decoded DEX bytes: {}", dex.total_decoded_bytes);
         for unit in &dex.units {
@@ -606,7 +634,7 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     let result = if phase_a_only {
         protect_apk(&request)
     } else {
-        protect_production_apk(&request)
+        protect_production_apk_with_overrides(&request, &overrides)
     }
     .map_err(|error| error.to_string())?;
     println!("Nexora Shield Phase A packaging ONLY — NOT FULL PROTECTION");
@@ -759,6 +787,8 @@ OPTIONS:\n\
   --unsigned                  Explicitly allow an unsigned output\n\
   --force                     Replace an existing output transactionally\n\
   --plan-only                 Read-only O.1 DEX preflight; does NOT protect or write output\n\
+  --enable-control <name>     Require an optional production control (repeatable)\n\
+  --disable-control <name>    Refuse a control; required controls cannot be disabled\n\
   --public-report <file>      Write non-sensitive JSON report\n\
   --private-report <file>     Write private build JSON report"
     );
