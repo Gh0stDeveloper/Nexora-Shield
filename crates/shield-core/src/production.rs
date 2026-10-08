@@ -4,7 +4,7 @@
 use crate::{CoreError, PipelineResult, ProtectionProfile, ProtectionRequest, Result};
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StageRequirement {
@@ -102,6 +102,75 @@ pub fn protect_production_apk(request: &ProtectionRequest) -> Result<PipelineRes
     ))
 }
 
+/// Resolve an intended file path, including symlinked ancestors, without
+/// requiring the final file to exist. Reject dangling symlinks.
+fn normalized_destination(path: &Path) -> Result<PathBuf> {
+    if fs::symlink_metadata(path).is_ok() {
+        return Ok(fs::canonicalize(path)?);
+    }
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for part in absolute.components() {
+        match part {
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                normalized.push(part.as_os_str());
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+        }
+    }
+    let mut cursor = normalized.as_path();
+    let mut suffix = Vec::new();
+    while !cursor.exists() {
+        let name = cursor.file_name().ok_or_else(|| {
+            CoreError::InvalidRequest("cannot resolve destination path".into())
+        })?;
+        suffix.push(name.to_os_string());
+        cursor = cursor.parent().ok_or_else(|| {
+            CoreError::InvalidRequest("destination has no parent".into())
+        })?;
+    }
+    let mut canonical = fs::canonicalize(cursor)?;
+    for name in suffix.iter().rev() {
+        canonical.push(name);
+    }
+    Ok(canonical)
+}
+
+/// Disallow output/report clobbering of input, signing keys or each other.
+/// This runs before any publication or report writes.
+pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()> {
+    let mut paths = vec![
+        ("input APK", &request.input),
+        ("output APK", &request.output),
+    ];
+    if let Some(signing) = &request.signing {
+        paths.push(("signing keystore", &signing.keystore));
+    }
+    if let Some(path) = &request.public_report {
+        paths.push(("public report", path));
+    }
+    if let Some(path) = &request.private_report {
+        paths.push(("private report", path));
+    }
+    let mut identities = std::collections::BTreeMap::new();
+    for (label, path) in paths {
+        let identity = normalized_destination(path)?;
+        if let Some(previous) = identities.insert(identity, label) {
+            return Err(CoreError::InvalidRequest(format!(
+                "artifact path collision between {previous} and {label}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl ProductionBuildContext {
     /// The inspected input path. The snapshot must be revalidated at execution.
     #[must_use]
@@ -143,6 +212,7 @@ impl ProductionBuildContext {
         if !request.input.is_file() {
             return Err(CoreError::InvalidRequest("input APK is not a file".into()));
         }
+        validate_reserved_paths(request)?;
         if request.input == request.output
             || (request.output.exists()
                 && fs::canonicalize(&request.input)? == fs::canonicalize(&request.output)?)
