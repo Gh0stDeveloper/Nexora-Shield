@@ -50,7 +50,7 @@ The most important open item is the production protection path: the current user
 | Shield Studio component | Completed; signed/notarized distribution pending O.7 |
 | Security Lab | Completed; coverage-guided fuzzing expansion pending O.9 |
 | Production hardening / Phase N | Completed within Phase N scope |
-| Production release audit / Phase O | **OPEN — release blocking** |
+| Production release audit / Phase O | **OPEN — O.0 freeze implemented; remediation continues** |
 | Stable 1.0 | **NO-GO until Phase O closes** |
 
 ## Implemented Protection Layers
@@ -280,6 +280,8 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the complete exit criteria and subpha
 - [Production Readiness Audit](docs/PRODUCTION-READINESS-AUDIT.md)
 - [Phase O — Production Release Audit & Hardening](docs/PHASE-O.md)
 - [Phase O Checklist](docs/PHASE-O-CHECKLIST.md)
+- [Phase O.0 Baseline](docs/PHASE-O0-BASELINE.md)
+- [Phase O Accepted Risk Policy](docs/PHASE-O-ACCEPTED-RISK.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
 
