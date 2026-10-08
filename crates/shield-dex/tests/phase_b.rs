@@ -171,7 +171,7 @@ fn selector_resolver_revalidates_public_fields_and_rule_limits() {
     assert!(SelectorResolver::resolve(&dex, &[malformed]).is_err());
     let control_chars = Selector {
         kind: SelectorKind::Class,
-        class_pattern: "Lcom/test/\\0;".into(),
+        class_pattern: "Lcom/test/\0;".into(),
         member_pattern: None,
     };
     assert!(SelectorResolver::resolve(&dex, &[control_chars]).is_err());
