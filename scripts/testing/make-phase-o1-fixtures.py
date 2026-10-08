@@ -149,4 +149,24 @@ with zipfile.ZipFile(directory / "duplicate-class.apk", "w", compression=zipfile
     output.writestr("classes.dex", first)
     output.writestr("classes2.dex", first)
 
-print("Phase O.1 stored valid / malformed / compressed / duplicate-class fixtures created.")
+# Corrupt the central-directory CRC of classes.dex without mutating the
+# payload, to prove that the production diagnostic validates real bytes.
+damaged = bytearray((directory / "valid.apk").read_bytes())
+offset = 0
+found = False
+while True:
+    offset = damaged.find(b"PK\\x01\\x02", offset)
+    if offset < 0:
+        break
+    name_len = int.from_bytes(damaged[offset + 28:offset + 30], "little")
+    name = damaged[offset + 46:offset + 46 + name_len]
+    if name == b"classes.dex":
+        damaged[offset + 16] ^= 0x01
+        found = True
+        break
+    offset += 4
+if not found:
+    raise RuntimeError("synthetic central-directory classes.dex record missing")
+(directory / "crc-mismatch.apk").write_bytes(damaged)
+
+print("Phase O.1 stored valid / malformed / compressed / duplicate-class / bad-CRC fixtures created.")
