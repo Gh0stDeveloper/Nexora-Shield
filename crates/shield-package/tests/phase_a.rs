@@ -93,14 +93,20 @@ fn rewrite_refuses_existing_destination_without_changing_it() {
     let output = directory.join("existing.apk");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"original")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original"),
+        ],
     );
     fs::write(&output, b"important existing data").expect("create existing output");
     let mut replacements = std::collections::BTreeMap::new();
     replacements.insert("classes.dex".to_string(), b"rewritten".to_vec());
     let failed = nexora_shield_package::rewrite_stored_entries(&input, &output, &replacements);
     assert!(failed.is_err());
-    assert_eq!(fs::read(&output).expect("read existing output"), b"important existing data");
+    assert_eq!(
+        fs::read(&output).expect("read existing output"),
+        b"important existing data"
+    );
     cleanup(&directory);
 }
 
@@ -111,7 +117,10 @@ fn rewrite_does_not_publish_partial_archive_on_invalid_input() {
     let output = directory.join("incomplete.apk");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"original")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original"),
+        ],
     );
     let mut replacements = std::collections::BTreeMap::new();
     replacements.insert("missing.dex".to_string(), b"rewritten".to_vec());
@@ -129,12 +138,17 @@ fn rewrite_does_not_follow_an_existing_destination_symlink() {
     let symlink = directory.join("alias.apk");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"original")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original"),
+        ],
     );
     fs::write(&victim, b"confidential").expect("victim data");
     std::os::unix::fs::symlink(&victim, &symlink).expect("symlink");
     let replacements = std::collections::BTreeMap::new();
-    assert!(nexora_shield_package::rewrite_stored_entries(&input, &symlink, &replacements).is_err());
+    assert!(
+        nexora_shield_package::rewrite_stored_entries(&input, &symlink, &replacements).is_err()
+    );
     assert_eq!(fs::read(&victim).expect("read victim"), b"confidential");
     assert!(symlink.symlink_metadata().is_ok());
     cleanup(&directory);
