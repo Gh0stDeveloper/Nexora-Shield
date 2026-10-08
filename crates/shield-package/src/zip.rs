@@ -206,8 +206,11 @@ pub fn rewrite_stored_entries(
     let mut source = File::open(input)?;
     // Exclusive creation ensures an existing artifact or symlink is never
     // overwritten, even if a concurrent process races the caller's preflight.
+    // The guard is declared BEFORE the file handle: on Windows the handle
+    // closes before cleanup attempts to unlink a failed partial archive.
+    let mut incomplete = IncompleteOutput { path: output, completed: true };
     let mut destination = File::options().write(true).create_new(true).open(output)?;
-    let mut incomplete = IncompleteOutput { path: output, completed: false };
+    incomplete.completed = false;
     let mut written = Vec::with_capacity(entries.len());
 
     for mut entry in entries {
