@@ -33,7 +33,7 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [ ] Align/sign final output
 - [ ] Verify final output
 - [ ] Emit executed-stage evidence
-- [ ] Fail closed for required unsupported stages
+- [x] Fail closed for required unsupported stages
 - [ ] CLI protect uses orchestrator
 - [ ] Gradle Plugin uses orchestrator
 - [ ] Shield Studio reaches same orchestrator
