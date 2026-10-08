@@ -11,7 +11,7 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [x] Prevent accidental stable publication while Phase O is open
 - [x] Publish P0/P1/P2 finding inventory
 - [x] Define accepted-risk process for non-release-blocking P2 only
-- [ ] Final O.0 documentation/CI gate
+- [x] Final O.0 documentation/CI gate
 
 ## O.1 Production Protection Orchestrator
 - [ ] Define authoritative production stage graph
