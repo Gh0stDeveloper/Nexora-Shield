@@ -23,6 +23,7 @@ pub struct StagedDexResult {
     pub source_files_removed: usize,
     pub debug_info_detached: usize,
     pub name_records: usize,
+    pub verified_code_items: usize,
     pub output_sha256: String,
 }
 
@@ -73,10 +74,12 @@ impl ProductionBuildContext {
             source_files_removed: 0,
             debug_info_detached: 0,
             name_records: 0,
+            verified_code_items: 0,
             output_sha256: String::new(),
         };
         let mut replacements = BTreeMap::new();
         for unit in outputs {
+            result.verified_code_items += unit.audit.preserved_code_items;
             if unit.rename_skipped_for_cross_dex_reflection {
                 result.skipped_cross_dex_rename_units += 1;
             }

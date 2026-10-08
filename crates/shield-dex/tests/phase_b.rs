@@ -1,7 +1,8 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 use nexora_shield_dex::{
-    refresh_integrity, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter, IrMethod,
+    refresh_integrity, ControlFlowGraph, DexInput, DexParser, DexRewriteVerifier, DexValidator,
+    DexWriter, IrMethod,
     MetadataReducer, MultiDexRewriteConfig, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass,
     Selector, SelectorKind, SelectorResolver, TypeAnalyzer, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE,
     NO_INDEX,
@@ -115,6 +116,73 @@ fn canonical_multidex_round_trip_rewrites_every_unit() {
 }
 
 #[test]
+fn o13_rewrite_audit_proves_only_declared_bytes_changed() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let original = DexParser::parse(&bytes).expect("original DEX");
+    let transformed = RenamePass::apply(&original, &RenameConfig::default())
+        .expect("fixed-layout rename");
+    let renamed = DexParser::parse(&transformed.bytes).expect("renamed DEX");
+    let (final_bytes, metadata) = MetadataReducer::strip_debug_metadata(&renamed)
+        .expect("real metadata removal");
+    let audit = DexRewriteVerifier::verify(
+        &original,
+        &final_bytes,
+        Some(&transformed.report),
+        Some(&metadata),
+    ).expect("every changed byte accounted for");
+    assert!(audit.changed_symbol_strings > 0);
+    assert_eq!(audit.source_files_removed, 1);
+    assert_eq!(audit.preserved_code_items, 1);
+}
+
+#[test]
+fn o13_rewrite_audit_rejects_unreported_executable_mutation() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let original = DexParser::parse(&bytes).expect("original DEX");
+    let code_offset = usize::try_from(
+        original.code_items.values().next().expect("test method").offset,
+    ).expect("host offset");
+    let mut corrupted = bytes;
+    corrupted[code_offset + 16] = 0; // Replace return-void with NOP.
+    refresh_integrity(&mut corrupted).expect("refresh tampered DEX checksum");
+    assert!(DexRewriteVerifier::verify(&original, &corrupted, None, None).is_err());
+}
+
+#[test]
+fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
+    let primary = build_test_dex("Lcom/test/Owner;", "run");
+    let secondary = build_test_dex_with_superclass(
+        "Lcom/test/Other;",
+        "go",
+        "Lcom/test/Owner;",
+    );
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ]).expect("valid cross-unit link");
+    let rejected = set.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig::default()),
+        strip_metadata: true,
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(rejected.expect_err("unsafe remapping must be rejected")
+        .to_string().contains("cross-DEX symbol references"));
+    let metadata_only = set.rewrite(&MultiDexRewriteConfig {
+        rename: None,
+        strip_metadata: true,
+        ..MultiDexRewriteConfig::default()
+    }).expect("metadata-only transformation preserves link");
+    assert_eq!(metadata_only.len(), 2);
+    assert!(metadata_only.iter().all(|item| item.audit.source_files_removed == 1));
+}
+
+#[test]
 fn multidex_parser_rejects_duplicate_class_ownership() {
     let primary = build_test_dex("Lcom/test/A;", "run");
     let err = MultiDexSet::parse(vec![
@@ -187,9 +255,17 @@ fn selector_resolver_revalidates_public_fields_and_rule_limits() {
 }
 
 fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
+    build_test_dex_with_superclass(class_descriptor, method_name, "Ljava/lang/Object;")
+}
+
+fn build_test_dex_with_superclass(
+    class_descriptor: &str,
+    method_name: &str,
+    superclass: &str,
+) -> Vec<u8> {
     let strings = [
         class_descriptor,
-        "Ljava/lang/Object;",
+        superclass,
         "V",
         method_name,
         "A.java",

@@ -1,9 +1,10 @@
 use crate::compatibility::CompatibilityAnalyzer;
 use crate::error::{DexError, Result};
-use crate::model::DexFile;
+use crate::model::{DexFile, ReferenceKind};
 use crate::parser::DexParser;
 use crate::transform::{
-    DexWriter, MetadataReducer, MetadataReductionReport, RenameConfig, RenamePass, RenameReport,
+    DexRewriteAudit, DexRewriteVerifier, DexWriter, MetadataReducer, MetadataReductionReport,
+    RenameConfig, RenamePass, RenameReport,
 };
 use crate::validator::DexValidator;
 
@@ -49,6 +50,7 @@ pub struct DexRewriteOutput {
     pub rename_report: Option<RenameReport>,
     pub metadata_report: Option<MetadataReductionReport>,
     pub rename_skipped_for_cross_dex_reflection: bool,
+    pub audit: DexRewriteAudit,
 }
 
 impl MultiDexSet {
@@ -114,6 +116,13 @@ impl MultiDexSet {
     }
 
     pub fn rewrite(&self, config: &MultiDexRewriteConfig) -> Result<Vec<DexRewriteOutput>> {
+        // Until O.1.3 has a global symbol binding/remapping executor, no
+        // class/method/field rename may invalidate references in another DEX.
+        if config.rename.is_some() && self.has_cross_dex_symbol_references()? {
+            return Err(DexError::UnsafeRename(
+                "cross-DEX symbol references require coordinated global remapping; use metadata-only rewrite".into(),
+            ));
+        }
         let cross_dex_reflection = config.conservative_cross_dex_reflection
             && self.units.len() > 1
             && self
@@ -154,14 +163,19 @@ impl MultiDexSet {
                 metadata_report = Some(report);
             }
 
-            let final_dex = DexParser::parse(&current)?;
-            let _ = DexValidator::validate(&final_dex)?;
+            let audit = DexRewriteVerifier::verify(
+                &unit.dex,
+                &current,
+                rename_report.as_ref(),
+                metadata_report.as_ref(),
+            )?;
             outputs.push(DexRewriteOutput {
                 name: unit.name.clone(),
                 bytes: current,
                 rename_report,
                 metadata_report,
                 rename_skipped_for_cross_dex_reflection: rename_skipped,
+                audit,
             });
         }
 
@@ -176,6 +190,53 @@ impl MultiDexSet {
             .collect();
         let _ = Self::parse(rewritten_inputs)?;
         Ok(outputs)
+    }
+
+    fn has_cross_dex_symbol_references(&self) -> Result<bool> {
+        if self.units.len() < 2 {
+            return Ok(false);
+        }
+        let mut owners = std::collections::BTreeMap::new();
+        for unit in &self.units {
+            for class in &unit.dex.classes {
+                let descriptor = unit.dex.type_descriptor(class.class_idx).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "type",
+                        index: class.class_idx,
+                    },
+                )?;
+                owners.insert(descriptor, unit.index);
+            }
+        }
+        for unit in &self.units {
+            for index in 0..unit.dex.types.len() {
+                let descriptor = unit.dex.type_descriptor(index as u32).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "type",
+                        index: index as u32,
+                    },
+                )?;
+                // Also recognize array forms referencing another unit's class.
+                let component = descriptor.trim_start_matches('[');
+                if owners.get(component).is_some_and(|owner| *owner != unit.index) {
+                    return Ok(true);
+                }
+            }
+            // Runtime literals can name classes dynamically. Do not assume
+            // that only reflection-indicator invocations reveal these links.
+            for code in unit.dex.code_items.values() {
+                for instruction in &code.instructions {
+                    if let Some((ReferenceKind::String, string_idx)) = instruction.reference {
+                        if let Some(value) = unit.dex.string(string_idx) {
+                            if owners.get(value).is_some_and(|owner| *owner != unit.index) {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
 }
 
