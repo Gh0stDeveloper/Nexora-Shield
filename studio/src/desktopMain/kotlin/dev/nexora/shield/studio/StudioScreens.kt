@@ -462,6 +462,20 @@ private fun ReportScreen(
             return@ScreenSurface
         }
 
+        Panel(
+            title = "Protection assurance",
+            subtitle = "A successful packaging task or valid signature does not prove the application is protected.",
+        ) {
+            StatusPill(
+                text = if (report.productionProtected) {
+                    "Production protection claimed — verify independent stage evidence"
+                } else {
+                    "NOT production protected — " + report.protectionScope
+                },
+                tone = if (report.productionProtected) ShieldTone.Info else ShieldTone.Warning,
+            )
+        }
+
         MetricGrid(compact) {
             MetricCard(
                 Icons.Outlined.Security,
@@ -492,7 +506,7 @@ private fun ReportScreen(
                 "Pipeline stages",
                 report.stages.size.toString(),
                 report.stages.lastOrNull() ?: "No stages",
-                ShieldTone.Success,
+                if (report.productionProtected) ShieldTone.Info else ShieldTone.Warning,
                 Modifier.weight(1f),
             )
         }
