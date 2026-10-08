@@ -128,13 +128,13 @@ fn normalized_destination(path: &Path) -> Result<PathBuf> {
     let mut cursor = normalized.as_path();
     let mut suffix = Vec::new();
     while !cursor.exists() {
-        let name = cursor.file_name().ok_or_else(|| {
-            CoreError::InvalidRequest("cannot resolve destination path".into())
-        })?;
+        let name = cursor
+            .file_name()
+            .ok_or_else(|| CoreError::InvalidRequest("cannot resolve destination path".into()))?;
         suffix.push(name.to_os_string());
-        cursor = cursor.parent().ok_or_else(|| {
-            CoreError::InvalidRequest("destination has no parent".into())
-        })?;
+        cursor = cursor
+            .parent()
+            .ok_or_else(|| CoreError::InvalidRequest("destination has no parent".into()))?;
     }
     let mut canonical = fs::canonicalize(cursor)?;
     for name in suffix.iter().rev() {
