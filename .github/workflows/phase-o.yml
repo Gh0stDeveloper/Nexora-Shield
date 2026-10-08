@@ -138,6 +138,11 @@ jobs:
           grep -q 'duplicate DEX selector rule' build/phase-o1/o12-duplicate.txt
           cargo test --locked -p nexora-shield-core dex_selection::tests
           cargo test --locked -p nexora-shield-dex multidex_parser_rejects
+      - name: O.1.3 verify real fixed-layout transformations and audit invariant
+        run: |
+          cargo test --locked -p nexora-shield-dex o13_
+          cargo test --locked -p nexora-shield-dex canonical_multidex_round_trip
+
       - name: Production protect must never return a Phase A packaging-only APK
         shell: bash
         run: |

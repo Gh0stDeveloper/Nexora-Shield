@@ -27,6 +27,12 @@ impl CompatibilityAnalyzer {
     pub fn analyze(dex: &DexFile) -> Result<CompatibilityReport> {
         let mut report = CompatibilityReport::default();
         let runtime_strings = runtime_string_indices(dex);
+        // A literal referenced by const-string is observable at runtime even
+        // without an obvious reflection indicator. Never rewrite its backing
+        // string table slot while renaming a coincident symbol.
+        for index in &runtime_strings {
+            report.protect(*index, "runtime const-string literal");
+        }
 
         report.reflection_detected = runtime_strings
             .iter()

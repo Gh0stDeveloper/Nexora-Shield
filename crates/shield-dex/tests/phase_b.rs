@@ -2,7 +2,7 @@
 
 use nexora_shield_dex::{
     refresh_integrity, ControlFlowGraph, DexInput, DexParser, DexRewriteVerifier, DexValidator,
-    DexWriter, IrMethod,
+    DexWriter, IrMethod, ReferenceKind,
     MetadataReducer, MultiDexRewriteConfig, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass,
     Selector, SelectorKind, SelectorResolver, TypeAnalyzer, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE,
     NO_INDEX,
@@ -133,6 +133,24 @@ fn o13_rewrite_audit_proves_only_declared_bytes_changed() {
     assert!(audit.changed_symbol_strings > 0);
     assert_eq!(audit.source_files_removed, 1);
     assert_eq!(audit.preserved_code_items, 1);
+}
+
+#[test]
+fn o13_symbol_rename_preserves_const_string_literals() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let mut parsed = DexParser::parse(&bytes).expect("parse DEX");
+    let name_index = parsed.methods[0].name_idx;
+    let code = parsed.code_items.values_mut().next().expect("test code");
+    code.instructions[0].reference = Some((ReferenceKind::String, name_index));
+    let transformed = RenamePass::apply(&parsed, &RenameConfig {
+        rename_classes: false,
+        rename_methods: true,
+        rename_fields: false,
+        ..RenameConfig::default()
+    }).expect("conservatively retain runtime literal");
+    assert!(transformed.report.records.is_empty());
+    assert!(transformed.report.skipped_protected.contains(&name_index));
+    assert_eq!(transformed.bytes, bytes);
 }
 
 #[test]
