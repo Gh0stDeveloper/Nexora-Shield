@@ -28,8 +28,12 @@ May contain stable cross-module contracts and orchestration primitives. It must 
 
 Presentation/transport layer over core APIs. It may parse command-line intent but must not own protection algorithms.
 
-## Future top-level areas
+## Current top-level areas
 
+The repository has moved beyond the original foundation layout. Current production/release work is organized around:
+
+- `crates/shield-core`
+- `crates/shield-cli`
 - `crates/shield-package`
 - `crates/shield-dex`
 - `crates/shield-crypto`
@@ -37,13 +41,18 @@ Presentation/transport layer over core APIs. It may parse command-line intent bu
 - `crates/shield-rasp`
 - `crates/shield-native`
 - `crates/shield-vm`
-- `crates/shield-diversify`
-- `integrations/gradle-plugin`
-- `apps/shield-studio`
-- `lab/shield-lab`
-- `samples/android`
+- `crates/shield-diversity`
+- `crates/shield-attestation`
+- `crates/shield-lab`
+- `crates/shield-release`
+- `gradle-plugin`
+- `studio`
+- `samples`
+- `security-lab`
+- `release`
+- `scripts/release`
 
-They are introduced only when the corresponding roadmap phase begins.
+New top-level areas require a concrete ownership boundary and must not duplicate protection semantics already owned by an existing crate/surface.
 
 ## Rust policy
 
@@ -57,7 +66,7 @@ They are introduced only when the corresponding roadmap phase begins.
 
 ## API policy
 
-Before 1.0, internal APIs may evolve. Public configuration and report formats are explicitly schema-versioned.
+The source version reached the 1.0.0 contract during Phase N, but public stable release remains blocked by Phase O. Public configuration and report formats are schema-versioned. Breaking public changes require an explicit compatibility/versioning decision rather than silently mutating the 1.0 contract.
 
 Breaking schema changes require:
 

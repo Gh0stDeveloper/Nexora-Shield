@@ -2,7 +2,13 @@
 
 ## Supported versions
 
-Durante pre-1.0 solo la rama principal y la release más reciente reciben correcciones de seguridad.
+Todavía no existe una release estable pública aprobada para usuarios finales. Mientras Phase O permanezca abierta, la rama `main` y cualquier RC explícitamente distribuida reciben correcciones de seguridad.
+
+Después de publicar `v1.0.0`, la política de soporte estable debe identificar explícitamente las versiones soportadas y su ventana de mantenimiento.
+
+## Production-readiness status
+
+La auditoría post-Phase-N detectó bloqueadores de producción y abrió **Phase O — Production Release Audit & Hardening**. Hasta su cierre, `v1.0.0` permanece bloqueada. Los detalles técnicos y criterios de salida están en `docs/PRODUCTION-READINESS-AUDIT.md` y `docs/PHASE-O.md`.
 
 ## Reporting
 

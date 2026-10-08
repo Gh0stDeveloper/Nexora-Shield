@@ -359,7 +359,61 @@ Evidencia final:
 - CI #1156: **success**.
 - Fallos: **0**.
 
-La fuente queda finalizada en `1.0.0`. El tag/release `v1.0.0` se publica posteriormente desde el commit validado de `main`, nunca desde una rama de feature.
+La fuente quedó sincronizada en `1.0.0` durante Phase N. Sin embargo, una auditoría de producción posterior a N detectó bloqueadores P0/P1 que Phase N no cubría completamente. Por ello, **Phase N conserva su cierre histórico, pero no autoriza por sí sola la publicación estable**. El tag/release `v1.0.0` queda congelado hasta cerrar Phase O.
+
+---
+
+
+## Fase O — Production Release Audit & Hardening
+
+Phase O es la fase obligatoria de preproducción posterior a Phase N. Convierte los motores ya implementados y validados aisladamente en un camino de producción E2E verificable para usuarios externos.
+
+### O.0 Release freeze and audit baseline
+### O.1 Production Protection Orchestrator
+### O.2 APK end-to-end protection proof
+### O.3 AAB / APKS / dynamic-feature production protection
+### O.4 AAR / library protection contract
+### O.5 Protection profiles and configuration enforcement
+### O.6 Release governance, licensing and security gates
+### O.7 External distribution and installer trust
+### O.8 Supply-chain hardening and complete SBOM
+### O.9 Parser, cryptography and host-safety hardening
+### O.10 Android compatibility and physical-device matrix
+### O.11 Production performance, reliability and soak qualification
+### O.12 Documentation and public repository correctness
+### O.13 Real external review and controlled beta
+### O.14 Final production audit
+### O.15 Stable 1.0 publication
+
+Bloqueadores principales identificados:
+
+- el comando real `nexora-shield protect` todavía orquesta esencialmente el pipeline de empaquetado de Phase A y no demuestra integración E2E de B–I en el artefacto final;
+- el Gradle Plugin alcanza ese mismo camino;
+- AAB/APKS y AAR requieren pruebas de protección real del código entregado, no solo validación estructural;
+- el repositorio público todavía no tiene licencia seleccionada;
+- el tag estable debe quedar mecánicamente ligado a un commit aprobado de `main`;
+- CodeQL debe bloquear por findings, no únicamente por éxito de ejecución;
+- la protección de `main` debe verificarse con evidencia administrativa;
+- distribución del plugin/CLI/Studio, signing/notarization, SBOM JVM/Gradle, fuzzing coverage-guided, matriz Android/OEM y recuperación transaccional deben cerrarse antes de stable.
+
+Estado actual: **ABIERTA — RELEASE BLOCKING**.
+
+Documentos autoritativos:
+- [Phase O](PHASE-O.md)
+- [Phase O checklist](PHASE-O-CHECKLIST.md)
+- [Post-N Production Readiness Audit](PRODUCTION-READINESS-AUDIT.md)
+
+Criterio de salida:
+- cero P0 abiertos;
+- cero P1 obligatorios abiertos;
+- cero P2 requeridos para release sin resolver;
+- producción `protect` ejecuta el stack documentado;
+- artefactos finales demuestran las protecciones;
+- distribución y release governance son verificables;
+- O.14 aprueba el commit exacto;
+- O.15 publica `v1.0.0` desde ese commit.
+
+**Mientras Phase O esté abierta, la decisión de release es NO-GO.**
 
 ---
 

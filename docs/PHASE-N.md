@@ -1,5 +1,7 @@
 # Phase N — Production Hardening
 
+> **Post-closure note:** Phase N remains historically completed for the controls it defined and validated. A stricter post-N production-readiness audit subsequently identified release blockers outside that original scope. Final stable publication is now governed by [Phase O](PHASE-O.md), and `v1.0.0` must not be published until Phase O closes.
+
 ## Objective
 
 Phase N converts the completed protection platform into a release-qualified 1.0 product.
@@ -174,4 +176,4 @@ Validated by:
 - CI #1156: successful;
 - zero failed jobs.
 
-The repository source is finalized at `1.0.0`. Stable GitHub Release publication is intentionally performed after merge from the validated `main` commit so the release tag cannot point at an unmerged feature branch.
+The repository source reached synchronized version `1.0.0` under the Phase N contract. This N closure does **not** constitute final production approval after the post-N audit. Stable GitHub Release publication is frozen until Phase O O.14 approves the exact final `main` commit and O.15 publication prerequisites are satisfied.

@@ -7,7 +7,7 @@
 A modular Android hardening platform designed to raise the cost of reverse engineering, tampering, repackaging, runtime instrumentation, and extraction of sensitive application logic.
 
 [![CI](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gh0stDeveloper/Nexora-Shield/actions/workflows/ci.yml)
-![Phase](https://img.shields.io/badge/Phase_N-1.0_RC_hardening-f59e0b?style=flat-square)
+![Phase](https://img.shields.io/badge/Phase_O-Production_Release_Audit-d97706?style=flat-square)
 ![Rust](https://img.shields.io/badge/Rust-1.81%2B-000000?style=flat-square&logo=rust&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-Application_Security-3DDC84?style=flat-square&logo=android&logoColor=white)
 
@@ -15,7 +15,7 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 ![Security](https://img.shields.io/badge/Security-Defense_in_Depth-111827?style=flat-square)
 
-[Vision](docs/VISION.md) · [Architecture](docs/ARCHITECTURE.md) · [Threat Model](docs/THREAT-MODEL.md) · [Security Design](docs/SECURITY-DESIGN.md) · [Configuration](docs/CONFIGURATION.md) · [Testing](docs/TESTING.md) · [API Stability](docs/API-STABILITY.md) · [Release Process](docs/RELEASE-PROCESS.md) · [Roadmap](docs/ROADMAP.md) · [Security Policy](SECURITY.md)
+[Vision](docs/VISION.md) · [Architecture](docs/ARCHITECTURE.md) · [Threat Model](docs/THREAT-MODEL.md) · [Security Design](docs/SECURITY-DESIGN.md) · [Configuration](docs/CONFIGURATION.md) · [Testing](docs/TESTING.md) · [Production Audit](docs/PRODUCTION-READINESS-AUDIT.md) · [Phase O](docs/PHASE-O.md) · [Release Process](docs/RELEASE-PROCESS.md) · [Roadmap](docs/ROADMAP.md) · [Security Policy](SECURITY.md)
 
 </div>
 
@@ -27,7 +27,9 @@ A modular Android hardening platform designed to raise the cost of reverse engin
 
 Its goal is not to claim that protected software is "unbreakable". Software executing on an attacker-controlled device can ultimately be inspected. The objective is to make analysis and modification substantially more expensive, reduce reusable bypasses, detect defined integrity violations, and keep defensive behavior measurable through repeatable tests.
 
-The protection platform through **Phase N — Production Hardening** is complete. The source contract is finalized at **1.0.0** and validated for stable publication.
+The component roadmap through **Phase N — Production Hardening** is complete, but a stricter post-N production audit found release-blocking integration and governance gaps. **Phase O — Production Release Audit & Hardening is open and `v1.0.0` is intentionally blocked.**
+
+The most important open item is the production protection path: the current user-facing `nexora-shield protect` command still reaches the Phase A packaging pipeline and does not yet prove end-to-end orchestration of all documented B–I protection engines into the final artifact. See the [Production Readiness Audit](docs/PRODUCTION-READINESS-AUDIT.md).
 
 | Area | Current state |
 | --- | --- |
@@ -43,12 +45,13 @@ The protection platform through **Phase N — Production Hardening** is complete
 | VM Shield | Completed |
 | Per-Build Diversification | Completed |
 | Attestation & Remote Policy | Completed |
-| Gradle Plugin | Completed |
-| AAB / AAR / Splits | Completed |
-| Shield Studio | Completed |
-| Security Lab | Completed |
-| Production hardening | **1.0 RC qualification** |
-| Stable 1.0 | **Qualified — source finalized at 1.0.0; release tag must be created from validated main** |
+| Gradle Plugin component | Completed; production orchestration pending O.1 |
+| AAB / AAR / Splits compatibility foundation | Completed; final-artifact protection proof pending O.3/O.4 |
+| Shield Studio component | Completed; signed/notarized distribution pending O.7 |
+| Security Lab | Completed; coverage-guided fuzzing expansion pending O.9 |
+| Production hardening / Phase N | Completed within Phase N scope |
+| Production release audit / Phase O | **OPEN — release blocking** |
+| Stable 1.0 | **NO-GO until Phase O closes** |
 
 ## Implemented Protection Layers
 
@@ -140,6 +143,8 @@ A dedicated **report-only mode** keeps detection observable without enforcing bl
 
 ## Architecture
 
+> The diagram below is the **target production architecture**. Phase O exists specifically to ensure the real CLI/Gradle/Studio production path executes this stage chain end-to-end before stable publication.
+
 ```mermaid
 flowchart TD
     INPUT["Android project / APK"] --> NORMALIZE["Package normalization"]
@@ -207,7 +212,7 @@ Maximum protection is intentionally not the default for an entire application.
 The CLI is the primary automation surface.
 
 ```bash
-nexora-shield protect app.apk --config nexora-shield.yml --output app-protected.apk
+nexora-shield protect app.apk --output app-protected.apk --profile hardened
 nexora-shield inspect app-protected.apk
 nexora-shield verify app-protected.apk
 nexora-shield retrace --mapping mapping.nshield crash.txt
@@ -247,15 +252,16 @@ A phase is only considered complete when its implementation, tests, documentatio
 | **C** | Data protection | ✅ Complete |
 | **D** | Integrity / anti-tamper | ✅ Complete |
 | **E** | RASP / risk engine | ✅ Complete |
-| **F** | Native Shield | Next |
-| **G** | VM Shield | Planned |
-| **H** | Per-build diversification | Planned |
-| **I** | Attestation / remote policy | Planned |
-| **J** | Gradle Plugin | Planned |
-| **K** | AAB / AAR / splits | Planned |
-| **L** | Shield Studio | Planned |
-| **M** | Security Lab | Planned |
-| **N** | Production hardening / 1.0 | Planned |
+| **F** | Native Shield | ✅ Complete |
+| **G** | VM Shield | ✅ Complete |
+| **H** | Per-build diversification | ✅ Complete |
+| **I** | Attestation / remote policy | ✅ Complete |
+| **J** | Gradle Plugin component | ✅ Complete |
+| **K** | AAB / AAR / splits compatibility foundation | ✅ Complete |
+| **L** | Shield Studio | ✅ Complete |
+| **M** | Security Lab | ✅ Complete |
+| **N** | Production hardening / 1.0 qualification | ✅ Complete in N scope |
+| **O** | Production release audit & hardening | 🚧 **Open — release blocking** |
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for the complete exit criteria and subphases.
 
@@ -271,6 +277,9 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the complete exit criteria and subpha
 - [Phase E Checklist](docs/PHASE-E-CHECKLIST.md)
 - [CI](docs/CI.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Production Readiness Audit](docs/PRODUCTION-READINESS-AUDIT.md)
+- [Phase O — Production Release Audit & Hardening](docs/PHASE-O.md)
+- [Phase O Checklist](docs/PHASE-O-CHECKLIST.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
 
