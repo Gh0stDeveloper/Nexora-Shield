@@ -35,7 +35,7 @@ nexoraShield {
         providers.environmentVariable("NEXORA_SHIELD_CLI").orElse("nexora-shield"),
     )
     releaseOnly.set(true)
-    profile.set("hardened")
+    profile.set("hardened")\n    // This historical Phase J sample exercises Phase A packaging only,\n    // not production security controls. Production defaults fail closed.\n    legacyPhaseAOnly.set(true)
 
     // Sample-only: production releases should configure signingKeystore and
     // env:/file: password references instead of allowing unsigned output.
