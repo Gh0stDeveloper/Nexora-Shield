@@ -294,7 +294,7 @@ The final audit contains machine-readable or captured repository-setting evidenc
 
 ## O.0 — Release freeze and audit baseline
 
-Status: **IMPLEMENTED / CI VALIDATION PENDING**
+Status: **COMPLETED** — Phase O #9 (`37710584139`) success
 
 Authoritative O.0 evidence:
 - `release/phase-o-status.json`
