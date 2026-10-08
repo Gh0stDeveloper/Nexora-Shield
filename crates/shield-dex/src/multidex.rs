@@ -185,7 +185,10 @@ pub fn canonical_dex_index(name: &str) -> Option<u32> {
         return Some(1);
     }
     let number = name.strip_prefix("classes")?.strip_suffix(".dex")?;
-    if number.is_empty() || number.starts_with('0') {
+    if number.is_empty()
+        || number.starts_with('0')
+        || !number.bytes().all(|byte| byte.is_ascii_digit())
+    {
         return None;
     }
     let parsed = number.parse::<u32>().ok()?;
@@ -210,6 +213,8 @@ mod tests {
         assert_eq!(canonical_dex_index("classes.dex"), Some(1));
         assert_eq!(canonical_dex_index("classes2.dex"), Some(2));
         assert_eq!(canonical_dex_index("classes02.dex"), None);
+        assert_eq!(canonical_dex_index("classes+2.dex"), None);
+        assert_eq!(canonical_dex_index("classes-2.dex"), None);
         assert_eq!(canonical_dex_name(1), "classes.dex");
         assert_eq!(canonical_dex_name(3), "classes3.dex");
     }
