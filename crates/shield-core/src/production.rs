@@ -198,9 +198,9 @@ pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()>
             }
         };
         if let Some(metadata) = metadata {
-            if metadata.is_dir() {
+            if !metadata.is_file() {
                 return Err(CoreError::InvalidRequest(format!(
-                    "{label} points to a directory instead of a file"
+                    "{label} is not a regular file"
                 )));
             }
             existing.push((label, metadata));

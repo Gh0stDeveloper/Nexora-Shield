@@ -11,7 +11,7 @@ Status: **IMPLEMENTED ON FEATURE BRANCH — CI VERIFICATION REQUIRED**.
    `NotIntegrated` status until an actual executor provides final evidence.
 4. Duplicate/contradictory flags fail explicitly (no silent last-wins).
 5. Output, reports, keystore and explicit tool paths are checked for canonical
-   collisions, Unix hardlink aliases and directory destinations.
+   collisions, Unix hardlink aliases and non-regular file destinations.
 6. Signing cannot be simultaneously requested and explicitly suppressed;
    production signing policy requires minSdk 24+ and v2/v3.
 7. `--plan-only` never writes protected output or report artifacts; full
