@@ -1,6 +1,6 @@
 # Nexora Shield release process
 
-> **Stable release freeze:** a strict post-Phase-N audit opened [Phase O](PHASE-O.md). The stable `v1.0.0` tag MUST NOT be created while Phase O remains open. Phase N qualification evidence is retained as historical evidence but is not sufficient for final production approval.
+> **Stable release freeze:** a strict post-Phase-N audit opened [Phase O](PHASE-O.md). The stable `v1.0.0` tag MUST NOT be created while Phase O remains open. This is now enforced by `scripts/release/verify-phase-o-release-freeze.py` inside the release workflow before build/publish jobs. Phase N qualification evidence is retained as historical evidence but is not sufficient for final production approval.
 
 ## Release channels
 
