@@ -380,6 +380,7 @@ impl ProductionBuildContext {
         align: bool,
         sign: bool,
     ) -> Vec<PlannedStage> {
+        use ProductionControl as C;
         use ProductionStage as S;
         use StageIntegration as I;
         use StageRequirement as R;
@@ -407,12 +408,12 @@ impl ProductionBuildContext {
             .into_iter()
             .map(|stage| {
                 let requirement = match stage {
-                    S::DataProtection if !policy.enabled(ProductionControl::DataProtection) => R::WhenSelected,
-                    S::Diversity if !policy.enabled(ProductionControl::Diversity) => R::WhenSelected,
-                    S::RaspRuntime if !policy.enabled(ProductionControl::RaspRuntime) => R::WhenSelected,
-                    S::NativeShield if !policy.enabled(ProductionControl::NativeShield) => R::WhenSelected,
-                    S::VmShield if !policy.enabled(ProductionControl::VmShield) => R::WhenSelected,
-                    S::Attestation if !policy.enabled(ProductionControl::Attestation) => R::WhenSelected,
+                    S::DataProtection if !policy.enabled(C::DataProtection) => R::WhenSelected,
+                    S::Diversity if !policy.enabled(C::Diversity) => R::WhenSelected,
+                    S::RaspRuntime if !policy.enabled(C::RaspRuntime) => R::WhenSelected,
+                    S::NativeShield if !policy.enabled(C::NativeShield) => R::WhenSelected,
+                    S::VmShield if !policy.enabled(C::VmShield) => R::WhenSelected,
+                    S::Attestation if !policy.enabled(C::Attestation) => R::WhenSelected,
                     S::Align if !align => R::Disabled,
                     S::Sign if !sign => R::Disabled,
                     _ => R::Required,
