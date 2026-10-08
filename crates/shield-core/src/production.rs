@@ -1,7 +1,10 @@
 //! Phase O.1 typed production stage contract (planning only).
 //! No stage is reported as executed without final-artifact evidence.
 
-use crate::{CoreError, PipelineResult, ProtectionProfile, ProtectionRequest, Result};
+use crate::{
+    CoreError, EffectiveProductionPolicy, PipelineResult, ProductionOverrides, ProtectionProfile,
+    ProtectionRequest, Result,
+};
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -87,6 +90,7 @@ pub struct ProductionBuildContext {
     input_sha256: String,
     dex_count: usize,
     profile: ProtectionProfile,
+    policy: EffectiveProductionPolicy,
     stages: Vec<PlannedStage>,
 }
 
@@ -98,7 +102,20 @@ pub struct ProductionBuildContext {
 /// Returns a fail-closed error until the entire release production path is
 /// implemented and verified. No output or reports are published on failure.
 pub fn protect_production_apk(request: &ProtectionRequest) -> Result<PipelineResult> {
-    let plan = ProductionBuildContext::prepare(request)?;
+    protect_production_apk_with_overrides(request, &ProductionOverrides::default())
+}
+
+/// Production entry point with explicit policy overrides; always fail-closed
+/// until every required stage has final-artifact evidence.
+///
+/// # Errors
+///
+/// Rejects unsafe configuration and unavailable production integrations.
+pub fn protect_production_apk_with_overrides(
+    request: &ProtectionRequest,
+    overrides: &ProductionOverrides,
+) -> Result<PipelineResult> {
+    let plan = ProductionBuildContext::prepare_with_overrides(request, overrides)?;
     let _ = plan.inspect_dex()?;
     plan.ensure_ready()?;
     // Even if the stage-status graph is mistakenly marked complete in future,
@@ -150,6 +167,12 @@ pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()>
     if let Some(signing) = &request.signing {
         paths.push(("signing keystore", &signing.keystore));
     }
+    if let Some(path) = &request.zipalign {
+        paths.push(("zipalign executable", path));
+    }
+    if let Some(path) = &request.apksigner {
+        paths.push(("apksigner executable", path));
+    }
     if let Some(path) = &request.public_report {
         paths.push(("public report", path));
     }
@@ -157,6 +180,7 @@ pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()>
         paths.push(("private report", path));
     }
     let mut identities = std::collections::BTreeMap::new();
+    let mut existing = Vec::new();
     for (label, path) in paths {
         let identity = normalized_destination(path)?;
         if let Some(previous) = identities.insert(identity, label) {
@@ -164,7 +188,32 @@ pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()>
                 "artifact path collision between {previous} and {label}"
             )));
         }
+        if let Ok(metadata) = fs::metadata(path) {
+            if metadata.is_dir() {
+                return Err(CoreError::InvalidRequest(format!(
+                    "{label} points to a directory instead of a file"
+                )));
+            }
+            existing.push((label, metadata));
+        }
     }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        for (index, (label, metadata)) in existing.iter().enumerate() {
+            for (other_label, other_metadata) in &existing[..index] {
+                if metadata.dev() == other_metadata.dev()
+                    && metadata.ino() == other_metadata.ino()
+                {
+                    return Err(CoreError::InvalidRequest(format!(
+                        "artifact hard-link collision between {other_label} and {label}"
+                    )));
+                }
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = existing;
     Ok(())
 }
 
@@ -196,6 +245,11 @@ impl ProductionBuildContext {
     }
 
     #[must_use]
+    pub const fn policy(&self) -> EffectiveProductionPolicy {
+        self.policy
+    }
+
+    #[must_use]
     pub fn stages(&self) -> &[PlannedStage] {
         &self.stages
     }
@@ -206,6 +260,32 @@ impl ProductionBuildContext {
     ///
     /// Rejects malformed APK inputs, invalid output targets and unsafe signing policy.
     pub fn prepare(request: &ProtectionRequest) -> Result<Self> {
+        Self::prepare_with_overrides(request, &ProductionOverrides::default())
+    }
+
+    /// Freeze effective profile controls and signing policy before inspecting APK bytes.
+    ///
+    /// # Errors
+    ///
+    /// Rejects unsafe downgrades, conflicts, malformed sources and unsafe destinations.
+    pub fn prepare_with_overrides(
+        request: &ProtectionRequest,
+        overrides: &ProductionOverrides,
+    ) -> Result<Self> {
+        let policy = EffectiveProductionPolicy::resolve(request.profile, overrides)?;
+        if request.allow_unsigned && request.signing.is_some() {
+            return Err(CoreError::InvalidRequest(
+                "unsigned consent cannot be combined with signing".into(),
+            ));
+        }
+        if let Some(signing) = &request.signing {
+            if signing.min_sdk < 24 || (!signing.v2 && !signing.v3) {
+                return Err(CoreError::InvalidRequest(
+                    "production signing requires minSdk >= 24 and APK Signature Scheme v2 or v3".into(),
+                ));
+            }
+            signing.validate()?;
+        }
         if !request.input.is_file() {
             return Err(CoreError::InvalidRequest("input APK is not a file".into()));
         }
@@ -241,7 +321,8 @@ impl ProductionBuildContext {
             input_sha256: inspected.sha256,
             dex_count: inspected.dex_files.len(),
             profile: request.profile,
-            stages: Self::stage_graph(request.profile, request.align, request.signing.is_some()),
+            policy,
+            stages: Self::stage_graph_for_policy(&policy, request.align, request.signing.is_some()),
         })
     }
 
@@ -278,7 +359,18 @@ impl ProductionBuildContext {
         )))
     }
 
+    #[cfg(test)]
     fn stage_graph(profile: ProtectionProfile, align: bool, sign: bool) -> Vec<PlannedStage> {
+        let policy = EffectiveProductionPolicy::resolve(profile, &ProductionOverrides::default())
+            .unwrap_or_else(|_| unreachable!());
+        Self::stage_graph_for_policy(&policy, align, sign)
+    }
+
+    fn stage_graph_for_policy(
+        policy: &EffectiveProductionPolicy,
+        align: bool,
+        sign: bool,
+    ) -> Vec<PlannedStage> {
         use ProductionStage as S;
         use StageIntegration as I;
         use StageRequirement as R;
@@ -302,18 +394,16 @@ impl ProductionBuildContext {
             S::FinalVerify,
             S::Evidence,
         ];
-        let hardened = profile != ProtectionProfile::Standard;
         order
             .into_iter()
             .map(|stage| {
                 let requirement = match stage {
-                    S::DataProtection | S::Diversity | S::RaspRuntime if !hardened => {
-                        R::WhenSelected
-                    }
-                    S::NativeShield | S::VmShield if profile == ProtectionProfile::Maximum => {
-                        R::Required
-                    }
-                    S::NativeShield | S::VmShield | S::Attestation => R::WhenSelected,
+                    S::DataProtection if !policy.data_protection => R::WhenSelected,
+                    S::Diversity if !policy.diversity => R::WhenSelected,
+                    S::RaspRuntime if !policy.rasp_runtime => R::WhenSelected,
+                    S::NativeShield if !policy.native_shield => R::WhenSelected,
+                    S::VmShield if !policy.vm_shield => R::WhenSelected,
+                    S::Attestation if !policy.attestation => R::WhenSelected,
                     S::Align if !align => R::Disabled,
                     S::Sign if !sign => R::Disabled,
                     _ => R::Required,
@@ -341,7 +431,7 @@ impl ProductionBuildContext {
 #[cfg(test)]
 mod tests {
     use super::{ProductionBuildContext, ProductionStage as S, StageRequirement as R};
-    use crate::ProtectionProfile;
+    use crate::{EffectiveProductionPolicy, ProductionOverrides, ProtectionProfile};
 
     #[test]
     fn graph_is_ordered_and_complete() {
@@ -378,6 +468,18 @@ mod tests {
     }
 
     #[test]
+    fn selecting_optional_defenses_makes_them_mandatory() {
+        let mut overrides = ProductionOverrides::default();
+        assert!(overrides.set(crate::ProductionControl::Attestation, true).is_ok());
+        assert!(overrides.set(crate::ProductionControl::VmShield, true).is_ok());
+        let policy = EffectiveProductionPolicy::resolve(ProtectionProfile::Standard, &overrides)
+            .unwrap_or_else(|_| unreachable!());
+        let graph = ProductionBuildContext::stage_graph_for_policy(&policy, true, true);
+        assert!(graph.iter().any(|s| s.stage == S::Attestation && s.requirement == R::Required));
+        assert!(graph.iter().any(|s| s.stage == S::VmShield && s.requirement == R::Required));
+    }
+
+    #[test]
     fn missing_mandatory_stages_fail_closed() {
         let ctx = ProductionBuildContext {
             input: "input.apk".into(),
@@ -385,6 +487,11 @@ mod tests {
             input_sha256: "fixture".into(),
             dex_count: 1,
             profile: ProtectionProfile::Standard,
+            policy: EffectiveProductionPolicy::resolve(
+                ProtectionProfile::Standard,
+                &ProductionOverrides::default(),
+            )
+            .unwrap_or_else(|_| unreachable!()),
             stages: ProductionBuildContext::stage_graph(ProtectionProfile::Standard, true, true),
         };
         assert!(ctx.required_unintegrated().contains(&S::DexTransform));
