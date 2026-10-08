@@ -567,8 +567,8 @@ fn run_protect(args: &[String]) -> Result<(), String> {
     };
 
     if plan_only {
-        let context = ProductionBuildContext::prepare(&request)
-            .map_err(|error| error.to_string())?;
+        let context =
+            ProductionBuildContext::prepare(&request).map_err(|error| error.to_string())?;
         let dex = context.inspect_dex().map_err(|error| error.to_string())?;
         println!("Phase O.1 production plan: READ-ONLY, NOT PROTECTED");
         println!("Input SHA-256: {}", dex.inspected_input_sha256);
@@ -586,7 +586,9 @@ fn run_protect(args: &[String]) -> Result<(), String> {
         for stage in context.stages() {
             println!(
                 "Stage {}: {:?}, {:?}",
-                stage.stage.as_str(), stage.requirement, stage.integration
+                stage.stage.as_str(),
+                stage.requirement,
+                stage.integration
             );
         }
         let missing = context.required_unintegrated();
