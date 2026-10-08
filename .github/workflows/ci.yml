@@ -124,7 +124,7 @@ jobs:
           NEXORA_TEST_KS_PASS: phase-a-password
           NEXORA_TEST_KEY_PASS: phase-a-password
         run: |
-          cargo run --quiet -p nexora-shield -- protect build/phase-a/input.apk \
+          cargo run --quiet -p nexora-shield -- package-apk build/phase-a/input.apk \
             --output build/phase-a/protected.apk \
             --profile hardened \
             --keystore build/phase-a/test.p12 \
