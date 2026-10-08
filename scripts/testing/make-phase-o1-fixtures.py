@@ -144,6 +144,26 @@ with zipfile.ZipFile(directory / "compressed-dex.apk", "w", compression=zipfile.
     output.writestr("AndroidManifest.xml", manifest)
     output.writestr("classes.dex", first)
 
+# Corrupt only the raw compressed stream (not ZIP CRC or length metadata).
+corrupted = bytearray((directory / "compressed-dex.apk").read_bytes())
+with zipfile.ZipFile(directory / "compressed-dex.apk") as compressed_apk:
+    entry = compressed_apk.getinfo("classes.dex")
+    offset = entry.header_offset
+    local_name_len = int.from_bytes(corrupted[offset + 26:offset + 28], "little")
+    local_extra_len = int.from_bytes(corrupted[offset + 28:offset + 30], "little")
+    payload_offset = offset + 30 + local_name_len + local_extra_len
+    corrupted[payload_offset] ^= 0xff
+(directory / "corrupt-deflate.apk").write_bytes(corrupted)
+
+# Reject an inflated-size claim before allocating memory for a ZIP bomb.
+oversized = bytearray((directory / "compressed-dex.apk").read_bytes())
+for signature, delta in ((b"PK\x03\x04", 22), (b"PK\x01\x02", 24)):
+    header = oversized.find(signature)
+    if header < 0:
+        raise RuntimeError("ZIP header missing from synthetic fixture")
+    oversized[header + delta:header + delta + 4] = (65 * 1024 * 1024).to_bytes(4, "little")
+(directory / "oversized-deflate.apk").write_bytes(oversized)
+
 with zipfile.ZipFile(directory / "duplicate-class.apk", "w", compression=zipfile.ZIP_STORED) as output:
     output.writestr("AndroidManifest.xml", manifest)
     output.writestr("classes.dex", first)
@@ -169,4 +189,4 @@ if not found:
     raise RuntimeError("synthetic central-directory classes.dex record missing")
 (directory / "crc-mismatch.apk").write_bytes(damaged)
 
-print("Phase O.1 stored valid / malformed / compressed / duplicate-class / bad-CRC fixtures created.")
+print("Phase O.1 stored/deflated valid, corrupt DEFLATE, oversize, malformed, duplicate and bad-CRC fixtures created.")

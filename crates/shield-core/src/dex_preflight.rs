@@ -1,13 +1,13 @@
 //! Read-only DEX inspection for the Phase O.1 production planner.
 //!
-//! Extraction is bounded. Unsupported compressed DEX entries are rejected
-//! rather than silently skipped or counted as protected.
+//! Extraction is bounded. ZIP STORE and DEFLATE are decoded with byte limits
+//! and checksum verification; unsupported/malformed DEX fails closed.
 
 use crate::{CoreError, ProductionBuildContext, Result};
 use nexora_shield_dex::{
     canonical_dex_index, CompatibilityAnalyzer, DexInput, MultiDexSet, SelectorResolver,
 };
-use nexora_shield_package::{crc32_ieee, read_stored_entry, read_zip_directory, sha256_file};
+use nexora_shield_package::{read_decoded_entry, read_zip_directory, sha256_file};
 use std::collections::BTreeSet;
 
 /// Maximum decoded size accepted for one DEX file in this first O.1 pass.
@@ -37,17 +37,16 @@ pub struct DexPreflight {
 }
 
 impl ProductionBuildContext {
-    /// Parses and validates every canonical stored DEX from the source APK,
+    /// Parses and validates every canonical DEX from the source APK,
     /// checks cross-DEX class ownership, then runs conservative compatibility
     /// and default selector resolution. No files are modified.
     ///
-    /// Deflated DEX is explicitly unsupported by this preliminary reader,
-    /// not considered inspected. A future bounded decompressor must replace
-    /// that limitation before O.1 can be closed.
+    /// STORE and DEFLATE DEX decoding are bounded and checked against ZIP
+    /// size and CRC metadata, but this remains a read-only diagnostic.
     ///
     /// # Errors
     ///
-    /// Fails on input substitution, non-STORE DEX, size limits, malformed DEX,
+    /// Fails on input substitution, unsupported compression, size limits, malformed DEX,
     /// duplicated class definitions or inconsistent DEX inventory.
     pub fn inspect_dex(&self) -> Result<DexPreflight> {
         self.verify_input_unchanged()?;
@@ -75,25 +74,7 @@ impl ProductionBuildContext {
                     "combined DEX size exceeds preflight memory budget".into(),
                 ));
             }
-            let bytes =
-                read_stored_entry(self.input(), &entry, MAX_DEX_BYTES)?.ok_or_else(|| {
-                    CoreError::InvalidRequest(format!(
-                        "DEX '{}' must use ZIP STORE for O.1 preflight; compressed DEX is unsupported",
-                        entry.name
-                    ))
-                })?;
-            if bytes.len() != decoded_size {
-                return Err(CoreError::InvalidRequest(format!(
-                    "DEX '{}' size does not match ZIP metadata",
-                    entry.name
-                )));
-            }
-            if crc32_ieee(&bytes) != entry.crc32 {
-                return Err(CoreError::InvalidRequest(format!(
-                    "DEX '{}' has an invalid ZIP CRC",
-                    entry.name
-                )));
-            }
+            let bytes = read_decoded_entry(self.input(), &entry, MAX_DEX_BYTES)?;
             inputs.push(DexInput {
                 name: entry.name,
                 bytes,

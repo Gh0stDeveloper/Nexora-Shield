@@ -59,9 +59,9 @@ The read-only CLI option `protect ... --plan-only` now invokes the same typed pr
 
 The option does not create an output APK or reports, does not sign, and reports `Production ready: false`. It is a preflight diagnostic, not an implementation of the complete `protect` production path.
 
-Current limit: this first read-only reader supports **stored (ZIP method 0) DEX only**. A DEX stored in ZIP Deflate (method 8) is rejected, not silently excluded. Support for bounded decompression and production transformations is still required.
+Historical limit (first pass, now superseded by the sixth pass): the reader originally accepted only ZIP STORE DEX. The current preflight and unsigned staging also support bounded ZIP DEFLATE DEX decoding; see below. Production transformations and Android runtime evidence remain required.
 
-The Phase O workflow now checks representative *synthetic* two-DEX APKs, malformed DEX, deflated DEX and cross-DEX duplicate classes. Synthetic APK fixtures are not Android emulator/device installation evidence.
+The Phase O workflow now checks representative *synthetic* two-DEX APKs, malformed DEX, valid/invalid deflated DEX and cross-DEX duplicate classes. Synthetic APK fixtures are not Android emulator/device installation evidence.
 
 Historical Phase A compatibility now requires explicitly calling `package-apk`. Production `protect` never reports a packaging-only artifact as protected. The executed production orchestrator and final-output evidence remain incomplete, so P0.1 stays open.
 
@@ -165,3 +165,20 @@ This improvement does **not** mean DEFLATE-compressed `classes*.dex` can be
 decoded or rewritten; preflight still rejects compressed DEX. It also does not
 substitute for a runtime-capable B–I executor, signing or Android device
 evidence. O.1 remains **OPEN** and `v1.0.0` remains **NO-GO**.
+
+## Sixth hardening pass — bounded ZIP DEFLATE DEX decoding
+
+The preflight and unsigned diagnostic DEX staging now decode canonical DEX
+entries stored using ZIP method 0 (STORE) **or method 8 (raw DEFLATE)** through
+the maintained pure-Rust `miniz_oxide` inflater. Each read enforces declared
+uncompressed size, a maximum compressed-input budget, the per-DEX/aggregate
+decoded budgets and CRC-32 verification; corrupt DEFLATE and oversized metadata
+are rejected. Diagnostic rewrites convert replaced DEX entries to STORE while
+preserving other APK payloads byte-for-byte.
+
+Synthetic tests exercise valid compressed DEX, corrupt DEFLATE, an over-limit
+declared size, the rebuilt DEX bytes and preservation of the manifest. These
+are not installable Android app tests. DEFLATE support is a necessary staging
+feature, **not** evidence of B–I protection, signing, runtime injection or an
+approved stable release. O.1 remains **OPEN**; final production executor and
+runtime installation proof are still required.

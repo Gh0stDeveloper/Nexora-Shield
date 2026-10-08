@@ -165,10 +165,11 @@ pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary
     rewrite_stored_entries(input, output, &BTreeMap::new())
 }
 
-/// Rebuilds ZIP32 while replacing explicitly named stored entries.
+/// Rebuilds ZIP32 while replacing explicitly named STORE/DEFLATE entries.
 ///
-/// Only STORE payloads may be replaced; a compressed or absent target is an
-/// error. Existing signature metadata is stripped because rewritten content
+/// Replacement payloads are written as STORE, while all other compressed bytes
+/// are preserved. Absent targets are rejected. Existing signature metadata is
+/// stripped because rewritten content
 /// invalidates signatures. Callers must verify the artifact and re-sign it.
 ///
 /// # Errors
@@ -221,6 +222,9 @@ pub fn rewrite_stored_entries(
                 ))
             })?;
             entry.crc32 = crc32_ieee(bytes);
+            // Rewritten classes*.dex are stored uncompressed so Android's
+            // class loader can map them without ZIP inflation.
+            entry.compression_method = 0;
             entry.compressed_size = size;
             entry.uncompressed_size = size;
         }
@@ -230,6 +234,10 @@ pub fn rewrite_stored_entries(
             PackageError::UnsupportedZip("normalized APK exceeds standard ZIP offset limits".into())
         })?;
 
+        // The rebuilt archive contains the full CRC/size in its new local
+        // header and never preserves the source data descriptor. Keep local
+        // and central flags consistent, including for compressed sources.
+        entry.flags &= !0x0008;
         let local_extra = filter_extra_fields(&entry.local_extra)?;
         write_local_header(&mut destination, &entry, &local_extra)?;
         destination.write_all(entry.name.as_bytes())?;
@@ -310,7 +318,7 @@ fn validate_replacements(
     entries: &[ZipEntry],
     replacements: &BTreeMap<String, Vec<u8>>,
 ) -> Result<()> {
-    // Each requested target must exist and use ZIP STORE.
+    // Each requested target must exist and use a supported ZIP method.
     for name in replacements.keys() {
         let entry = entries
             .iter()
@@ -318,9 +326,9 @@ fn validate_replacements(
             .ok_or_else(|| {
                 PackageError::InvalidArgument(format!("replacement target '{name}' is absent"))
             })?;
-        if entry.compression_method != 0 {
+        if !matches!(entry.compression_method, 0 | 8) {
             return Err(PackageError::UnsupportedZip(format!(
-                "replacement target '{name}' must use ZIP STORE"
+                "replacement target '{name}' uses an unsupported ZIP method"
             )));
         }
     }
@@ -466,6 +474,80 @@ pub fn verify_preserved_entry_payload(
             .map_err(|_| PackageError::UnsupportedZip("chunk size overflow".into()))?;
     }
     Ok(())
+}
+
+/// Reads a ZIP STORE or raw DEFLATE entry with strict compressed/decoded size
+/// budgets and validates the decoded CRC-32. No implicit fallback or skipping.
+///
+/// # Errors
+///
+/// Refuses a ZIP bomb, unsupported method, truncated data, invalid DEFLATE,
+/// or any inconsistency between ZIP metadata and decoded content.
+pub fn read_decoded_entry(path: &Path, entry: &ZipEntry, max_decoded: usize) -> Result<Vec<u8>> {
+    let expected = usize::try_from(entry.uncompressed_size)
+        .map_err(|_| PackageError::UnsupportedZip("decoded entry size overflows host".into()))?;
+    if expected > max_decoded {
+        return Err(PackageError::UnsupportedZip(format!(
+            "entry '{}' exceeds decoded size budget",
+            entry.name
+        )));
+    }
+
+    let decoded = match entry.compression_method {
+        0 => {
+            if entry.compressed_size != entry.uncompressed_size {
+                return Err(PackageError::InvalidZip(format!(
+                    "stored entry '{}' has inconsistent lengths",
+                    entry.name
+                )));
+            }
+            read_stored_entry(path, entry, max_decoded)?.ok_or_else(|| {
+                PackageError::InvalidZip(format!("cannot read stored entry '{}'", entry.name))
+            })?
+        }
+        8 => {
+            // Strict bound on *both* the raw DEFLATE buffer and decoded data.
+            // An incompressible valid DEFLATE stream has small framing overhead.
+            let compressed_budget = max_decoded
+                .checked_add(max_decoded / 8)
+                .and_then(|n| n.checked_add(65_536))
+                .ok_or_else(|| PackageError::UnsupportedZip("compressed budget overflow".into()))?;
+            let length = usize::try_from(entry.compressed_size)
+                .map_err(|_| PackageError::UnsupportedZip("compressed size overflows host".into()))?;
+            if length > compressed_budget {
+                return Err(PackageError::UnsupportedZip(format!(
+                    "compressed entry '{}' exceeds inspection budget",
+                    entry.name
+                )));
+            }
+            let mut file = File::open(path)?;
+            let offset = local_data_offset(&mut file, entry)?;
+            file.seek(SeekFrom::Start(offset))?;
+            let mut compressed = vec![0_u8; length];
+            file.read_exact(&mut compressed)?;
+            miniz_oxide::inflate::decompress_to_vec_with_limit(&compressed, max_decoded)
+                .map_err(|error| {
+                    PackageError::InvalidZip(format!(
+                        "invalid DEFLATE entry '{}': {error:?}",
+                        entry.name
+                    ))
+                })?
+        }
+        _ => {
+            return Err(PackageError::UnsupportedZip(format!(
+                "compression method {} is unsupported for '{}'",
+                entry.compression_method, entry.name
+            )));
+        }
+    };
+
+    if decoded.len() != expected || crc32_ieee(&decoded) != entry.crc32 {
+        return Err(PackageError::VerificationFailed(format!(
+            "decoded entry '{}' does not match declared size and CRC-32",
+            entry.name
+        )));
+    }
+    Ok(decoded)
 }
 
 /// Standard IEEE CRC-32 for ZIP entry integrity; not a cryptographic hash.

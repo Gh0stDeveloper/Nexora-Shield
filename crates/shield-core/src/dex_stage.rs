@@ -4,7 +4,7 @@
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
 use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
-    crc32_ieee, is_legacy_signature_entry, read_stored_entry, read_zip_directory,
+    crc32_ieee, is_legacy_signature_entry, read_decoded_entry, read_stored_entry, read_zip_directory,
     rewrite_stored_entries, verify_apk_structure, verify_preserved_entry_payload, ZipDirectory,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -132,19 +132,7 @@ impl ProductionBuildContext {
                     "DEX staging exceeds preflight memory limit".into(),
                 ));
             }
-            let bytes =
-                read_stored_entry(self.input(), entry, MAX_DEX_BYTES)?.ok_or_else(|| {
-                    CoreError::InvalidRequest(format!(
-                        "unsupported compressed DEX '{}'",
-                        entry.name
-                    ))
-                })?;
-            if crc32_ieee(&bytes) != entry.crc32 {
-                return Err(CoreError::InvalidRequest(format!(
-                    "DEX '{}' has an invalid ZIP CRC",
-                    entry.name
-                )));
-            }
+            let bytes = read_decoded_entry(self.input(), entry, MAX_DEX_BYTES)?;
             originals.insert(entry.name.clone(), bytes.clone());
             inputs.push(DexInput {
                 name: entry.name.clone(),
