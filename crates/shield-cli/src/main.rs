@@ -19,8 +19,7 @@ use phase_k_cli::{
 
 use nexora_shield_core::{
     apk_inspection_json, protect_apk, protect_production_apk, ProductionBuildContext,
-    ProtectionProfile, ProtectionRequest,
-    CONFIG_SCHEMA_VERSION,
+    ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
