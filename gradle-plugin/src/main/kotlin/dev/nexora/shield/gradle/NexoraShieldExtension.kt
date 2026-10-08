@@ -13,8 +13,7 @@ open class NexoraShieldExtension @Inject constructor(objects: ObjectFactory) {
 
     val profile: Property<String> = objects.property(String::class.java).convention("hardened")
     val cliExecutable: Property<String> = objects.property(String::class.java).convention("nexora-shield")
-    // Explicit compatibility switch for historical Phase A packaging tests ONLY.
-    // Never interpret this as enabling actual production protections.
+    // Explicit compatibility for historical Phase A packaging tests only.
     val legacyPhaseAOnly: Property<Boolean> =
         objects.property(Boolean::class.java).convention(false)
     val allowUnsigned: Property<Boolean> = objects.property(Boolean::class.java).convention(false)
