@@ -107,6 +107,26 @@ jobs:
       - name: Run stage graph contracts
         run: cargo test --locked -p nexora-shield-core production::tests
 
+
+  o1-studio-preflight:
+    name: O.1 Shield Studio production preflight routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Configure JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - name: Compile Studio and test fail-closed production planning
+        run: gradle -p studio desktopTest --no-daemon --stacktrace
+
   o0-release-freeze:
     name: O.0 release freeze and audit baseline
     runs-on: ubuntu-latest
