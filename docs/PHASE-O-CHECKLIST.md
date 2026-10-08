@@ -17,7 +17,7 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [x] Define authoritative production stage graph
 - [x] Add typed production build context
 - [ ] Resolve configuration before mutation
-- [ ] Resolve effective protection profile
+- [x] Resolve effective protection profile
 - [ ] Integrate DEX parse/validation
 - [ ] Integrate compatibility analysis
 - [ ] Integrate selectors
