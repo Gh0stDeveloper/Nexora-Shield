@@ -159,6 +159,30 @@ fn multidex_parser_rejects_gaps_and_noncanonical_dex_names() {
     assert!(leading_zero.is_err());
 }
 
+#[test]
+fn selector_resolver_revalidates_public_fields_and_rule_limits() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let dex = DexParser::parse(&bytes).expect("parse synthetic DEX");
+    let malformed = Selector {
+        kind: SelectorKind::Method,
+        class_pattern: "Lcom/test/A;".into(),
+        member_pattern: None,
+    };
+    assert!(SelectorResolver::resolve(&dex, &[malformed]).is_err());
+    let control_chars = Selector {
+        kind: SelectorKind::Class,
+        class_pattern: "Lcom/test/\\0;".into(),
+        member_pattern: None,
+    };
+    assert!(SelectorResolver::resolve(&dex, &[control_chars]).is_err());
+    let many = vec![Selector {
+        kind: SelectorKind::Class,
+        class_pattern: "Lcom/test/*;".into(),
+        member_pattern: None,
+    }; 129];
+    assert!(SelectorResolver::resolve(&dex, &many).is_err());
+}
+
 fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     let strings = [
         class_descriptor,
