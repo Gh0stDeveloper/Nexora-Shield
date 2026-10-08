@@ -48,12 +48,16 @@ jobs:
             protect build/phase-o1/valid.apk \
             --output build/phase-o1/forbidden-production.apk \
             --profile hardened --unsigned --no-align \
+            --public-report build/phase-o1/forbidden-public.json \
+            --private-report build/phase-o1/forbidden-private.json \
             > build/phase-o1/production-denied.txt 2>&1; then
             echo "Security regression: incomplete production path returned success" >&2
             exit 1
           fi
           grep -q 'production protection unavailable' build/phase-o1/production-denied.txt
           test ! -e build/phase-o1/forbidden-production.apk
+          test ! -e build/phase-o1/forbidden-public.json
+          test ! -e build/phase-o1/forbidden-private.json
 
       - name: Rebuild and verify a diagnostic APK with real transformed DEX
         run: |
