@@ -94,6 +94,26 @@ impl SelectorResolver {
         if selectors.is_empty() {
             return Ok(select_all(dex));
         }
+        if selectors.len() > 128 {
+            return Err(DexError::InvalidSelector(
+                "too many DEX selector rules (maximum 128)".into(),
+            ));
+        }
+        // Public selector fields can be modified after Selector::new, so
+        // revalidate at the engine boundary as well as in the CLI policy.
+        for selector in selectors {
+            validate_selector_pattern(&selector.class_pattern, "class")?;
+            if let Some(pattern) = &selector.member_pattern {
+                validate_selector_pattern(pattern, "member")?;
+            }
+            if matches!(selector.kind, SelectorKind::Method | SelectorKind::Field)
+                && selector.member_pattern.is_none()
+            {
+                return Err(DexError::InvalidSelector(
+                    "member selector requires a member pattern".into(),
+                ));
+            }
+        }
 
         let mut selection = Selection::default();
         for selector in selectors {
