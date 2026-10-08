@@ -117,7 +117,10 @@ fn dex_staging_refuses_aliases_of_source_and_planned_output() {
     let output = directory.join("output.apk");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"some bytes")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"some bytes"),
+        ],
     );
     let request = ProtectionRequest {
         input: input.clone(),
