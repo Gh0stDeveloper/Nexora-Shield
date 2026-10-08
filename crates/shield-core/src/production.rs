@@ -1,7 +1,7 @@
 //! Phase O.1 typed production stage contract (planning only).
 //! No stage is reported as executed without final-artifact evidence.
 
-use crate::{CoreError, ProtectionProfile, ProtectionRequest, Result};
+use crate::{CoreError, PipelineResult, ProtectionProfile, ProtectionRequest, Result};
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -82,6 +82,24 @@ pub struct ProductionBuildContext {
     dex_count: usize,
     profile: ProtectionProfile,
     stages: Vec<PlannedStage>,
+}
+
+/// Public production entry point. It can NEVER silently fall back to Phase A
+/// ZIP normalization when mandatory protection controls are unavailable.
+///
+/// # Errors
+///
+/// Returns a fail-closed error until the entire release production path is
+/// implemented and verified. No output or reports are published on failure.
+pub fn protect_production_apk(request: &ProtectionRequest) -> Result<PipelineResult> {
+    let plan = ProductionBuildContext::prepare(request)?;
+    let _ = plan.inspect_dex()?;
+    plan.ensure_ready()?;
+    // Even if the stage-status graph is mistakenly marked complete in future,
+    // no output may be published until the actual executor is implemented.
+    Err(CoreError::InvalidRequest(
+        "production executor is not yet integrated: no protected APK was created".into(),
+    ))
 }
 
 impl ProductionBuildContext {
