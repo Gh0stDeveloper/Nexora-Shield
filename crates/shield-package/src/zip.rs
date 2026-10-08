@@ -180,11 +180,7 @@ pub fn rewrite_stored_entries(
     output: &Path,
     replacements: &BTreeMap<String, Vec<u8>>,
 ) -> Result<NormalizationSummary> {
-    if input == output {
-        return Err(PackageError::InvalidArgument(
-            "input and output paths must be different".into(),
-        ));
-    }
+    validate_distinct_archive_paths(input, output)?;
 
     let directory = read_zip_directory(input)?;
     let input_entries = directory.entries.len();
@@ -299,6 +295,15 @@ pub fn rewrite_stored_entries(
         output_entries: written.len(),
         stripped_signature_entries: stripped,
     })
+}
+
+fn validate_distinct_archive_paths(input: &Path, output: &Path) -> Result<()> {
+    if input == output {
+        return Err(PackageError::InvalidArgument(
+            "input and output paths must be different".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_replacements(
