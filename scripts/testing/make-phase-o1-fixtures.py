@@ -120,6 +120,8 @@ def build(path: Path, descriptor: str, method_name: str) -> None:
     put_u32(data, 8, zlib.adler32(data[12:]) & 0xffffffff)
     path.write_bytes(data)
 
+Path("build/phase-o1").mkdir(parents=True, exist_ok=True)
+
 build(Path("build/phase-o1/classes.dex"), "Lcom/test/A;", "run")
 build(Path("build/phase-o1/classes2.dex"), "Lcom/test/B;", "go")
 
