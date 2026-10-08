@@ -88,11 +88,13 @@ mod tests {
         assert!(policy.add_include(selector.clone()).is_ok());
         assert!(policy.add_include(selector).is_err());
         assert_eq!(policy.includes().len(), 1);
-        assert!(policy.add_exclude(Selector {
-            kind: SelectorKind::Class,
-            class_pattern: "bad\\0pattern".into(),
-            member_pattern: None,
-        }).is_err());
+        assert!(policy
+            .add_exclude(Selector {
+                kind: SelectorKind::Class,
+                class_pattern: "bad\0pattern".into(),
+                member_pattern: None,
+            })
+            .is_err());
         for i in 1..MAX_DEX_SELECTOR_RULES {
             let selector = Selector::new(SelectorKind::Class, format!("Lcom/example/C{i};"), None)
                 .unwrap_or_else(|_| unreachable!());
