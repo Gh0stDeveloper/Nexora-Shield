@@ -18,7 +18,8 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, ProductionBuildContext, ProtectionProfile, ProtectionRequest,
+    apk_inspection_json, protect_apk, protect_production_apk, ProductionBuildContext,
+    ProtectionProfile, ProtectionRequest,
     CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
@@ -61,7 +62,8 @@ fn run() -> Result<(), String> {
         }
         "inspect" => run_inspect(&args),
         "verify" => run_verify(&args),
-        "protect" => run_protect(&args),
+        "protect" => run_protect(&args, false),
+        "package-apk" => run_protect(&args, true),
         "aab-inspect" => run_aab_inspect(&args),
         "aab-verify" => run_aab_verify(&args),
         "aar-inspect" => run_aar_inspect(&args),
@@ -423,7 +425,7 @@ fn run_verify(args: &[String]) -> Result<(), String> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn run_protect(args: &[String]) -> Result<(), String> {
+fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     if args.is_empty() || args.iter().any(|value| value == "--help" || value == "-h") {
         print_protect_help();
         return Ok(());
@@ -566,6 +568,10 @@ fn run_protect(args: &[String]) -> Result<(), String> {
         private_report,
     };
 
+    if plan_only && phase_a_only {
+        return Err("package-apk does not support --plan-only; use protect --plan-only".into());
+    }
+
     if plan_only {
         let context =
             ProductionBuildContext::prepare(&request).map_err(|error| error.to_string())?;
@@ -598,8 +604,13 @@ fn run_protect(args: &[String]) -> Result<(), String> {
         return Ok(());
     }
 
-    let result = protect_apk(&request).map_err(|error| error.to_string())?;
-    println!("Nexora Shield Phase A protection pipeline: OK");
+    let result = if phase_a_only {
+        protect_apk(&request)
+    } else {
+        protect_production_apk(&request)
+    }
+    .map_err(|error| error.to_string())?;
+    println!("Nexora Shield Phase A packaging ONLY — NOT FULL PROTECTION");
     println!("Build ID: {}", result.plan.build_id);
     println!("Output: {}", result.plan.output.display());
     println!("SHA-256: {}", result.output_inspection.sha256);
@@ -688,7 +699,7 @@ fn print_help() {
 Android application protection and RASP platform.\n\n\
 USAGE:\n  nexora-shield <COMMAND> [OPTIONS]\n\n\
 COMMANDS:\n\
-  protect      Normalize, align, sign and verify an APK\n\
+  protect      Production protection (fails closed until all required controls exist)\n\\\n  package-apk  Legacy Phase A normalization, alignment and signing ONLY\n\
   inspect      Inspect APK structure, manifest and multi-DEX layout\n\
   verify           Verify APK structure and optionally Android signatures\n\
   data-protect     Protect one string/constant/resource/generic data item\n\
@@ -731,7 +742,7 @@ OPTIONS:\n\
 fn print_protect_help() {
     println!(
         "USAGE:\n  nexora-shield protect <input.apk> --output <output.apk> [OPTIONS]\n\n\
-By default Nexora Shield requires signing and alignment. Use --unsigned only when an unsigned artifact is intentional.\n\n\
+Production protection fails closed while O.1 is unfinished. Use --plan-only for\n\\\nread-only inspection. package-apk is legacy Phase A packaging ONLY.\n\\\nSigning and alignment are required unless disabled explicitly.\n\n\
 OPTIONS:\n\
   -o, --output <apk>          Output APK\n\
   --profile <name>            standard|hardened|maximum (default: hardened)\n\
