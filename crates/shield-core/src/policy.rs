@@ -171,11 +171,19 @@ mod tests {
         let hardened = hardened.unwrap_or_else(|_| unreachable!());
         let maximum = maximum.unwrap_or_else(|_| unreachable!());
         assert!(standard.enabled(C::IntegrityGraph));
-        assert!(!standard.enabled(C::DataProtection) && !standard.enabled(C::NativeShield) && !standard.enabled(C::VmShield));
-        assert!(!standard.enabled(C::Diversity) && !standard.enabled(C::RaspRuntime) && !standard.enabled(C::Attestation));
-        assert!(hardened.enabled(C::DataProtection) && hardened.enabled(C::Diversity) && hardened.enabled(C::RaspRuntime));
-        assert!(!hardened.enabled(C::NativeShield) && !hardened.enabled(C::VmShield));
-        assert!(maximum.enabled(C::NativeShield) && maximum.enabled(C::VmShield));
+        assert!(!standard.enabled(C::DataProtection));
+        assert!(!standard.enabled(C::NativeShield));
+        assert!(!standard.enabled(C::VmShield));
+        assert!(!standard.enabled(C::Diversity));
+        assert!(!standard.enabled(C::RaspRuntime));
+        assert!(!standard.enabled(C::Attestation));
+        assert!(hardened.enabled(C::DataProtection));
+        assert!(hardened.enabled(C::Diversity));
+        assert!(hardened.enabled(C::RaspRuntime));
+        assert!(!hardened.enabled(C::NativeShield));
+        assert!(!hardened.enabled(C::VmShield));
+        assert!(maximum.enabled(C::NativeShield));
+        assert!(maximum.enabled(C::VmShield));
     }
 
     #[test]
@@ -184,7 +192,8 @@ mod tests {
         assert!(overrides.set(C::VmShield, true).is_ok());
         assert!(overrides.set(C::Attestation, true).is_ok());
         let result = P::resolve(ProtectionProfile::Standard, &overrides);
-        assert!(matches!(result, Ok(policy) if policy.enabled(C::VmShield) && policy.enabled(C::Attestation)));
+        assert!(matches!(result, Ok(policy) if policy.enabled(C::VmShield)));
+        assert!(matches!(result, Ok(policy) if policy.enabled(C::Attestation)));
     }
 
     #[test]
