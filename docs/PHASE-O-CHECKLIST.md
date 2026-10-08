@@ -14,8 +14,8 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [x] Final O.0 documentation/CI gate
 
 ## O.1 Production Protection Orchestrator
-- [ ] Define authoritative production stage graph
-- [ ] Add typed production build context
+- [x] Define authoritative production stage graph
+- [x] Add typed production build context
 - [ ] Resolve configuration before mutation
 - [ ] Resolve effective protection profile
 - [ ] Integrate DEX parse/validation
