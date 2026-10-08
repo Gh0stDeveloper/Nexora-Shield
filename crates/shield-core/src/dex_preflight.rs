@@ -10,7 +10,6 @@ use nexora_shield_dex::{
 };
 use nexora_shield_package::{read_decoded_entry, read_zip_directory, sha256_file};
 
-
 /// Maximum decoded size accepted for one DEX file in this first O.1 pass.
 pub const MAX_DEX_BYTES: usize = 64 * 1024 * 1024;
 /// Maximum combined DEX size to cap parser memory consumption.
