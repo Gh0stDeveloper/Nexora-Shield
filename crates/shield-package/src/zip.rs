@@ -526,11 +526,10 @@ pub fn read_decoded_entry(path: &Path, entry: &ZipEntry, max_decoded: usize) -> 
             let mut compressed = vec![0_u8; length];
             file.read_exact(&mut compressed)?;
             miniz_oxide::inflate::decompress_to_vec_with_limit(&compressed, max_decoded)
-                .map_err(|error| {
-                    PackageError::InvalidZip(format!(
-                        "invalid DEFLATE entry '{}': {error:?}",
-                        entry.name
-                    ))
+                // Do not include the inflater error's partial output: it may
+                // contain attacker-controlled bytes and could flood logs.
+                .map_err(|_| {
+                    PackageError::InvalidZip(format!("invalid DEFLATE entry '{}'", entry.name))
                 })?
         }
         _ => {

@@ -156,12 +156,27 @@ with zipfile.ZipFile(directory / "compressed-dex.apk") as compressed_apk:
 (directory / "corrupt-deflate.apk").write_bytes(corrupted)
 
 # Reject an inflated-size claim before allocating memory for a ZIP bomb.
+# Patch the *DEX* local header AND corresponding central record; changing the
+# first ZIP record only changes the manifest and does not test DEX limits.
 oversized = bytearray((directory / "compressed-dex.apk").read_bytes())
-for signature, delta in ((b"PK\x03\x04", 22), (b"PK\x01\x02", 24)):
-    header = oversized.find(signature)
-    if header < 0:
-        raise RuntimeError("ZIP header missing from synthetic fixture")
-    oversized[header + delta:header + delta + 4] = (65 * 1024 * 1024).to_bytes(4, "little")
+with zipfile.ZipFile(directory / "compressed-dex.apk") as compressed_apk:
+    dex_entry = compressed_apk.getinfo("classes.dex")
+    oversized[dex_entry.header_offset + 22:dex_entry.header_offset + 26] = (65 * 1024 * 1024).to_bytes(4, "little")
+central_offset = 0
+found = False
+while True:
+    central_offset = oversized.find(b"PK\x01\x02", central_offset)
+    if central_offset < 0:
+        break
+    name_len = int.from_bytes(oversized[central_offset + 28:central_offset + 30], "little")
+    name = oversized[central_offset + 46:central_offset + 46 + name_len]
+    if name == b"classes.dex":
+        oversized[central_offset + 24:central_offset + 28] = (65 * 1024 * 1024).to_bytes(4, "little")
+        found = True
+        break
+    central_offset += 4
+if not found:
+    raise RuntimeError("DEX central record missing from oversized fixture")
 (directory / "oversized-deflate.apk").write_bytes(oversized)
 
 with zipfile.ZipFile(directory / "duplicate-class.apk", "w", compression=zipfile.ZIP_STORED) as output:
