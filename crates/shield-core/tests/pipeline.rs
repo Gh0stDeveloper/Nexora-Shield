@@ -110,6 +110,42 @@ fn report_destinations_cannot_clobber_source_or_output() {
     cleanup(&directory);
 }
 
+#[test]
+fn dex_staging_refuses_aliases_of_source_and_planned_output() {
+    let directory = test_directory("dex-stage-alias");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"some bytes")],
+    );
+    let request = ProtectionRequest {
+        input: input.clone(),
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let context = nexora_shield_core::ProductionBuildContext::prepare(&request)
+        .expect("read-only production plan");
+    let config = nexora_shield_dex::MultiDexRewriteConfig {
+        strip_metadata: true,
+        ..Default::default()
+    };
+    let source_alias = directory.join(".").join("input.apk");
+    let output_alias = directory.join(".").join("output.apk");
+    assert!(context.stage_dex_rewrite(&source_alias, &config).is_err());
+    assert!(context.stage_dex_rewrite(&output_alias, &config).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
 fn test_directory(label: &str) -> PathBuf {
     let counter = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
