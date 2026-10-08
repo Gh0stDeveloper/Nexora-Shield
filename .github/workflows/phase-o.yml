@@ -40,6 +40,21 @@ jobs:
           grep -q 'Production ready: false' build/phase-o1/plan.txt
           grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan.txt
           test ! -e build/phase-o1/not-created.apk
+      - name: Production protect must never return a Phase A packaging-only APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk \
+            --output build/phase-o1/forbidden-production.apk \
+            --profile hardened --unsigned --no-align \
+            > build/phase-o1/production-denied.txt 2>&1; then
+            echo "Security regression: incomplete production path returned success" >&2
+            exit 1
+          fi
+          grep -q 'production protection unavailable' build/phase-o1/production-denied.txt
+          test ! -e build/phase-o1/forbidden-production.apk
+
       - name: Rebuild and verify a diagnostic APK with real transformed DEX
         run: |
           cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
