@@ -47,8 +47,40 @@ class StudioServicesTest {
 
         assertEquals("build-1", report.buildId)
         assertTrue(report.signed)
+        assertFalse(report.productionProtected)
+        assertEquals("unverified-legacy", report.protectionScope)
         assertEquals(10.0, evaluation.measuredApkGrowthPercent)
         assertEquals(true, evaluation.apkGrowthWithinBudget)
+    }
+
+    @Test
+    fun packagingOnlyReportDoesNotCountAsProductionSecurity() {
+        val reportFile = createTempFile("nexora-phase-a", ".json")
+        reportFile.writeText(
+            """
+            {
+              "build_id": "phase-a",
+              "schema_version": 1,
+              "profile": "hardened",
+              "input_sha256": "aa",
+              "output_sha256": "bb",
+              "input_size": 512,
+              "output_size": 512,
+              "entry_count": 2,
+              "dex_count": 1,
+              "manifest_format": "text-xml",
+              "aligned": false,
+              "signed": false,
+              "stripped_signature_entries": 0,
+              "stages": ["normalized", "published"],
+              "protection_scope": "phase-a-packaging-only",
+              "production_protected": false
+            }
+            """.trimIndent(),
+        )
+        val report = SecurityReportLoader().load(reportFile)
+        assertFalse(report.productionProtected)
+        assertEquals("phase-a-packaging-only", report.protectionScope)
     }
 
     @Test
