@@ -159,7 +159,10 @@ fn staging_rejects_symlink_parent_then_dotdot_alias_of_planned_output() {
     std::os::unix::fs::symlink(&inner, directory.join("via")).expect("link directory");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"source")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"source"),
+        ],
     );
     let output = directory.join("target/output.apk");
     let request = ProtectionRequest {
