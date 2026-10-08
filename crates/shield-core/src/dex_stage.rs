@@ -4,8 +4,9 @@
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
 use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
-    crc32_ieee, is_legacy_signature_entry, read_decoded_entry, read_stored_entry, read_zip_directory,
-    rewrite_stored_entries, verify_apk_structure, verify_preserved_entry_payload, ZipDirectory,
+    crc32_ieee, is_legacy_signature_entry, read_decoded_entry, read_stored_entry,
+    read_zip_directory, rewrite_stored_entries, verify_apk_structure,
+    verify_preserved_entry_payload, ZipDirectory,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;

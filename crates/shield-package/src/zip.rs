@@ -513,8 +513,9 @@ pub fn read_decoded_entry(path: &Path, entry: &ZipEntry, max_decoded: usize) -> 
                 .checked_add(max_decoded / 8)
                 .and_then(|n| n.checked_add(65_536))
                 .ok_or_else(|| PackageError::UnsupportedZip("compressed budget overflow".into()))?;
-            let length = usize::try_from(entry.compressed_size)
-                .map_err(|_| PackageError::UnsupportedZip("compressed size overflows host".into()))?;
+            let length = usize::try_from(entry.compressed_size).map_err(|_| {
+                PackageError::UnsupportedZip("compressed size overflows host".into())
+            })?;
             if length > compressed_budget {
                 return Err(PackageError::UnsupportedZip(format!(
                     "compressed entry '{}' exceeds inspection budget",
