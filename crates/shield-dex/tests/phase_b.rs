@@ -152,7 +152,7 @@ fn o13_symbol_rename_preserves_const_string_literals() {
         },
     )
     .expect("conservatively retain runtime literal");
-    assert!(transformed.report.records.is_empty());
+    assert_eq!(transformed.report.records, Vec::new());
     assert!(transformed.report.skipped_protected.contains(&name_index));
     assert_eq!(transformed.bytes, bytes);
 }
