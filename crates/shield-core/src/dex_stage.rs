@@ -4,9 +4,7 @@
 //! intentionally does not perform final runtime binding, signing or release.
 
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
-use nexora_shield_dex::{
-    canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet,
-};
+use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
     crc32_ieee, is_legacy_signature_entry, read_stored_entry, read_zip_directory,
     rewrite_stored_entries, verify_apk_structure,
@@ -65,20 +63,25 @@ impl ProductionBuildContext {
             let size = usize::try_from(entry.uncompressed_size).map_err(|_| {
                 CoreError::InvalidRequest("DEX size overflows host word width".into())
             })?;
-            total = total.checked_add(size).ok_or_else(|| {
-                CoreError::InvalidRequest("total DEX size overflow".into())
-            })?;
+            total = total
+                .checked_add(size)
+                .ok_or_else(|| CoreError::InvalidRequest("total DEX size overflow".into()))?;
             if size > MAX_DEX_BYTES || total > MAX_TOTAL_DEX_BYTES {
                 return Err(CoreError::InvalidRequest(
                     "DEX staging exceeds preflight memory limit".into(),
                 ));
             }
-            let bytes = read_stored_entry(self.input(), entry, MAX_DEX_BYTES)?.ok_or_else(|| {
-                CoreError::InvalidRequest(format!("unsupported compressed DEX '{}'", entry.name))
-            })?;
+            let bytes =
+                read_stored_entry(self.input(), entry, MAX_DEX_BYTES)?.ok_or_else(|| {
+                    CoreError::InvalidRequest(format!(
+                        "unsupported compressed DEX '{}'",
+                        entry.name
+                    ))
+                })?;
             if crc32_ieee(&bytes) != entry.crc32 {
                 return Err(CoreError::InvalidRequest(format!(
-                    "DEX '{}' has an invalid ZIP CRC", entry.name
+                    "DEX '{}' has an invalid ZIP CRC",
+                    entry.name
                 )));
             }
             originals.insert(entry.name.clone(), bytes.clone());
@@ -143,9 +146,10 @@ impl ProductionBuildContext {
                     ));
                 }
                 if let Some(expected) = replacements.get(&entry.name) {
-                    let actual = read_stored_entry(destination, entry, MAX_DEX_BYTES)?.ok_or_else(
-                        || CoreError::InvalidRequest("staged DEX is not stored".into()),
-                    )?;
+                    let actual =
+                        read_stored_entry(destination, entry, MAX_DEX_BYTES)?.ok_or_else(|| {
+                            CoreError::InvalidRequest("staged DEX is not stored".into())
+                        })?;
                     if actual != *expected || crc32_ieee(&actual) != entry.crc32 {
                         return Err(CoreError::InvalidRequest(format!(
                             "staged DEX '{}' differs from validated rewrite",
@@ -154,19 +158,23 @@ impl ProductionBuildContext {
                     }
                     observed.insert(entry.name.clone());
                 } else {
-                    let source = directory.entries.iter().find(|candidate| {
-                        candidate.name == entry.name
-                    }).ok_or_else(|| {
-                        CoreError::InvalidRequest(format!(
-                            "unexpected APK entry '{}'", entry.name
-                        ))
-                    })?;
+                    let source = directory
+                        .entries
+                        .iter()
+                        .find(|candidate| candidate.name == entry.name)
+                        .ok_or_else(|| {
+                            CoreError::InvalidRequest(format!(
+                                "unexpected APK entry '{}'",
+                                entry.name
+                            ))
+                        })?;
                     if source.crc32 != entry.crc32
                         || source.uncompressed_size != entry.uncompressed_size
                         || source.compression_method != entry.compression_method
                     {
                         return Err(CoreError::InvalidRequest(format!(
-                            "unmodified APK entry '{}' changed", entry.name
+                            "unmodified APK entry '{}' changed",
+                            entry.name
                         )));
                     }
                 }
@@ -184,7 +192,8 @@ impl ProductionBuildContext {
                 ));
             }
             let verified = MultiDexSet::parse(
-                built.entries
+                built
+                    .entries
                     .iter()
                     .filter(|entry| replacements.contains_key(&entry.name))
                     .map(|entry| {
