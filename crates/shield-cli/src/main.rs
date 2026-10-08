@@ -18,9 +18,9 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, protect_production_apk_with_selection,
-    DexSelectorPolicy, ProductionBuildContext, ProductionControl, ProductionOverrides,
-    ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, protect_production_apk_with_selection, DexSelectorPolicy,
+    ProductionBuildContext, ProductionControl, ProductionOverrides, ProtectionProfile,
+    ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -485,8 +485,8 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
                     .map_err(|error| error.to_string())?;
                 index += 2;
             }
-            "--class" | "--method" | "--field" | "--exclude-class"
-            | "--exclude-method" | "--exclude-field" => {
+            "--class" | "--method" | "--field" | "--exclude-class" | "--exclude-method"
+            | "--exclude-field" => {
                 let option = args[index].as_str();
                 let value = require_value(args, index, option)?;
                 let excluded = option.starts_with("--exclude-");
@@ -613,7 +613,9 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
         return Err("package-apk does not support --plan-only; use protect --plan-only".into());
     }
     if phase_a_only && (overrides != ProductionOverrides::default() || !dex_selectors.is_empty()) {
-        return Err("package-apk cannot accept production protection or DEX selector options".into());
+        return Err(
+            "package-apk cannot accept production protection or DEX selector options".into(),
+        );
     }
 
     if plan_only {
@@ -642,7 +644,10 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
         }
         println!("DEX units: {}", dex.units.len());
         println!("Total decoded DEX bytes: {}", dex.total_decoded_bytes);
-        println!("Cross-DEX reflection risk: {}", dex.cross_dex_reflection_risk);
+        println!(
+            "Cross-DEX reflection risk: {}",
+            dex.cross_dex_reflection_risk
+        );
         for unit in &dex.units {
             println!(
                 "  {}: classes={}, methods={}, fields={}, selected={}/{}/{}, reflection={}, native={}, protected-names={}",
