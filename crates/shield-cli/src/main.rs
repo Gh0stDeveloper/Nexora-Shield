@@ -742,7 +742,8 @@ OPTIONS:\n\
   --apksigner <path>          Explicit official apksigner path\n\
   --no-align                  Skip zipalign explicitly\n\
   --unsigned                  Explicitly allow an unsigned output\n\
-  --force                     Replace an existing output transactionally\\n\\\n  --plan-only                 Read-only O.1 DEX preflight; does NOT protect or write output\n\
+  --force                     Replace an existing output transactionally\n\
+  --plan-only                 Read-only O.1 DEX preflight; does NOT protect or write output\n\
   --public-report <file>      Write non-sensitive JSON report\n\
   --private-report <file>     Write private build JSON report"
     );
