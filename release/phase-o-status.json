@@ -15,11 +15,19 @@
   },
   "sourceVersion": "1.0.0",
   "o0": {
-    "status": "in-progress",
+    "status": "complete",
     "owner": "repository-maintainers",
     "closureAuthority": "Phase O final production audit",
     "finalApprovalPhase": "O.14",
-    "publicationPhase": "O.15"
+    "publicationPhase": "O.15",
+    "completedEvidence": {
+      "workflow": "Phase O",
+      "runNumber": 9,
+      "runId": 37710584139,
+      "headSha": "21711b57220b19a8c534607b1027e7ededaff666",
+      "job": "O.0 release freeze and audit baseline",
+      "conclusion": "success"
+    }
   },
   "phaseNHistoricalEvidence": {
     "preserved": true,
