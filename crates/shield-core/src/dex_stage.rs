@@ -42,7 +42,15 @@ impl ProductionBuildContext {
                 "staging requires a real DEX transform".into(),
             ));
         }
-        if destination.exists() || destination == self.input() || destination == self.output() {
+        // Compare resolved paths rather than raw strings: aliases through
+        // "./", ".." and symlinked parents must not bypass output isolation.
+        // symlink_metadata catches dangling final-component symlinks as well.
+        if fs::symlink_metadata(destination).is_ok()
+            || crate::production::normalized_destination(destination)?
+                == crate::production::normalized_destination(self.input())?
+            || crate::production::normalized_destination(destination)?
+                == crate::production::normalized_destination(self.output())?
+        {
             return Err(CoreError::InvalidRequest(
                 "DEX staging destination must be new and separate from source/output".into(),
             ));
