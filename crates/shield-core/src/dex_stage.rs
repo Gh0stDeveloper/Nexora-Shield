@@ -11,6 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+// Bind the validated multidex input set and its exact source bytes.
+type LoadedDexSources = (Vec<DexInput>, BTreeMap<String, Vec<u8>>);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StagedDexResult {
     pub dex_units: usize,
@@ -105,7 +108,7 @@ impl ProductionBuildContext {
     fn load_dex_inputs(
         &self,
         directory: &ZipDirectory,
-    ) -> Result<(Vec<DexInput>, BTreeMap<String, Vec<u8>>)> {
+    ) -> Result<LoadedDexSources> {
         let mut inputs = Vec::new();
         let mut originals = BTreeMap::new();
         let mut total = 0_usize;
