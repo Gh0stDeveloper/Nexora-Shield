@@ -121,7 +121,7 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
             val stem = inputApk.name.removeSuffix(".apk")
             val command = mutableListOf(
                 cliExecutable.get(),
-                "protect",
+                if (legacyPhaseAOnly.get()) "package-apk" else "protect",
                 inputApk.absolutePath,
                 "--output",
                 outputApk.absolutePath,
@@ -239,28 +239,17 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     }
 
     private fun summaryJson(apkCount: Int): String {
-        return "{
-" +
-            "  \"schema\": 1,
-" +
-            "  \"variant\": \"" + jsonEscape(variantName.get()) + "\",
-" +
-            "  \"profile\": \"" + jsonEscape(profile.get()) + "\",
-" +
-            "  \"apkCount\": " + apkCount + ",
-" +
-            "  \"signed\": " + signingKeystore.isPresent + ",
-" +
-            "  \"aligned\": " + align.get() + ",
-" +
-            "  \"publicReports\": " + publicReports.get() + ",
-" +
-            "  \"privateReports\": " + privateReports.get() + ",
-" +
-            "  \"cacheKeyVersion\": \"" + jsonEscape(cacheKeyVersion.get()) + "\"
-" +
-            "}
-"
+        return "{\n" +
+            "  \"schema\": 1,\n" +
+            "  \"variant\": \"" + jsonEscape(variantName.get()) + "\",\n" +
+            "  \"profile\": \"" + jsonEscape(profile.get()) + "\",\n" +
+            "  \"apkCount\": " + apkCount + ",\n" +
+            "  \"signed\": " + signingKeystore.isPresent + ",\n" +
+            "  \"aligned\": " + align.get() + ",\n" +
+            "  \"publicReports\": " + publicReports.get() + ",\n" +
+            "  \"privateReports\": " + privateReports.get() + ",\n" +
+            "  \"cacheKeyVersion\": \"" + jsonEscape(cacheKeyVersion.get()) + "\"\n" +
+            "}\n"
     }
 
     private fun jsonEscape(value: String): String =
