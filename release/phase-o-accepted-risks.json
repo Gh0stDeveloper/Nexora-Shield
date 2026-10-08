@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "policy": {
+    "allowedSeverities": [
+      "P2"
+    ],
+    "prohibitedSeverities": [
+      "P0",
+      "P1"
+    ],
+    "releaseRequiredFindingsMayBeAccepted": false,
+    "requiredFields": [
+      "findingId",
+      "rationale",
+      "owner",
+      "approvedBy",
+      "approvedAt",
+      "expiresAt",
+      "compensatingControls"
+    ]
+  },
+  "acceptedRisks": []
+}
