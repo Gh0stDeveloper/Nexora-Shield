@@ -18,7 +18,8 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, ProductionBuildContext, ProtectionProfile, ProtectionRequest,
+    CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -443,6 +444,7 @@ fn run_protect(args: &[String]) -> Result<(), String> {
     let mut min_sdk = 24_u32;
     let mut public_report = None;
     let mut private_report = None;
+    let mut plan_only = false;
     let mut index = 1_usize;
 
     while index < args.len() {
@@ -463,6 +465,10 @@ fn run_protect(args: &[String]) -> Result<(), String> {
             }
             "--unsigned" => {
                 allow_unsigned = true;
+                index += 1;
+            }
+            "--plan-only" => {
+                plan_only = true;
                 index += 1;
             }
             "--force" => {
@@ -559,6 +565,36 @@ fn run_protect(args: &[String]) -> Result<(), String> {
         public_report,
         private_report,
     };
+
+    if plan_only {
+        let context = ProductionBuildContext::prepare(&request)
+            .map_err(|error| error.to_string())?;
+        let dex = context.inspect_dex().map_err(|error| error.to_string())?;
+        println!("Phase O.1 production plan: READ-ONLY, NOT PROTECTED");
+        println!("Input SHA-256: {}", dex.inspected_input_sha256);
+        println!("Profile: {}", context.profile());
+        println!("DEX units: {}", dex.units.len());
+        println!("Total decoded DEX bytes: {}", dex.total_decoded_bytes);
+        for unit in &dex.units {
+            println!(
+                "  {}: classes={}, methods={}, fields={}, selected={}/{}/{}, reflection={}, native={}, protected-names={}",
+                unit.name, unit.class_count, unit.method_count, unit.field_count,
+                unit.selected_classes, unit.selected_methods, unit.selected_fields,
+                unit.reflection_detected, unit.native_method_count, unit.protected_string_count
+            );
+        }
+        for stage in context.stages() {
+            println!(
+                "Stage {}: {:?}, {:?}",
+                stage.stage.as_str(), stage.requirement, stage.integration
+            );
+        }
+        let missing = context.required_unintegrated();
+        println!("Production ready: false");
+        println!("Required stages not integrated: {}", missing.len());
+        println!("No APK, signing data or build reports were created.");
+        return Ok(());
+    }
 
     let result = protect_apk(&request).map_err(|error| error.to_string())?;
     println!("Nexora Shield Phase A protection pipeline: OK");
@@ -706,7 +742,7 @@ OPTIONS:\n\
   --apksigner <path>          Explicit official apksigner path\n\
   --no-align                  Skip zipalign explicitly\n\
   --unsigned                  Explicitly allow an unsigned output\n\
-  --force                     Replace an existing output transactionally\n\
+  --force                     Replace an existing output transactionally\\n\\\n  --plan-only                 Read-only O.1 DEX preflight; does NOT protect or write output\n\
   --public-report <file>      Write non-sensitive JSON report\n\
   --private-report <file>     Write private build JSON report"
     );
