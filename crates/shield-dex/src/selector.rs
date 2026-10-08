@@ -48,7 +48,9 @@ const MAX_SELECTOR_PATTERN_BYTES: usize = 256;
 fn validate_selector_pattern(pattern: &str, label: &str) -> Result<()> {
     if pattern.is_empty()
         || pattern.len() > MAX_SELECTOR_PATTERN_BYTES
-        || pattern.bytes().any(|byte| byte == 0 || byte.is_ascii_control())
+        || pattern
+            .bytes()
+            .any(|byte| byte == 0 || byte.is_ascii_control())
     {
         return Err(DexError::InvalidSelector(format!(
             "{label} selector pattern must be 1..=256 bytes and contain no control characters"
@@ -119,9 +121,11 @@ impl SelectorResolver {
                                     index: encoded.method_idx,
                                 },
                             )?;
-                            if selector.member_pattern.as_deref().map_or(true, |pattern| {
-                                glob_match(pattern, name)
-                            }) {
+                            if selector
+                                .member_pattern
+                                .as_deref()
+                                .map_or(true, |pattern| glob_match(pattern, name))
+                            {
                                 selection.methods.insert(encoded.method_idx);
                             }
                         }
@@ -134,9 +138,11 @@ impl SelectorResolver {
                                     index: encoded.field_idx,
                                 },
                             )?;
-                            if selector.member_pattern.as_deref().map_or(true, |pattern| {
-                                glob_match(pattern, name)
-                            }) {
+                            if selector
+                                .member_pattern
+                                .as_deref()
+                                .map_or(true, |pattern| glob_match(pattern, name))
+                            {
                                 selection.fields.insert(encoded.field_idx);
                             }
                         }
@@ -215,7 +221,7 @@ mod tests {
     fn reject_malformed_or_unbounded_selector_patterns() {
         assert!(Selector::new(SelectorKind::Class, "", None).is_err());
         assert!(Selector::new(SelectorKind::Class, "a".repeat(257), None).is_err());
-        assert!(Selector::new(SelectorKind::Class, "Lfoo;\\0", None).is_err());
+        assert!(Selector::new(SelectorKind::Class, "Lfoo;\0", None).is_err());
         assert!(Selector::new(SelectorKind::Method, "Lcom/*;", Some("m".repeat(257))).is_err());
         assert!(Selector::new(SelectorKind::Method, "Lcom/*;", None).is_err());
     }
