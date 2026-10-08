@@ -188,7 +188,16 @@ pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()>
                 "artifact path collision between {previous} and {label}"
             )));
         }
-        if let Ok(metadata) = fs::metadata(path) {
+        let metadata = match fs::metadata(path) {
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(_) => {
+                return Err(CoreError::InvalidRequest(format!(
+                    "cannot inspect {label} destination metadata"
+                )));
+            }
+        };
+        if let Some(metadata) = metadata {
             if metadata.is_dir() {
                 return Err(CoreError::InvalidRequest(format!(
                     "{label} points to a directory instead of a file"

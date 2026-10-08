@@ -41,3 +41,10 @@ Config-file parsing, schema-version migration, full selector/resource/crypto
 settings, budget enforcement and user-level YAML/CLI override precedence
 are separate O.5 acceptance gates. Do not claim YAML-configured full
 protection based on these typed CLI selections.
+
+The shipped declarative example has been updated to match the present v1
+JSON Schema vocabulary; it remains **illustrative and non-executable** until
+the O.5 YAML parser and schema-to-policy mapping are implemented. On Windows,
+canonical path alias checks apply, but hardlink file-ID equivalence requires a
+separate portable metadata integration; this is a recorded limitation rather
+than a claimed cross-platform guarantee.
