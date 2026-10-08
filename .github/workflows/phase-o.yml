@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for variant in invalid-dex compressed-dex duplicate-class; do
+          for variant in invalid-dex compressed-dex duplicate-class crc-mismatch; do
             if cargo run --locked --quiet -p nexora-shield -- \
                 protect "build/phase-o1/${variant}.apk" \
                 --output build/phase-o1/rejected.apk \
