@@ -1,5 +1,5 @@
 use crate::error::{PackageError, Result};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -147,6 +147,24 @@ pub fn read_zip_directory(path: &Path) -> Result<ZipDirectory> {
 /// Returns an error when the input is malformed/unsupported, the output cannot
 /// be written, or standard ZIP32 limits would be exceeded.
 pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary> {
+    rewrite_stored_entries(input, output, &BTreeMap::new())
+}
+
+/// Rebuilds ZIP32 while replacing explicitly named stored entries.
+///
+/// Only STORE payloads may be replaced; a compressed or absent target is an
+/// error. Existing signature metadata is stripped because rewritten content
+/// invalidates signatures. Callers must verify the artifact and re-sign it.
+///
+/// # Errors
+///
+/// Rejects missing/unsupported target entries, unsafe replacement sizes and
+/// invalid ZIP32 inputs. The destination should be a private transaction path.
+pub fn rewrite_stored_entries(
+    input: &Path,
+    output: &Path,
+    replacements: &BTreeMap<String, Vec<u8>>,
+) -> Result<NormalizationSummary> {
     if input == output {
         return Err(PackageError::InvalidArgument(
             "input and output paths must be different".into(),
@@ -168,11 +186,36 @@ pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary
     });
     entries.sort_by(|left, right| left.name.as_bytes().cmp(right.name.as_bytes()));
 
+    // No silent partial transformation: every requested name must have one
+    // existing STORE target after stripping obsolete signatures.
+    for name in replacements.keys() {
+        let entry = entries.iter().find(|entry| entry.name == *name).ok_or_else(|| {
+            PackageError::InvalidArgument(format!("replacement target '{name}' is absent"))
+        })?;
+        if entry.compression_method != 0 {
+            return Err(PackageError::UnsupportedZip(format!(
+                "replacement target '{name}' must use ZIP STORE"
+            )));
+        }
+    }
+
     let mut source = File::open(input)?;
     let mut destination = File::create(output)?;
     let mut written = Vec::with_capacity(entries.len());
 
-    for entry in entries {
+    for mut entry in entries {
+        if let Some(bytes) = replacements.get(&entry.name) {
+            let size = u32::try_from(bytes.len()).map_err(|_| {
+                PackageError::UnsupportedZip(format!(
+                    "replacement '{}' exceeds ZIP32 size limits",
+                    entry.name
+                ))
+            })?;
+            entry.crc32 = crc32_ieee(bytes);
+            entry.compressed_size = size;
+            entry.uncompressed_size = size;
+        }
+
         let output_offset = destination.stream_position()?;
         let output_offset = u32::try_from(output_offset).map_err(|_| {
             PackageError::UnsupportedZip("normalized APK exceeds standard ZIP offset limits".into())
@@ -183,15 +226,19 @@ pub fn normalize_zip(input: &Path, output: &Path) -> Result<NormalizationSummary
         destination.write_all(entry.name.as_bytes())?;
         destination.write_all(&local_extra)?;
 
-        let data_offset = local_data_offset(&mut source, &entry)?;
-        source.seek(SeekFrom::Start(data_offset))?;
-        let mut limited = (&mut source).take(u64::from(entry.compressed_size));
-        let copied = std::io::copy(&mut limited, &mut destination)?;
-        if copied != u64::from(entry.compressed_size) {
-            return Err(PackageError::InvalidZip(format!(
-                "compressed payload for '{}' is truncated",
-                entry.name
-            )));
+        if let Some(bytes) = replacements.get(&entry.name) {
+            destination.write_all(bytes)?;
+        } else {
+            let data_offset = local_data_offset(&mut source, &entry)?;
+            source.seek(SeekFrom::Start(data_offset))?;
+            let mut limited = (&mut source).take(u64::from(entry.compressed_size));
+            let copied = std::io::copy(&mut limited, &mut destination)?;
+            if copied != u64::from(entry.compressed_size) {
+                return Err(PackageError::InvalidZip(format!(
+                    "compressed payload for '{}' is truncated",
+                    entry.name
+                )));
+            }
         }
 
         let mut updated = entry;
@@ -303,6 +350,19 @@ pub fn read_stored_entry(
     let mut data = vec![0_u8; length];
     file.read_exact(&mut data)?;
     Ok(Some(data))
+}
+
+/// Standard IEEE CRC-32 for ZIP entry integrity; not a cryptographic hash.
+#[must_use]
+pub fn crc32_ieee(data: &[u8]) -> u32 {
+    let mut crc = !0_u32;
+    for byte in data {
+        crc ^= u32::from(*byte);
+        for _ in 0..8 {
+            crc = (crc >> 1) ^ (0xedb8_8320_u32 & (0_u32.wrapping_sub(crc & 1)));
+        }
+    }
+    !crc
 }
 
 fn content_identity(entries: &[ZipEntry], ignore_signatures: bool) -> Vec<(String, u32, u32, u16)> {
