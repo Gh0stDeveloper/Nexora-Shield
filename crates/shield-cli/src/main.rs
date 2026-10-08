@@ -18,9 +18,9 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, protect_production_apk_with_overrides,
-    ProductionBuildContext, ProductionControl, ProductionOverrides, ProtectionProfile,
-    ProtectionRequest, CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, protect_production_apk_with_selection,
+    DexSelectorPolicy, ProductionBuildContext, ProductionControl, ProductionOverrides,
+    ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -448,6 +448,7 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     let mut private_report = None;
     let mut plan_only = false;
     let mut overrides = ProductionOverrides::default();
+    let mut dex_selectors = DexSelectorPolicy::default();
     let mut index = 1_usize;
 
     while index < args.len() {
@@ -482,6 +483,35 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
                 overrides
                     .set(control, enable)
                     .map_err(|error| error.to_string())?;
+                index += 2;
+            }
+            "--class" | "--method" | "--field" | "--exclude-class"
+            | "--exclude-method" | "--exclude-field" => {
+                let option = args[index].as_str();
+                let value = require_value(args, index, option)?;
+                let excluded = option.starts_with("--exclude-");
+                let kind = if option.ends_with("class") {
+                    SelectorKind::Class
+                } else if option.ends_with("method") {
+                    SelectorKind::Method
+                } else {
+                    SelectorKind::Field
+                };
+                let selector = match kind {
+                    SelectorKind::Class => Selector::new(kind, value, None),
+                    SelectorKind::Method | SelectorKind::Field => {
+                        let (class, member) = split_member_selector(value, option)?;
+                        Selector::new(kind, class, Some(member.to_owned()))
+                    }
+                    SelectorKind::Any => unreachable!(),
+                }
+                .map_err(|error| error.to_string())?;
+                if excluded {
+                    dex_selectors.add_exclude(selector)
+                } else {
+                    dex_selectors.add_include(selector)
+                }
+                .map_err(|error| error.to_string())?;
                 index += 2;
             }
             "--force" => {
@@ -582,14 +612,16 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     if plan_only && phase_a_only {
         return Err("package-apk does not support --plan-only; use protect --plan-only".into());
     }
-    if phase_a_only && overrides != ProductionOverrides::default() {
-        return Err("package-apk cannot accept production protection control overrides".into());
+    if phase_a_only && (overrides != ProductionOverrides::default() || !dex_selectors.is_empty()) {
+        return Err("package-apk cannot accept production protection or DEX selector options".into());
     }
 
     if plan_only {
         let context = ProductionBuildContext::prepare_with_overrides(&request, &overrides)
             .map_err(|error| error.to_string())?;
-        let dex = context.inspect_dex().map_err(|error| error.to_string())?;
+        let dex = context
+            .inspect_dex_with_selectors(&dex_selectors)
+            .map_err(|error| error.to_string())?;
         println!("Phase O.1 production plan: READ-ONLY, NOT PROTECTED");
         println!("Input SHA-256: {}", dex.inspected_input_sha256);
         println!("Profile: {}", context.profile());
@@ -610,6 +642,7 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
         }
         println!("DEX units: {}", dex.units.len());
         println!("Total decoded DEX bytes: {}", dex.total_decoded_bytes);
+        println!("Cross-DEX reflection risk: {}", dex.cross_dex_reflection_risk);
         for unit in &dex.units {
             println!(
                 "  {}: classes={}, methods={}, fields={}, selected={}/{}/{}, reflection={}, native={}, protected-names={}",
@@ -636,7 +669,7 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     let result = if phase_a_only {
         protect_apk(&request)
     } else {
-        protect_production_apk_with_overrides(&request, &overrides)
+        protect_production_apk_with_selection(&request, &overrides, &dex_selectors)
     }
     .map_err(|error| error.to_string())?;
     println!("Nexora Shield Phase A packaging ONLY — NOT FULL PROTECTION");
@@ -791,6 +824,12 @@ OPTIONS:\n\
   --plan-only                 Read-only O.1 DEX preflight; does NOT protect or write output\n\
   --enable-control <name>     Require an optional production control (repeatable)\n\
   --disable-control <name>    Refuse a control; required controls cannot be disabled\n\
+  --class <dex-glob>          Include matching defined classes (DEX descriptors)\n\
+  --method <class#member>     Include matching defined methods\n\
+  --field <class#member>      Include matching defined fields\n\
+  --exclude-class <glob>     Exclude matching classes\n\
+  --exclude-method <c#m>     Exclude matching methods\n\
+  --exclude-field <c#f>      Exclude matching fields\n\
   --public-report <file>      Write non-sensitive JSON report\n\
   --private-report <file>     Write private build JSON report"
     );
