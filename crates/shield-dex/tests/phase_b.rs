@@ -114,6 +114,50 @@ fn canonical_multidex_round_trip_rewrites_every_unit() {
     }
 }
 
+#[test]
+fn multidex_parser_rejects_duplicate_class_ownership() {
+    let primary = build_test_dex("Lcom/test/A;", "run");
+    let err = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary.clone(),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: primary,
+        },
+    ]).expect_err("two canonical DEX units cannot own the same class");
+    assert!(err.to_string().contains("duplicate class definition"));
+}
+
+#[test]
+fn multidex_parser_rejects_gaps_and_noncanonical_dex_names() {
+    let first = build_test_dex("Lcom/test/A;", "run");
+    let other = build_test_dex("Lcom/test/B;", "go");
+    let missing_second = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: first.clone(),
+        },
+        DexInput {
+            name: "classes3.dex".into(),
+            bytes: other.clone(),
+        },
+    ]);
+    assert!(missing_second.is_err());
+    let leading_zero = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: first,
+        },
+        DexInput {
+            name: "classes02.dex".into(),
+            bytes: other,
+        },
+    ]);
+    assert!(leading_zero.is_err());
+}
+
 fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
     let strings = [
         class_descriptor,

@@ -89,6 +89,27 @@ impl MultiDexSet {
             }
         }
 
+        // An APK cannot resolve competing owners of the same class descriptor.
+        // Validate across *all* units here, not only in CLI preflight, so every
+        // caller (including diagnostic rewrites) receives the same guarantee.
+        let mut owners = std::collections::BTreeMap::new();
+        for unit in &units {
+            for class in &unit.dex.classes {
+                let descriptor = unit.dex.type_descriptor(class.class_idx).ok_or_else(|| {
+                    DexError::InvalidMultiDex(format!(
+                        "{} has a class without a valid descriptor",
+                        unit.name
+                    ))
+                })?;
+                if let Some(previous) = owners.insert(descriptor, unit.name.as_str()) {
+                    return Err(DexError::InvalidMultiDex(format!(
+                        "duplicate class definition {descriptor} in {previous} and {}",
+                        unit.name
+                    )));
+                }
+            }
+        }
+
         Ok(Self { units })
     }
 
