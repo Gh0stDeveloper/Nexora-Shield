@@ -157,6 +157,7 @@ impl ProductionBuildContext {
         order.into_iter().map(|stage| {
             let requirement = match stage {
                 S::DataProtection | S::Diversity | S::RaspRuntime if !hardened => R::WhenSelected,
+                S::NativeShield | S::VmShield if profile == ProtectionProfile::Maximum => R::Required,
                 S::NativeShield | S::VmShield | S::Attestation => R::WhenSelected,
                 S::Align if !align => R::Disabled,
                 S::Sign if !sign => R::Disabled,
@@ -194,6 +195,9 @@ mod tests {
         assert!(strict.iter().any(|s| s.stage == S::DexTransform
             && s.integration == super::StageIntegration::NotIntegrated));
         assert!(base.iter().any(|s| s.stage == S::Sign && s.requirement == R::Disabled));
+        let maximum = ProductionBuildContext::stage_graph(ProtectionProfile::Maximum, true, true);
+        assert!(maximum.iter().any(|s| s.stage == S::VmShield && s.requirement == R::Required));
+        assert!(maximum.iter().any(|s| s.stage == S::NativeShield && s.requirement == R::Required));
     }
 
     #[test]
