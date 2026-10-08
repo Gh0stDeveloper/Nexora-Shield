@@ -25,8 +25,7 @@ pub use plan::BuildPlan;
 pub use policy::{EffectiveProductionPolicy, ProductionControl, ProductionOverrides};
 pub use production::{
     protect_production_apk, protect_production_apk_with_overrides, PlannedStage,
-    ProductionBuildContext, ProductionStage,
-    StageIntegration, StageRequirement,
+    ProductionBuildContext, ProductionStage, StageIntegration, StageRequirement,
 };
 pub use report::{apk_inspection_json, write_report_atomic, PrivateBuildReport, PublicBuildReport};
 

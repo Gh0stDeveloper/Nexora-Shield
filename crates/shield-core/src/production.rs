@@ -202,8 +202,7 @@ pub(crate) fn validate_reserved_paths(request: &ProtectionRequest) -> Result<()>
         use std::os::unix::fs::MetadataExt;
         for (index, (label, metadata)) in existing.iter().enumerate() {
             for (other_label, other_metadata) in &existing[..index] {
-                if metadata.dev() == other_metadata.dev()
-                    && metadata.ino() == other_metadata.ino()
+                if metadata.dev() == other_metadata.dev() && metadata.ino() == other_metadata.ino()
                 {
                     return Err(CoreError::InvalidRequest(format!(
                         "artifact hard-link collision between {other_label} and {label}"
@@ -281,7 +280,8 @@ impl ProductionBuildContext {
         if let Some(signing) = &request.signing {
             if signing.min_sdk < 24 || (!signing.v2 && !signing.v3) {
                 return Err(CoreError::InvalidRequest(
-                    "production signing requires minSdk >= 24 and APK Signature Scheme v2 or v3".into(),
+                    "production signing requires minSdk >= 24 and APK Signature Scheme v2 or v3"
+                        .into(),
                 ));
             }
             signing.validate()?;
@@ -470,13 +470,21 @@ mod tests {
     #[test]
     fn selecting_optional_defenses_makes_them_mandatory() {
         let mut overrides = ProductionOverrides::default();
-        assert!(overrides.set(crate::ProductionControl::Attestation, true).is_ok());
-        assert!(overrides.set(crate::ProductionControl::VmShield, true).is_ok());
+        assert!(overrides
+            .set(crate::ProductionControl::Attestation, true)
+            .is_ok());
+        assert!(overrides
+            .set(crate::ProductionControl::VmShield, true)
+            .is_ok());
         let policy = EffectiveProductionPolicy::resolve(ProtectionProfile::Standard, &overrides)
             .unwrap_or_else(|_| unreachable!());
         let graph = ProductionBuildContext::stage_graph_for_policy(&policy, true, true);
-        assert!(graph.iter().any(|s| s.stage == S::Attestation && s.requirement == R::Required));
-        assert!(graph.iter().any(|s| s.stage == S::VmShield && s.requirement == R::Required));
+        assert!(graph
+            .iter()
+            .any(|s| s.stage == S::Attestation && s.requirement == R::Required));
+        assert!(graph
+            .iter()
+            .any(|s| s.stage == S::VmShield && s.requirement == R::Required));
     }
 
     #[test]

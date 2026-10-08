@@ -114,7 +114,11 @@ impl EffectiveProductionPolicy {
         let maximum = profile == ProtectionProfile::Maximum;
         Ok(Self {
             profile,
-            data_protection: resolve_control("data-protection", hardened, overrides.data_protection)?,
+            data_protection: resolve_control(
+                "data-protection",
+                hardened,
+                overrides.data_protection,
+            )?,
             native_shield: resolve_control("native-shield", maximum, overrides.native_shield)?,
             vm_shield: resolve_control("vm-shield", maximum, overrides.vm_shield)?,
             diversity: resolve_control("diversity", hardened, overrides.diversity)?,
@@ -180,7 +184,11 @@ mod tests {
 
     #[test]
     fn attempts_to_downgrade_mandatory_controls_are_rejected() {
-        for profile in [ProtectionProfile::Standard, ProtectionProfile::Hardened, ProtectionProfile::Maximum] {
+        for profile in [
+            ProtectionProfile::Standard,
+            ProtectionProfile::Hardened,
+            ProtectionProfile::Maximum,
+        ] {
             let mut overrides = O::default();
             assert!(overrides.set(C::IntegrityGraph, false).is_ok());
             assert!(P::resolve(profile, &overrides).is_err());

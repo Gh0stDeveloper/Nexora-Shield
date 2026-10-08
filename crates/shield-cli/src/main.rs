@@ -18,9 +18,9 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, protect_production_apk_with_overrides, ProductionBuildContext,
-    ProductionControl, ProductionOverrides, ProtectionProfile, ProtectionRequest,
-    CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, protect_production_apk_with_overrides,
+    ProductionBuildContext, ProductionControl, ProductionOverrides, ProtectionProfile,
+    ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -477,9 +477,11 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
             "--enable-control" | "--disable-control" => {
                 let enable = args[index] == "--enable-control";
                 let name = require_value(args, index, args[index].as_str())?;
-                let control = ProductionControl::from_str(name)
+                let control =
+                    ProductionControl::from_str(name).map_err(|error| error.to_string())?;
+                overrides
+                    .set(control, enable)
                     .map_err(|error| error.to_string())?;
-                overrides.set(control, enable).map_err(|error| error.to_string())?;
                 index += 2;
             }
             "--force" => {
