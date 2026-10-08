@@ -155,7 +155,7 @@ damaged = bytearray((directory / "valid.apk").read_bytes())
 offset = 0
 found = False
 while True:
-    offset = damaged.find(b"PK\\x01\\x02", offset)
+    offset = damaged.find(b"PK\x01\x02", offset)
     if offset < 0:
         break
     name_len = int.from_bytes(damaged[offset + 28:offset + 30], "little")
