@@ -346,6 +346,28 @@ pub fn verify_normalized_equivalence(input: &Path, normalized: &Path) -> Result<
         ));
     }
 
+    // ZIP CRC-32 is not collision-resistant and central directory metadata can
+    // describe bytes that are no longer present. Prove each copied payload
+    // byte-for-byte using bounded, constant-memory reads instead of trusting
+    // only a CRC/length tuple.
+    let normalized_entries = result
+        .entries
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry))
+        .collect::<BTreeMap<_, _>>();
+    for entry in &original.entries {
+        if is_legacy_signature_entry(&entry.name) {
+            continue;
+        }
+        let rebuilt = normalized_entries.get(entry.name.as_str()).ok_or_else(|| {
+            PackageError::VerificationFailed(format!(
+                "normalized archive lost entry '{}'",
+                entry.name
+            ))
+        })?;
+        verify_preserved_entry_payload(input, entry, normalized, rebuilt)?;
+    }
+
     Ok(())
 }
 
@@ -390,6 +412,60 @@ pub fn read_stored_entry(
     let mut data = vec![0_u8; length];
     file.read_exact(&mut data)?;
     Ok(Some(data))
+}
+
+/// Confirms that one untouched entry has identical raw compressed payload
+/// bytes in two ZIP32 archives, without buffering the entire entry.
+///
+/// This is stronger than a CRC-32/size comparison and also applies to DEFLATE
+/// entries, which are copied without decompression.
+///
+/// # Errors
+///
+/// Rejects changed ZIP metadata, truncated payloads or any byte difference.
+pub fn verify_preserved_entry_payload(
+    source_path: &Path,
+    original: &ZipEntry,
+    rebuilt_path: &Path,
+    rebuilt: &ZipEntry,
+) -> Result<()> {
+    if original.name != rebuilt.name
+        || original.compression_method != rebuilt.compression_method
+        || original.compressed_size != rebuilt.compressed_size
+        || original.uncompressed_size != rebuilt.uncompressed_size
+        || original.crc32 != rebuilt.crc32
+    {
+        return Err(PackageError::VerificationFailed(format!(
+            "preserved ZIP entry '{}' metadata differs",
+            original.name
+        )));
+    }
+
+    let mut source = File::open(source_path)?;
+    let mut destination = File::open(rebuilt_path)?;
+    let source_offset = local_data_offset(&mut source, original)?;
+    let destination_offset = local_data_offset(&mut destination, rebuilt)?;
+    source.seek(SeekFrom::Start(source_offset))?;
+    destination.seek(SeekFrom::Start(destination_offset))?;
+
+    let mut remaining = u64::from(original.compressed_size);
+    let mut source_chunk = [0_u8; 65_536];
+    let mut destination_chunk = [0_u8; 65_536];
+    while remaining > 0 {
+        let count = usize::try_from(remaining.min(65_536))
+            .map_err(|_| PackageError::UnsupportedZip("entry size exceeds host limit".into()))?;
+        source.read_exact(&mut source_chunk[..count])?;
+        destination.read_exact(&mut destination_chunk[..count])?;
+        if source_chunk[..count] != destination_chunk[..count] {
+            return Err(PackageError::VerificationFailed(format!(
+                "preserved ZIP entry '{}' payload differs",
+                original.name
+            )));
+        }
+        remaining -= u64::try_from(count)
+            .map_err(|_| PackageError::UnsupportedZip("chunk size overflow".into()))?;
+    }
+    Ok(())
 }
 
 /// Standard IEEE CRC-32 for ZIP entry integrity; not a cryptographic hash.

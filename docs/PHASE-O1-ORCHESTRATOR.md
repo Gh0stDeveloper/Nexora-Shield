@@ -150,3 +150,18 @@ method/data transforms, RASP, Integrity Graph, native/VM execution, diversity,
 optional attestation binding and Android final signature/install tests are
 wired and verified together. A passing diagnostic ZIP test or Compose desktop
 test does not satisfy these product-level requirements.
+
+## Fifth hardening pass — raw payload equivalence proof
+
+The ZIP normalizer and the O.1 unsigned staging validator now check the **exact
+compressed payload bytes** for all untouched entries in fixed 64 KiB chunks.
+Prior checks compared only CRC-32, uncompressed size and compression method,
+which cannot establish payload identity under a CRC collision or forged central
+directory metadata. The stronger check applies to stored and DEFLATE copied
+entries without decompressing them. A regression test mutates an entry's bytes
+while deliberately leaving its central-directory CRC and size unchanged.
+
+This improvement does **not** mean DEFLATE-compressed `classes*.dex` can be
+decoded or rewritten; preflight still rejects compressed DEX. It also does not
+substitute for a runtime-capable B–I executor, signing or Android device
+evidence. O.1 remains **OPEN** and `v1.0.0` remains **NO-GO**.

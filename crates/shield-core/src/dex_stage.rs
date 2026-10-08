@@ -5,7 +5,7 @@ use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_
 use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
     crc32_ieee, is_legacy_signature_entry, read_stored_entry, read_zip_directory,
-    rewrite_stored_entries, verify_apk_structure, ZipDirectory,
+    rewrite_stored_entries, verify_apk_structure, verify_preserved_entry_payload, ZipDirectory,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -168,7 +168,7 @@ impl ProductionBuildContext {
             ));
         }
         let built = read_zip_directory(destination)?;
-        verify_rebuilt_zip(source, &built, destination, replacements)?;
+        verify_rebuilt_zip(self.input(), source, &built, destination, replacements)?;
         let decoded = built
             .entries
             .iter()
@@ -196,6 +196,7 @@ impl ProductionBuildContext {
 }
 
 fn verify_rebuilt_zip(
+    source_path: &Path,
     source: &ZipDirectory,
     built: &ZipDirectory,
     destination: &Path,
@@ -226,15 +227,9 @@ fn verify_rebuilt_zip(
                 .ok_or_else(|| {
                     CoreError::InvalidRequest(format!("unexpected APK entry '{}'", entry.name))
                 })?;
-            if original.crc32 != entry.crc32
-                || original.uncompressed_size != entry.uncompressed_size
-                || original.compression_method != entry.compression_method
-            {
-                return Err(CoreError::InvalidRequest(format!(
-                    "unmodified APK entry '{}' changed",
-                    entry.name
-                )));
-            }
+            // A CRC/size equality check alone cannot prove untouched bytes.
+            // Compare the exact copied compressed payload in bounded chunks.
+            verify_preserved_entry_payload(source_path, original, destination, entry)?;
         }
     }
     if observed.len() != replacements.len()

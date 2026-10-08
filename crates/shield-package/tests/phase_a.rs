@@ -66,6 +66,38 @@ fn normalizer_preserves_payload_identity_and_discovers_multidex() {
 }
 
 #[test]
+fn equivalence_rejects_payload_tamper_even_when_crc_metadata_is_unchanged() {
+    let directory = test_directory("tampered-raw-payload");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original-dex"),
+            ("res/raw/token.bin", b"payload"),
+        ],
+    );
+    normalize_zip(&input, &output).expect("normalize fixture");
+    verify_normalized_equivalence(&input, &output).expect("unmodified archive");
+
+    let mut bytes = fs::read(&output).expect("read normalized archive");
+    let needle = b"payload";
+    let position = bytes
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .expect("find stored payload");
+    bytes[position..position + needle.len()].copy_from_slice(b"PAYLOAD");
+    fs::write(&output, bytes).expect("write byte-tampered archive");
+
+    // The ZIP still parses with original central CRC/size records, but the
+    // stream-preservation check must reject the modified payload.
+    read_zip_directory(&output).expect("unchanged ZIP directory");
+    assert!(verify_normalized_equivalence(&input, &output).is_err());
+    cleanup(&directory);
+}
+
+#[test]
 fn verifier_rejects_non_contiguous_multidex_sequence() {
     let directory = test_directory("dex-gap");
     let input = directory.join("gap.apk");

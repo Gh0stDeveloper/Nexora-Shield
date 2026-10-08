@@ -34,6 +34,6 @@ pub use hash::sha256_file;
 pub use tools::{AndroidTools, SigningConfig};
 pub use zip::{
     crc32_ieee, is_legacy_signature_entry, normalize_zip, read_stored_entry, read_zip_directory,
-    rewrite_stored_entries, verify_normalized_equivalence, NormalizationSummary, ZipDirectory,
+    rewrite_stored_entries, verify_normalized_equivalence, verify_preserved_entry_payload, NormalizationSummary, ZipDirectory,
     ZipEntry,
 };
