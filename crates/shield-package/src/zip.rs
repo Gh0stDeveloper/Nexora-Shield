@@ -186,21 +186,7 @@ pub fn rewrite_stored_entries(
     });
     entries.sort_by(|left, right| left.name.as_bytes().cmp(right.name.as_bytes()));
 
-    // No silent partial transformation: every requested name must have one
-    // existing STORE target after stripping obsolete signatures.
-    for name in replacements.keys() {
-        let entry = entries
-            .iter()
-            .find(|entry| entry.name == *name)
-            .ok_or_else(|| {
-                PackageError::InvalidArgument(format!("replacement target '{name}' is absent"))
-            })?;
-        if entry.compression_method != 0 {
-            return Err(PackageError::UnsupportedZip(format!(
-                "replacement target '{name}' must use ZIP STORE"
-            )));
-        }
-    }
+    validate_replacements(&entries, replacements)?;
 
     let mut source = File::open(input)?;
     let mut destination = File::create(output)?;
@@ -288,6 +274,27 @@ pub fn rewrite_stored_entries(
         output_entries: written.len(),
         stripped_signature_entries: stripped,
     })
+}
+
+fn validate_replacements(
+    entries: &[ZipEntry],
+    replacements: &BTreeMap<String, Vec<u8>>,
+) -> Result<()> {
+    // Each requested target must exist and use ZIP STORE.
+    for name in replacements.keys() {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.name == *name)
+            .ok_or_else(|| {
+                PackageError::InvalidArgument(format!("replacement target '{name}' is absent"))
+            })?;
+        if entry.compression_method != 0 {
+            return Err(PackageError::UnsupportedZip(format!(
+                "replacement target '{name}' must use ZIP STORE"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Confirms that normalization preserved non-signature payload identities.
