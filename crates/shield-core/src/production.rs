@@ -3,8 +3,7 @@
 
 use crate::{
     CoreError, DexSelectorPolicy, EffectiveProductionPolicy, PipelineResult, ProductionControl,
-    ProductionOverrides,
-    ProtectionProfile, ProtectionRequest, Result,
+    ProductionOverrides, ProtectionProfile, ProtectionRequest, Result,
 };
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
