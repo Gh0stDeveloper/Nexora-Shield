@@ -47,7 +47,7 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     abstract val cliExecutable: Property<String>
 
     @get:Input
-    abstract val allowUnsigned: Property<Boolean>
+    abstract val allowUnsigned: Property<Boolean>\n\n    @get:Input\n    abstract val legacyPhaseAOnly: Property<Boolean>
 
     @get:Input
     abstract val align: Property<Boolean>
