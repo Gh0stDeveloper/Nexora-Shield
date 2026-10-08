@@ -119,7 +119,7 @@ impl SelectorResolver {
                                     index: encoded.method_idx,
                                 },
                             )?;
-                            if selector.member_pattern.as_deref().is_none_or(|pattern| {
+                            if selector.member_pattern.as_deref().map_or(true, |pattern| {
                                 glob_match(pattern, name)
                             }) {
                                 selection.methods.insert(encoded.method_idx);
@@ -134,7 +134,7 @@ impl SelectorResolver {
                                     index: encoded.field_idx,
                                 },
                             )?;
-                            if selector.member_pattern.as_deref().is_none_or(|pattern| {
+                            if selector.member_pattern.as_deref().map_or(true, |pattern| {
                                 glob_match(pattern, name)
                             }) {
                                 selection.fields.insert(encoded.field_idx);
