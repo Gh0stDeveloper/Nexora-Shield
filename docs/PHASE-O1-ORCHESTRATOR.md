@@ -44,3 +44,23 @@ The matrix is an initial implementation contract, not final profile policy. Phas
 - Signed output verification and representative Android E2E tests remain pending.
 
 **O.1 is NOT complete.** The checklist records only the stage graph and typed context as completed. No stable-release approval is implied.
+
+## Second engineering pass — real DEX preflight
+
+The read-only CLI option `protect ... --plan-only` now invokes the same typed production build context and inspects actual canonical DEX contents from the input APK. The core checks:
+
+- the inspected input SHA-256 before and after DEX inspection;
+- bounds of 64 MiB per DEX and 256 MiB combined decoded DEX sizes;
+- canonical DEX sequencing with the established `MultiDexSet` parser and validator;
+- duplicate class descriptors across DEX units;
+- per-unit compatibility/reflection and JNI/native findings;
+- default selector resolution and eligible classes/methods/fields;
+- missing mandatory production stages, explicitly reported as **NotIntegrated**.
+
+The option does not create an output APK or reports, does not sign, and reports `Production ready: false`. It is a preflight diagnostic, not an implementation of the complete `protect` production path.
+
+Current limit: this first read-only reader supports **stored (ZIP method 0) DEX only**. A DEX stored in ZIP Deflate (method 8) is rejected, not silently excluded. Support for bounded decompression and production transformations is still required.
+
+The Phase O workflow now checks representative *synthetic* two-DEX APKs, malformed DEX, deflated DEX and cross-DEX duplicate classes. Synthetic APK fixtures are not Android emulator/device installation evidence.
+
+The existing packaging-only `protect` command remains unchanged for historical Phase A test compatibility and is **not an approved full-protection operation**. Until it is replaced with the executed orchestrator and final-output evidence, P0.1 remains open.
