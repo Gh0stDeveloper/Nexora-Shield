@@ -7,7 +7,7 @@ use crate::{CoreError, ProductionBuildContext, Result};
 use nexora_shield_dex::{
     canonical_dex_index, CompatibilityAnalyzer, DexInput, MultiDexSet, SelectorResolver,
 };
-use nexora_shield_package::{read_stored_entry, read_zip_directory, sha256_file};
+use nexora_shield_package::{crc32_ieee, read_stored_entry, read_zip_directory, sha256_file};
 use std::collections::BTreeSet;
 
 /// Maximum decoded size accepted for one DEX file in this first O.1 pass.
@@ -86,6 +86,11 @@ impl ProductionBuildContext {
                 return Err(CoreError::InvalidRequest(format!(
                     "DEX '{}' size does not match ZIP metadata",
                     entry.name
+                )));
+            }
+            if crc32_ieee(&bytes) != entry.crc32 {
+                return Err(CoreError::InvalidRequest(format!(
+                    "DEX '{}' has an invalid ZIP CRC", entry.name
                 )));
             }
             inputs.push(DexInput {
