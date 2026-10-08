@@ -73,6 +73,8 @@ impl PublicBuildReport {
                 "  \"aligned\": {},\n",
                 "  \"signed\": {},\n",
                 "  \"stripped_signature_entries\": {},\n",
+                "  \"protection_scope\": \"phase-a-packaging-only\",\n",
+                "  \"production_protected\": false,\n",
                 "  \"stages\": {}\n",
                 "}}\n"
             ),
@@ -124,6 +126,8 @@ impl PrivateBuildReport {
                 "  \"created_unix_ms\": {},\n",
                 "  \"dex_files\": {},\n",
                 "  \"stripped_signature_entries\": {},\n",
+                "  \"protection_scope\": \"phase-a-packaging-only\",\n",
+                "  \"production_protected\": false,\n",
                 "  \"stages\": {}\n",
                 "}}\n"
             ),
