@@ -39,7 +39,7 @@ The matrix is an initial implementation contract, not final profile policy. Phas
 - DEX discovery/parse of real APK content, compatibility and selectors must be connected.
 - DEX/data/resources, native, VM, integrity, RASP, diversity and attestation must be applied to the final package, not just standalone fixtures.
 - Archive rebuild, signature, runtime smoke, rollback safety and evidence tied to final bytes are not integrated.
-- `nexora-shield protect` still executes the historical Phase A packaging path. The Gradle Plugin and Studio are **not** yet connected to this new contract. These are critical P0 gaps.
+- `nexora-shield protect` now executes only the production entry point and refuses incomplete builds. A distinct `package-apk` operation preserves explicitly requested Phase A packaging for tests. The production Gradle Plugin also defaults to the fail-closed command; Studio preflight can inspect the same contract, but full production execution remains unavailable.
 - The source/input digest must be checked again immediately before execution to prevent a post-plan substitution (TOCTOU).
 - Signed output verification and representative Android E2E tests remain pending.
 
@@ -63,7 +63,7 @@ Current limit: this first read-only reader supports **stored (ZIP method 0) DEX 
 
 The Phase O workflow now checks representative *synthetic* two-DEX APKs, malformed DEX, deflated DEX and cross-DEX duplicate classes. Synthetic APK fixtures are not Android emulator/device installation evidence.
 
-The existing packaging-only `protect` command remains unchanged for historical Phase A test compatibility and is **not an approved full-protection operation**. Until it is replaced with the executed orchestrator and final-output evidence, P0.1 remains open.
+Historical Phase A compatibility now requires explicitly calling `package-apk`. Production `protect` never reports a packaging-only artifact as protected. The executed production orchestrator and final-output evidence remain incomplete, so P0.1 stays open.
 
 ## Third engineering pass — executable DEX-only diagnostic staging
 
@@ -117,3 +117,36 @@ stage graph correctly advertises these as unintegrated.
 
 **O.1 is NOT complete; the staged diagnostic does not close its outstanding
 mandatory work. Phase O / stable remains NO-GO.**
+
+## Fourth engineering pass — transaction isolation, truthful readiness and Studio routing
+
+- ZIP32 reconstruction now **exclusively creates** its destination. It refuses
+  preexisting files and symlinks and removes partial output following write
+  failures. Guard/file declaration order ensures cleanup also works on Windows.
+- The staging API rejects normalized source/output aliases, including
+  `./`, `../` and symlinked parent directory forms. Regression tests cover
+  existing output preservation, symlink targets, missing replacements and
+  staged-path collisions.
+- Required-stage readiness no longer excludes operations merely because they
+  were `ReadOnlyPlanning`: **every required stage must be
+  `ProductionIntegrated`**, and the executor still independently refuses
+  release until it has implemented real artifact publication.
+- `DiagnosticOnly` describes DEX validation, compatibility, selectors,
+  rewriting, rebuild and ZIP verification. It explicitly does **not** mean
+  embedded application protection. Production stages such as RASP, native/VM,
+  data protection and integrity remain `NotIntegrated`.
+- Studio now invokes `protect --plan-only` from its build console using
+  the configured profile. This is a diagnostic that creates no APK. Studio
+  public-report views also distinguish Phase A packaging-only results from
+  actual production-protection claims.
+- Phase O CI covers three resolved profile matrices, ZIP CRC corruption,
+  source/output aliases, no-output/no-report production failure, staged DEX
+  validation and Studio JVM tests.
+
+### Why the release remains blocked
+
+No production artifact may be claimed until the app-facing runtime loader,
+method/data transforms, RASP, Integrity Graph, native/VM execution, diversity,
+optional attestation binding and Android final signature/install tests are
+wired and verified together. A passing diagnostic ZIP test or Compose desktop
+test does not satisfy these product-level requirements.
