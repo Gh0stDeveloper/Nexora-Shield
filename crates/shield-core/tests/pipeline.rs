@@ -190,12 +190,9 @@ fn staging_rejects_symlink_parent_then_dotdot_alias_of_planned_output() {
     cleanup(&directory);
 }
 
-
 #[test]
 fn o11_policy_resolution_precedes_source_access_and_never_writes() {
-    use nexora_shield_core::{
-        ProductionBuildContext, ProductionControl, ProductionOverrides,
-    };
+    use nexora_shield_core::{ProductionBuildContext, ProductionControl, ProductionOverrides};
     let directory = test_directory("o11-no-mutation");
     let input = directory.join("missing.apk");
     let output = directory.join("must-not-exist.apk");
@@ -213,7 +210,9 @@ fn o11_policy_resolution_precedes_source_access_and_never_writes() {
         private_report: None,
     };
     let mut overrides = ProductionOverrides::default();
-    assert!(overrides.set(ProductionControl::NativeShield, false).is_ok());
+    assert!(overrides
+        .set(ProductionControl::NativeShield, false)
+        .is_ok());
     let error = ProductionBuildContext::prepare_with_overrides(&request, &overrides)
         .expect_err("reject profile downgrade before opening source");
     assert!(error.to_string().contains("native-shield"));
@@ -228,7 +227,10 @@ fn o11_rejects_directory_destinations_before_writes() {
     let input = directory.join("input.apk");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"fixture")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"fixture"),
+        ],
     );
     let output = directory.join("output.apk");
     fs::create_dir(&output).expect("directory target fixture");
@@ -260,7 +262,10 @@ fn o11_refuses_hardlink_aliases_even_when_force_is_enabled() {
     let output = directory.join("output.apk");
     write_stored_zip(
         &input,
-        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"fixture")],
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"fixture"),
+        ],
     );
     fs::hard_link(&input, &output).expect("create hard-link alias");
     let before = fs::read(&input).expect("read original");

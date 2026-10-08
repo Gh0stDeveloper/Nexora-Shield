@@ -2,8 +2,8 @@
 //! No stage is reported as executed without final-artifact evidence.
 
 use crate::{
-    CoreError, EffectiveProductionPolicy, PipelineResult, ProductionOverrides, ProtectionProfile,
-    ProtectionRequest, Result,
+    CoreError, EffectiveProductionPolicy, PipelineResult, ProductionControl, ProductionOverrides,
+    ProtectionProfile, ProtectionRequest, Result,
 };
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
@@ -331,7 +331,7 @@ impl ProductionBuildContext {
             dex_count: inspected.dex_files.len(),
             profile: request.profile,
             policy,
-            stages: Self::stage_graph_for_policy(&policy, request.align, request.signing.is_some()),
+            stages: Self::stage_graph_for_policy(policy, request.align, request.signing.is_some()),
         })
     }
 
@@ -372,11 +372,11 @@ impl ProductionBuildContext {
     fn stage_graph(profile: ProtectionProfile, align: bool, sign: bool) -> Vec<PlannedStage> {
         let policy = EffectiveProductionPolicy::resolve(profile, &ProductionOverrides::default())
             .unwrap_or_else(|_| unreachable!());
-        Self::stage_graph_for_policy(&policy, align, sign)
+        Self::stage_graph_for_policy(policy, align, sign)
     }
 
     fn stage_graph_for_policy(
-        policy: &EffectiveProductionPolicy,
+        policy: EffectiveProductionPolicy,
         align: bool,
         sign: bool,
     ) -> Vec<PlannedStage> {
@@ -407,12 +407,12 @@ impl ProductionBuildContext {
             .into_iter()
             .map(|stage| {
                 let requirement = match stage {
-                    S::DataProtection if !policy.data_protection => R::WhenSelected,
-                    S::Diversity if !policy.diversity => R::WhenSelected,
-                    S::RaspRuntime if !policy.rasp_runtime => R::WhenSelected,
-                    S::NativeShield if !policy.native_shield => R::WhenSelected,
-                    S::VmShield if !policy.vm_shield => R::WhenSelected,
-                    S::Attestation if !policy.attestation => R::WhenSelected,
+                    S::DataProtection if !policy.enabled(ProductionControl::DataProtection) => R::WhenSelected,
+                    S::Diversity if !policy.enabled(ProductionControl::Diversity) => R::WhenSelected,
+                    S::RaspRuntime if !policy.enabled(ProductionControl::RaspRuntime) => R::WhenSelected,
+                    S::NativeShield if !policy.enabled(ProductionControl::NativeShield) => R::WhenSelected,
+                    S::VmShield if !policy.enabled(ProductionControl::VmShield) => R::WhenSelected,
+                    S::Attestation if !policy.enabled(ProductionControl::Attestation) => R::WhenSelected,
                     S::Align if !align => R::Disabled,
                     S::Sign if !sign => R::Disabled,
                     _ => R::Required,
@@ -487,7 +487,7 @@ mod tests {
             .is_ok());
         let policy = EffectiveProductionPolicy::resolve(ProtectionProfile::Standard, &overrides)
             .unwrap_or_else(|_| unreachable!());
-        let graph = ProductionBuildContext::stage_graph_for_policy(&policy, true, true);
+        let graph = ProductionBuildContext::stage_graph_for_policy(policy, true, true);
         assert!(graph
             .iter()
             .any(|s| s.stage == S::Attestation && s.requirement == R::Required));

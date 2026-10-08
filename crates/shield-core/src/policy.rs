@@ -17,6 +17,19 @@ pub enum ProductionControl {
 
 impl ProductionControl {
     #[must_use]
+    const fn mask(self) -> u8 {
+        match self {
+            Self::DataProtection => 1,
+            Self::NativeShield => 2,
+            Self::VmShield => 4,
+            Self::Diversity => 8,
+            Self::IntegrityGraph => 16,
+            Self::RaspRuntime => 32,
+            Self::Attestation => 64,
+        }
+    }
+
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DataProtection => "data-protection",
@@ -94,13 +107,7 @@ impl ProductionOverrides {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EffectiveProductionPolicy {
     pub profile: ProtectionProfile,
-    pub data_protection: bool,
-    pub native_shield: bool,
-    pub vm_shield: bool,
-    pub diversity: bool,
-    pub integrity_graph: bool,
-    pub rasp_runtime: bool,
-    pub attestation: bool,
+    enabled_mask: u8,
 }
 
 impl EffectiveProductionPolicy {
@@ -110,35 +117,33 @@ impl EffectiveProductionPolicy {
     ///
     /// Returns an error when an explicit override disables a mandatory control.
     pub fn resolve(profile: ProtectionProfile, overrides: &ProductionOverrides) -> Result<Self> {
+        use ProductionControl as C;
         let hardened = profile != ProtectionProfile::Standard;
         let maximum = profile == ProtectionProfile::Maximum;
+        let selections = [
+            (C::DataProtection, hardened, overrides.data_protection),
+            (C::NativeShield, maximum, overrides.native_shield),
+            (C::VmShield, maximum, overrides.vm_shield),
+            (C::Diversity, hardened, overrides.diversity),
+            (C::IntegrityGraph, true, overrides.integrity_graph),
+            (C::RaspRuntime, hardened, overrides.rasp_runtime),
+            (C::Attestation, false, overrides.attestation),
+        ];
+        let mut enabled_mask = 0_u8;
+        for (control, mandatory, override_value) in selections {
+            if resolve_control(control.as_str(), mandatory, override_value)? {
+                enabled_mask |= control.mask();
+            }
+        }
         Ok(Self {
             profile,
-            data_protection: resolve_control(
-                "data-protection",
-                hardened,
-                overrides.data_protection,
-            )?,
-            native_shield: resolve_control("native-shield", maximum, overrides.native_shield)?,
-            vm_shield: resolve_control("vm-shield", maximum, overrides.vm_shield)?,
-            diversity: resolve_control("diversity", hardened, overrides.diversity)?,
-            integrity_graph: resolve_control("integrity-graph", true, overrides.integrity_graph)?,
-            rasp_runtime: resolve_control("rasp-runtime", hardened, overrides.rasp_runtime)?,
-            attestation: resolve_control("attestation", false, overrides.attestation)?,
+            enabled_mask,
         })
     }
 
     #[must_use]
     pub const fn enabled(self, control: ProductionControl) -> bool {
-        match control {
-            ProductionControl::DataProtection => self.data_protection,
-            ProductionControl::NativeShield => self.native_shield,
-            ProductionControl::VmShield => self.vm_shield,
-            ProductionControl::Diversity => self.diversity,
-            ProductionControl::IntegrityGraph => self.integrity_graph,
-            ProductionControl::RaspRuntime => self.rasp_runtime,
-            ProductionControl::Attestation => self.attestation,
-        }
+        self.enabled_mask & control.mask() != 0
     }
 }
 
@@ -165,12 +170,12 @@ mod tests {
         let standard = standard.unwrap_or_else(|_| unreachable!());
         let hardened = hardened.unwrap_or_else(|_| unreachable!());
         let maximum = maximum.unwrap_or_else(|_| unreachable!());
-        assert!(standard.integrity_graph);
-        assert!(!standard.data_protection && !standard.native_shield && !standard.vm_shield);
-        assert!(!standard.diversity && !standard.rasp_runtime && !standard.attestation);
-        assert!(hardened.data_protection && hardened.diversity && hardened.rasp_runtime);
-        assert!(!hardened.native_shield && !hardened.vm_shield);
-        assert!(maximum.native_shield && maximum.vm_shield);
+        assert!(standard.enabled(C::IntegrityGraph));
+        assert!(!standard.enabled(C::DataProtection) && !standard.enabled(C::NativeShield) && !standard.enabled(C::VmShield));
+        assert!(!standard.enabled(C::Diversity) && !standard.enabled(C::RaspRuntime) && !standard.enabled(C::Attestation));
+        assert!(hardened.enabled(C::DataProtection) && hardened.enabled(C::Diversity) && hardened.enabled(C::RaspRuntime));
+        assert!(!hardened.enabled(C::NativeShield) && !hardened.enabled(C::VmShield));
+        assert!(maximum.enabled(C::NativeShield) && maximum.enabled(C::VmShield));
     }
 
     #[test]
@@ -179,7 +184,7 @@ mod tests {
         assert!(overrides.set(C::VmShield, true).is_ok());
         assert!(overrides.set(C::Attestation, true).is_ok());
         let result = P::resolve(ProtectionProfile::Standard, &overrides);
-        assert!(matches!(result, Ok(policy) if policy.vm_shield && policy.attestation));
+        assert!(matches!(result, Ok(policy) if policy.enabled(C::VmShield) && policy.enabled(C::Attestation)));
     }
 
     #[test]
