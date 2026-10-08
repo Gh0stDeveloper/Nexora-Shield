@@ -2,6 +2,7 @@ package dev.nexora.shield.studio.service
 
 import dev.nexora.shield.studio.model.PerformanceBudgets
 import dev.nexora.shield.studio.model.SecretSettings
+import dev.nexora.shield.studio.model.ShieldProfile
 import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.createTempFile
@@ -108,6 +109,29 @@ class StudioServicesTest {
         assertTrue(
             runCatching { service.commandForTask(root, "assembleRelease;rm") }.isFailure,
         )
+    }
+
+    @Test
+    fun productionReadinessUsesFailClosedProtectPlannerWithoutPackaging() {
+        val root = createTempDirectory("nexora-o1-studio-plan")
+        val apk = root.resolve("source.apk")
+        apk.writeText("synthetic-only")
+        val output = root.resolve("build/protected.apk")
+        val service = ProductionReadinessService()
+
+        val args = service.planCommand(apk, output, ShieldProfile.MAXIMUM, "nexora-shield")
+        assertEquals("protect", args[1])
+        assertEquals(apk.toAbsolutePath().normalize().toString(), args[2])
+        assertEquals("maximum", args[args.indexOf("--profile") + 1])
+        assertTrue(args.contains("--plan-only"))
+        assertFalse(args.contains("package-apk"))
+        assertFalse(Files.exists(output))
+        assertTrue(runCatching {
+            service.planCommand(apk, apk, ShieldProfile.STANDARD, "nexora-shield")
+        }.isFailure)
+        assertTrue(runCatching {
+            service.planCommand(root.resolve("missing.apk"), output, ShieldProfile.STANDARD, "nexora-shield")
+        }.isFailure)
     }
 
     @Test
