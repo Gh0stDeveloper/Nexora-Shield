@@ -12,6 +12,21 @@ const MAX_ZIP_COMMENT: usize = u16::MAX as usize;
 const NORMALIZED_DOS_DATE: u16 = 0x0021;
 const NORMALIZED_DOS_TIME: u16 = 0x0000;
 
+/// Automatically removes a partially written archive on any error path.
+#[derive(Debug)]
+struct IncompleteOutput<'a> {
+    path: &'a Path,
+    completed: bool,
+}
+
+impl Drop for IncompleteOutput<'_> {
+    fn drop(&mut self) {
+        if !self.completed {
+            let _ = std::fs::remove_file(self.path);
+        }
+    }
+}
+
 /// Metadata for one standard (non-ZIP64) ZIP entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZipEntry {
@@ -189,7 +204,10 @@ pub fn rewrite_stored_entries(
     validate_replacements(&entries, replacements)?;
 
     let mut source = File::open(input)?;
-    let mut destination = File::create(output)?;
+    // Exclusive creation ensures an existing artifact or symlink is never
+    // overwritten, even if a concurrent process races the caller's preflight.
+    let mut destination = File::options().write(true).create_new(true).open(output)?;
+    let mut incomplete = IncompleteOutput { path: output, completed: false };
     let mut written = Vec::with_capacity(entries.len());
 
     for mut entry in entries {
@@ -268,6 +286,7 @@ pub fn rewrite_stored_entries(
     write_u16(&mut destination, 0)?;
     destination.flush()?;
     destination.sync_all()?;
+    incomplete.completed = true;
 
     Ok(NormalizationSummary {
         input_entries,
