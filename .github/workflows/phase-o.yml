@@ -1,0 +1,50 @@
+name: Phase O
+
+on:
+  push:
+    branches:
+      - main
+      - feat/phase-o0-release-freeze
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-o-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  o0-release-freeze:
+    name: O.0 release freeze and audit baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate Phase O baseline and finding inventory
+        run: python scripts/release/verify-phase-o-release-freeze.py
+
+      - name: Prove stable publication is blocked
+        shell: bash
+        run: |
+          if python scripts/release/verify-phase-o-release-freeze.py --channel stable; then
+            echo "Phase O freeze is open but stable channel was unexpectedly allowed" >&2
+            exit 1
+          fi
+          echo "Stable publication correctly rejected while Phase O is open."
+
+      - name: Prove controlled RC channel remains available
+        run: python scripts/release/verify-phase-o-release-freeze.py --channel rc
+
+      - name: Validate Phase O documentation
+        run: |
+          python scripts/release/verify-docs.py
+          grep -q 'OPEN — RELEASE BLOCKING' docs/PHASE-O.md
+          grep -q 'NO-GO for public stable' docs/PRODUCTION-READINESS-AUDIT.md
+          grep -q 'Phase O.0 — Release Freeze and Audit Baseline' docs/PHASE-O0-BASELINE.md
+          grep -q 'Accepted Risk Policy' docs/PHASE-O-ACCEPTED-RISK.md
