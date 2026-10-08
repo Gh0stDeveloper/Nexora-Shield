@@ -15,8 +15,14 @@ pub enum StageRequirement {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StageIntegration {
+    /// Available only to inspect a request; never sufficient for publication.
     ReadOnlyPlanning,
+    /// Exercised on a diagnostic artifact without end-to-end Android defenses.
+    DiagnosticOnly,
+    /// No usable executor for this required production capability.
     NotIntegrated,
+    /// Requires validated final-artifact evidence from the production executor.
+    ProductionIntegrated,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -255,7 +261,7 @@ impl ProductionBuildContext {
             .iter()
             .filter(|s| {
                 s.requirement == StageRequirement::Required
-                    && s.integration == StageIntegration::NotIntegrated
+                    && s.integration != StageIntegration::ProductionIntegrated
             })
             .map(|s| s.stage)
             .collect()
@@ -323,6 +329,12 @@ impl ProductionBuildContext {
                 };
                 let integration = match stage {
                     S::Inspect | S::Configure => I::ReadOnlyPlanning,
+                    S::DexParse
+                    | S::Compatibility
+                    | S::Selectors
+                    | S::DexTransform
+                    | S::Rebuild
+                    | S::FinalVerify => I::DiagnosticOnly,
                     _ => I::NotIntegrated,
                 };
                 PlannedStage {
@@ -360,7 +372,7 @@ mod tests {
             .iter()
             .any(|s| s.stage == S::DataProtection && s.requirement == R::Required));
         assert!(strict.iter().any(|s| {
-            s.stage == S::DexTransform && s.integration == super::StageIntegration::NotIntegrated
+            s.stage == S::DexTransform && s.integration == super::StageIntegration::DiagnosticOnly
         }));
         assert!(base
             .iter()
@@ -385,6 +397,8 @@ mod tests {
             stages: ProductionBuildContext::stage_graph(ProtectionProfile::Standard, true, true),
         };
         assert!(ctx.required_unintegrated().contains(&S::DexTransform));
+        assert!(ctx.required_unintegrated().contains(&S::Inspect));
+        assert!(ctx.required_unintegrated().contains(&S::Rebuild));
         assert!(ctx.ensure_ready().is_err());
     }
 }
