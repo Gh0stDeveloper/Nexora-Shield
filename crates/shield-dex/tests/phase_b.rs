@@ -167,6 +167,43 @@ fn o13_rewrite_audit_rejects_unreported_executable_mutation() {
 }
 
 #[test]
+fn o13_multidex_refuses_class_name_collisions_with_foreign_types() {
+    let primary = build_test_dex("Lcom/test/Owner;", "run");
+    let solo = MultiDexSet::parse(vec![DexInput {
+        name: "classes.dex".into(),
+        bytes: primary.clone(),
+    }]).expect("single valid DEX");
+    let renamed = solo.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig::default()),
+        ..MultiDexRewriteConfig::default()
+    }).expect("derive a deterministic class name");
+    let renamed_dex = DexParser::parse(&renamed[0].bytes).expect("rewritten");
+    let future_name = renamed_dex.type_descriptor(0).expect("class descriptor");
+    assert_ne!(future_name, "Lcom/test/Owner;");
+    let secondary = build_test_dex_with_superclass(
+        "Lcom/test/Other;",
+        "go",
+        future_name,
+    );
+    let linked = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ]).expect("original DEX inputs valid");
+    let result = linked.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig::default()),
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(result.expect_err("must not capture foreign DEX type")
+        .to_string().contains("collides with an existing DEX type reference"));
+}
+
+#[test]
 fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
     let primary = build_test_dex("Lcom/test/Owner;", "run");
     let secondary = build_test_dex_with_superclass(

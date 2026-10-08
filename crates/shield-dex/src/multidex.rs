@@ -188,7 +188,40 @@ impl MultiDexSet {
                 bytes: output.bytes.clone(),
             })
             .collect();
-        let _ = Self::parse(rewritten_inputs)?;
+        let rewritten_set = Self::parse(rewritten_inputs)?;
+        // A generated class name must not capture an existing unresolved type
+        // reference from *any* original DEX. This includes SDK/library types
+        // that are not defined locally, so a class-ownership check alone is
+        // insufficient.
+        let reserved_types = self
+            .units
+            .iter()
+            .flat_map(|unit| {
+                (0..unit.dex.types.len())
+                    .filter_map(|index| unit.dex.type_descriptor(index as u32))
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        for (original, rewritten) in self.units.iter().zip(&rewritten_set.units) {
+            for class in &original.dex.classes {
+                let before = original.dex.type_descriptor(class.class_idx).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "type",
+                        index: class.class_idx,
+                    },
+                )?;
+                let after = rewritten.dex.type_descriptor(class.class_idx).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "type",
+                        index: class.class_idx,
+                    },
+                )?;
+                if before != after && reserved_types.contains(after) {
+                    return Err(DexError::UnsafeRename(format!(
+                        "renamed class descriptor {after} collides with an existing DEX type reference"
+                    )));
+                }
+            }
+        }
         Ok(outputs)
     }
 
