@@ -21,9 +21,24 @@ pub enum StageIntegration {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProductionStage {
-    Inspect, Configure, DexParse, Compatibility, Selectors, DexTransform,
-    DataProtection, NativeShield, VmShield, Diversity, IntegrityGraph,
-    RaspRuntime, Attestation, Rebuild, Align, Sign, FinalVerify, Evidence,
+    Inspect,
+    Configure,
+    DexParse,
+    Compatibility,
+    Selectors,
+    DexTransform,
+    DataProtection,
+    NativeShield,
+    VmShield,
+    Diversity,
+    IntegrityGraph,
+    RaspRuntime,
+    Attestation,
+    Rebuild,
+    Align,
+    Sign,
+    FinalVerify,
+    Evidence,
 }
 
 impl ProductionStage {
@@ -117,9 +132,12 @@ impl ProductionBuildContext {
     /// Mandatory stages that are not yet implemented in the production pipeline.
     #[must_use]
     pub fn required_unintegrated(&self) -> Vec<ProductionStage> {
-        self.stages.iter()
-            .filter(|s| s.requirement == StageRequirement::Required
-                && s.integration == StageIntegration::NotIntegrated)
+        self.stages
+            .iter()
+            .filter(|s| {
+                s.requirement == StageRequirement::Required
+                    && s.integration == StageIntegration::NotIntegrated
+            })
             .map(|s| s.stage)
             .collect()
     }
@@ -134,7 +152,8 @@ impl ProductionBuildContext {
         if missing.is_empty() {
             return Ok(());
         }
-        let missing_names = missing.iter()
+        let missing_names = missing
+            .iter()
             .map(|stage| stage.as_str())
             .collect::<Vec<_>>()
             .join(", ");
@@ -148,27 +167,52 @@ impl ProductionBuildContext {
         use StageIntegration as I;
         use StageRequirement as R;
         let order = [
-            S::Inspect, S::Configure, S::DexParse, S::Compatibility, S::Selectors,
-            S::DexTransform, S::DataProtection, S::NativeShield, S::VmShield,
-            S::Diversity, S::IntegrityGraph, S::RaspRuntime, S::Attestation,
-            S::Rebuild, S::Align, S::Sign, S::FinalVerify, S::Evidence,
+            S::Inspect,
+            S::Configure,
+            S::DexParse,
+            S::Compatibility,
+            S::Selectors,
+            S::DexTransform,
+            S::DataProtection,
+            S::NativeShield,
+            S::VmShield,
+            S::Diversity,
+            S::IntegrityGraph,
+            S::RaspRuntime,
+            S::Attestation,
+            S::Rebuild,
+            S::Align,
+            S::Sign,
+            S::FinalVerify,
+            S::Evidence,
         ];
         let hardened = profile != ProtectionProfile::Standard;
-        order.into_iter().map(|stage| {
-            let requirement = match stage {
-                S::DataProtection | S::Diversity | S::RaspRuntime if !hardened => R::WhenSelected,
-                S::NativeShield | S::VmShield if profile == ProtectionProfile::Maximum => R::Required,
-                S::NativeShield | S::VmShield | S::Attestation => R::WhenSelected,
-                S::Align if !align => R::Disabled,
-                S::Sign if !sign => R::Disabled,
-                _ => R::Required,
-            };
-            let integration = match stage {
-                S::Inspect | S::Configure => I::ReadOnlyPlanning,
-                _ => I::NotIntegrated,
-            };
-            PlannedStage { stage, requirement, integration }
-        }).collect()
+        order
+            .into_iter()
+            .map(|stage| {
+                let requirement = match stage {
+                    S::DataProtection | S::Diversity | S::RaspRuntime if !hardened => {
+                        R::WhenSelected
+                    }
+                    S::NativeShield | S::VmShield if profile == ProtectionProfile::Maximum => {
+                        R::Required
+                    }
+                    S::NativeShield | S::VmShield | S::Attestation => R::WhenSelected,
+                    S::Align if !align => R::Disabled,
+                    S::Sign if !sign => R::Disabled,
+                    _ => R::Required,
+                };
+                let integration = match stage {
+                    S::Inspect | S::Configure => I::ReadOnlyPlanning,
+                    _ => I::NotIntegrated,
+                };
+                PlannedStage {
+                    stage,
+                    requirement,
+                    integration,
+                }
+            })
+            .collect()
     }
 }
 
@@ -190,14 +234,25 @@ mod tests {
     fn profiles_differ_without_claiming_executed_protections() {
         let base = ProductionBuildContext::stage_graph(ProtectionProfile::Standard, false, false);
         let strict = ProductionBuildContext::stage_graph(ProtectionProfile::Hardened, false, false);
-        assert!(base.iter().any(|s| s.stage == S::DataProtection && s.requirement == R::WhenSelected));
-        assert!(strict.iter().any(|s| s.stage == S::DataProtection && s.requirement == R::Required));
-        assert!(strict.iter().any(|s| s.stage == S::DexTransform
-            && s.integration == super::StageIntegration::NotIntegrated));
-        assert!(base.iter().any(|s| s.stage == S::Sign && s.requirement == R::Disabled));
+        assert!(base
+            .iter()
+            .any(|s| s.stage == S::DataProtection && s.requirement == R::WhenSelected));
+        assert!(strict
+            .iter()
+            .any(|s| s.stage == S::DataProtection && s.requirement == R::Required));
+        assert!(strict.iter().any(|s| {
+            s.stage == S::DexTransform && s.integration == super::StageIntegration::NotIntegrated
+        }));
+        assert!(base
+            .iter()
+            .any(|s| s.stage == S::Sign && s.requirement == R::Disabled));
         let maximum = ProductionBuildContext::stage_graph(ProtectionProfile::Maximum, true, true);
-        assert!(maximum.iter().any(|s| s.stage == S::VmShield && s.requirement == R::Required));
-        assert!(maximum.iter().any(|s| s.stage == S::NativeShield && s.requirement == R::Required));
+        assert!(maximum
+            .iter()
+            .any(|s| s.stage == S::VmShield && s.requirement == R::Required));
+        assert!(maximum
+            .iter()
+            .any(|s| s.stage == S::NativeShield && s.requirement == R::Required));
     }
 
     #[test]
