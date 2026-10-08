@@ -17,6 +17,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  o1-stage-contracts:
+    name: O.1 typed stage graph contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run stage graph contracts
+        run: cargo test --locked -p nexora-shield-core production::tests
+
   o0-release-freeze:
     name: O.0 release freeze and audit baseline
     runs-on: ubuntu-latest
