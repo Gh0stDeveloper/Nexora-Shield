@@ -149,6 +149,44 @@ fn dex_staging_refuses_aliases_of_source_and_planned_output() {
     cleanup(&directory);
 }
 
+#[cfg(unix)]
+#[test]
+fn staging_rejects_symlink_parent_then_dotdot_alias_of_planned_output() {
+    let directory = test_directory("symlink-parent-dotdot");
+    let input = directory.join("input.apk");
+    let inner = directory.join("target/deep");
+    fs::create_dir_all(&inner).expect("create symlink target");
+    std::os::unix::fs::symlink(&inner, directory.join("via")).expect("link directory");
+    write_stored_zip(
+        &input,
+        &[("AndroidManifest.xml", b"<manifest/>"), ("classes.dex", b"source")],
+    );
+    let output = directory.join("target/output.apk");
+    let request = ProtectionRequest {
+        input,
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let context = nexora_shield_core::ProductionBuildContext::prepare(&request)
+        .expect("valid read-only plan");
+    let config = nexora_shield_dex::MultiDexRewriteConfig {
+        strip_metadata: true,
+        ..Default::default()
+    };
+    let alias = directory.join("via/../output.apk");
+    assert!(context.stage_dex_rewrite(&alias, &config).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
 fn test_directory(label: &str) -> PathBuf {
     let counter = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
