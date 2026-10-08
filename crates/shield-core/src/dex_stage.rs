@@ -155,7 +155,9 @@ impl ProductionBuildContext {
     ) -> Result<String> {
         let inspection = verify_apk_structure(destination)?;
         if inspection.dex_files.len() != self.dex_count() {
-            return Err(CoreError::InvalidRequest("staged APK lost a DEX unit".into()));
+            return Err(CoreError::InvalidRequest(
+                "staged APK lost a DEX unit".into(),
+            ));
         }
         let built = read_zip_directory(destination)?;
         verify_rebuilt_zip(source, &built, destination, replacements)?;
@@ -176,7 +178,9 @@ impl ProductionBuildContext {
             CoreError::InvalidRequest(format!("staged APK DEX verification: {error}"))
         })?;
         if reparsed.units.len() != replacements.len() {
-            return Err(CoreError::InvalidRequest("staged DEX count mismatch".into()));
+            return Err(CoreError::InvalidRequest(
+                "staged DEX count mismatch".into(),
+            ));
         }
         self.verify_input_unchanged()?;
         Ok(inspection.sha256)
@@ -197,10 +201,8 @@ fn verify_rebuilt_zip(
             ));
         }
         if let Some(expected) = replacements.get(&entry.name) {
-            let actual =
-                read_stored_entry(destination, entry, MAX_DEX_BYTES)?.ok_or_else(|| {
-                    CoreError::InvalidRequest("staged DEX is not stored".into())
-                })?;
+            let actual = read_stored_entry(destination, entry, MAX_DEX_BYTES)?
+                .ok_or_else(|| CoreError::InvalidRequest("staged DEX is not stored".into()))?;
             if actual != *expected || crc32_ieee(&actual) != entry.crc32 {
                 return Err(CoreError::InvalidRequest(format!(
                     "staged DEX '{}' differs from validated rewrite",
