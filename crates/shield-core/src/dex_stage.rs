@@ -113,10 +113,7 @@ impl ProductionBuildContext {
         }
     }
 
-    fn load_dex_inputs(
-        &self,
-        directory: &ZipDirectory,
-    ) -> Result<LoadedDexSources> {
+    fn load_dex_inputs(&self, directory: &ZipDirectory) -> Result<LoadedDexSources> {
         let mut inputs = Vec::new();
         let mut originals = BTreeMap::new();
         let mut total = 0_usize;
