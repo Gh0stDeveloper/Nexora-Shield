@@ -1,0 +1,212 @@
+//! Phase O.1 typed production stage contract (planning only).
+//! No stage is reported as executed without final-artifact evidence.
+
+use crate::{CoreError, ProtectionProfile, ProtectionRequest, Result};
+use nexora_shield_package::verify_apk_structure;
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StageRequirement {
+    Required,
+    WhenSelected,
+    Disabled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StageIntegration {
+    ReadOnlyPlanning,
+    NotIntegrated,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProductionStage {
+    Inspect, Configure, DexParse, Compatibility, Selectors, DexTransform,
+    DataProtection, NativeShield, VmShield, Diversity, IntegrityGraph,
+    RaspRuntime, Attestation, Rebuild, Align, Sign, FinalVerify, Evidence,
+}
+
+impl ProductionStage {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Inspect => "inspect",
+            Self::Configure => "configure",
+            Self::DexParse => "dex-parse",
+            Self::Compatibility => "compatibility",
+            Self::Selectors => "selectors",
+            Self::DexTransform => "dex-transform",
+            Self::DataProtection => "data-protection",
+            Self::NativeShield => "native-shield",
+            Self::VmShield => "vm-shield",
+            Self::Diversity => "diversity",
+            Self::IntegrityGraph => "integrity-graph",
+            Self::RaspRuntime => "rasp-runtime",
+            Self::Attestation => "attestation",
+            Self::Rebuild => "rebuild",
+            Self::Align => "align",
+            Self::Sign => "sign",
+            Self::FinalVerify => "final-verify",
+            Self::Evidence => "evidence",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlannedStage {
+    pub stage: ProductionStage,
+    pub requirement: StageRequirement,
+    pub integration: StageIntegration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductionBuildContext {
+    pub input: PathBuf,
+    pub output: PathBuf,
+    pub input_sha256: String,
+    pub dex_count: usize,
+    pub profile: ProtectionProfile,
+    pub stages: Vec<PlannedStage>,
+}
+
+impl ProductionBuildContext {
+    /// Creates an immutable, read-only plan; never creates an output or report.
+    ///
+    /// # Errors
+    ///
+    /// Rejects malformed APK inputs, invalid output targets and unsafe signing policy.
+    pub fn prepare(request: &ProtectionRequest) -> Result<Self> {
+        if !request.input.is_file() {
+            return Err(CoreError::InvalidRequest("input APK is not a file".into()));
+        }
+        if request.input == request.output
+            || (request.output.exists()
+                && fs::canonicalize(&request.input)? == fs::canonicalize(&request.output)?)
+        {
+            return Err(CoreError::InvalidRequest(
+                "input/output refer to the same file".into(),
+            ));
+        }
+        if request.output.exists() && !request.overwrite {
+            return Err(CoreError::InvalidRequest("output already exists".into()));
+        }
+        if request.signing.is_none() && !request.allow_unsigned {
+            return Err(CoreError::InvalidRequest(
+                "unsigned production output requires explicit consent".into(),
+            ));
+        }
+        if request.public_report.is_some() && request.public_report == request.private_report {
+            return Err(CoreError::InvalidRequest("report paths must differ".into()));
+        }
+        let inspected = verify_apk_structure(&request.input)?;
+        if inspected.dex_files.is_empty() {
+            return Err(CoreError::InvalidRequest(
+                "APK contains no DEX for production code protection".into(),
+            ));
+        }
+        Ok(Self {
+            input: request.input.clone(),
+            output: request.output.clone(),
+            input_sha256: inspected.sha256,
+            dex_count: inspected.dex_files.len(),
+            profile: request.profile,
+            stages: Self::stage_graph(request.profile, request.align, request.signing.is_some()),
+        })
+    }
+
+    /// Mandatory stages that are not yet implemented in the production pipeline.
+    #[must_use]
+    pub fn required_unintegrated(&self) -> Vec<ProductionStage> {
+        self.stages.iter()
+            .filter(|s| s.requirement == StageRequirement::Required
+                && s.integration == StageIntegration::NotIntegrated)
+            .map(|s| s.stage)
+            .collect()
+    }
+
+    /// Fails closed until mandatory integrations are implemented and verified.
+    ///
+    /// # Errors
+    ///
+    /// Returns an explicit error listing unavailable mandatory controls.
+    pub fn ensure_ready(&self) -> Result<()> {
+        let missing = self.required_unintegrated();
+        if missing.is_empty() {
+            return Ok(());
+        }
+        let missing_names = missing.iter()
+            .map(|stage| stage.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        Err(CoreError::InvalidRequest(format!(
+            "production protection unavailable; required stages not integrated: {missing_names}"
+        )))
+    }
+
+    fn stage_graph(profile: ProtectionProfile, align: bool, sign: bool) -> Vec<PlannedStage> {
+        use ProductionStage as S;
+        use StageIntegration as I;
+        use StageRequirement as R;
+        let order = [
+            S::Inspect, S::Configure, S::DexParse, S::Compatibility, S::Selectors,
+            S::DexTransform, S::DataProtection, S::NativeShield, S::VmShield,
+            S::Diversity, S::IntegrityGraph, S::RaspRuntime, S::Attestation,
+            S::Rebuild, S::Align, S::Sign, S::FinalVerify, S::Evidence,
+        ];
+        let hardened = profile != ProtectionProfile::Standard;
+        order.into_iter().map(|stage| {
+            let requirement = match stage {
+                S::DataProtection | S::Diversity | S::RaspRuntime if !hardened => R::WhenSelected,
+                S::NativeShield | S::VmShield | S::Attestation => R::WhenSelected,
+                S::Align if !align => R::Disabled,
+                S::Sign if !sign => R::Disabled,
+                _ => R::Required,
+            };
+            let integration = match stage {
+                S::Inspect | S::Configure => I::ReadOnlyPlanning,
+                _ => I::NotIntegrated,
+            };
+            PlannedStage { stage, requirement, integration }
+        }).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ProductionBuildContext, ProductionStage as S, StageRequirement as R};
+    use crate::ProtectionProfile;
+
+    #[test]
+    fn graph_is_ordered_and_complete() {
+        let stages = ProductionBuildContext::stage_graph(ProtectionProfile::Maximum, true, true);
+        assert_eq!(stages.len(), 18);
+        assert_eq!(stages.first().map(|s| s.stage), Some(S::Inspect));
+        assert_eq!(stages.last().map(|s| s.stage), Some(S::Evidence));
+        assert!(stages.iter().all(|s| !s.stage.as_str().is_empty()));
+    }
+
+    #[test]
+    fn profiles_differ_without_claiming_executed_protections() {
+        let base = ProductionBuildContext::stage_graph(ProtectionProfile::Standard, false, false);
+        let strict = ProductionBuildContext::stage_graph(ProtectionProfile::Hardened, false, false);
+        assert!(base.iter().any(|s| s.stage == S::DataProtection && s.requirement == R::WhenSelected));
+        assert!(strict.iter().any(|s| s.stage == S::DataProtection && s.requirement == R::Required));
+        assert!(strict.iter().any(|s| s.stage == S::DexTransform
+            && s.integration == super::StageIntegration::NotIntegrated));
+        assert!(base.iter().any(|s| s.stage == S::Sign && s.requirement == R::Disabled));
+    }
+
+    #[test]
+    fn missing_mandatory_stages_fail_closed() {
+        let ctx = ProductionBuildContext {
+            input: "input.apk".into(),
+            output: "out.apk".into(),
+            input_sha256: "fixture".into(),
+            dex_count: 1,
+            profile: ProtectionProfile::Standard,
+            stages: ProductionBuildContext::stage_graph(ProtectionProfile::Standard, true, true),
+        };
+        assert!(ctx.required_unintegrated().contains(&S::DexTransform));
+        assert!(ctx.ensure_ready().is_err());
+    }
+}
