@@ -189,9 +189,12 @@ pub fn rewrite_stored_entries(
     // No silent partial transformation: every requested name must have one
     // existing STORE target after stripping obsolete signatures.
     for name in replacements.keys() {
-        let entry = entries.iter().find(|entry| entry.name == *name).ok_or_else(|| {
-            PackageError::InvalidArgument(format!("replacement target '{name}' is absent"))
-        })?;
+        let entry = entries
+            .iter()
+            .find(|entry| entry.name == *name)
+            .ok_or_else(|| {
+                PackageError::InvalidArgument(format!("replacement target '{name}' is absent"))
+            })?;
         if entry.compression_method != 0 {
             return Err(PackageError::UnsupportedZip(format!(
                 "replacement target '{name}' must use ZIP STORE"
