@@ -110,7 +110,7 @@ pub fn protect_production_apk(request: &ProtectionRequest) -> Result<PipelineRes
 
 /// Resolve an intended file path, including symlinked ancestors, without
 /// requiring the final file to exist. Reject dangling symlinks.
-fn normalized_destination(path: &Path) -> Result<PathBuf> {
+pub(crate) fn normalized_destination(path: &Path) -> Result<PathBuf> {
     if fs::symlink_metadata(path).is_ok() {
         return Ok(fs::canonicalize(path)?);
     }
@@ -127,7 +127,10 @@ fn normalized_destination(path: &Path) -> Result<PathBuf> {
             }
             Component::CurDir => {}
             Component::ParentDir => {
-                normalized.pop();
+                // Lexical traversal cannot climb above an absolute path root.
+                if normalized.parent().is_some() {
+                    normalized.pop();
+                }
             }
         }
     }
