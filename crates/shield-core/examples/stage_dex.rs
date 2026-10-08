@@ -1,5 +1,5 @@
 //! Internal Phase O.1 diagnostic only. Never ship this as a release entrypoint.
-use nexora_shield_core::{ProtectionProfile, ProtectionRequest, ProductionBuildContext};
+use nexora_shield_core::{ProductionBuildContext, ProtectionProfile, ProtectionRequest};
 use nexora_shield_dex::{MultiDexRewriteConfig, RenameConfig};
 use std::path::PathBuf;
 
