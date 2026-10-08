@@ -105,44 +105,7 @@ impl ProductionBuildContext {
         }
         let set = MultiDexSet::parse(inputs)
             .map_err(|error| CoreError::InvalidRequest(format!("DEX validation: {error}")))?;
-        let mut selected = vec![Selection::default(); set.units.len()];
-        if policy.includes().is_empty() {
-            for (slot, unit) in selected.iter_mut().zip(&set.units) {
-                *slot = SelectorResolver::resolve(&unit.dex, &[]).map_err(|error| {
-                    CoreError::InvalidRequest(format!("DEX selector resolution: {error}"))
-                })?;
-            }
-        }
-        for selector in policy.includes() {
-            let matches = resolve_selector_across_dex(&set, selector)?;
-            if matches.iter().all(Selection::is_empty) {
-                return Err(CoreError::InvalidRequest(format!(
-                    "include selector matched no defined DEX symbols: {}",
-                    selector.class_pattern
-                )));
-            }
-            for (slot, matches) in selected.iter_mut().zip(matches) {
-                slot.union_with(&matches);
-            }
-        }
-        for selector in policy.excludes() {
-            let matches = resolve_selector_across_dex(&set, selector)?;
-            if matches.iter().all(Selection::is_empty) {
-                return Err(CoreError::InvalidRequest(format!(
-                    "exclude selector matched no defined DEX symbols: {}",
-                    selector.class_pattern
-                )));
-            }
-            for (slot, matches) in selected.iter_mut().zip(matches) {
-                slot.subtract(&matches);
-            }
-        }
-        if selected.iter().all(Selection::is_empty) {
-            return Err(CoreError::InvalidRequest(
-                "effective DEX selector selection is empty".into(),
-            ));
-        }
-
+        let selected = resolve_effective_selection(&set, policy)?;
         let mut units = Vec::with_capacity(set.units.len());
         let mut reflection_count = 0_usize;
         for (unit, selection) in set.units.iter().zip(selected) {
@@ -195,6 +158,51 @@ impl ProductionBuildContext {
         }
         Ok(())
     }
+}
+
+fn resolve_effective_selection(
+    set: &MultiDexSet,
+    policy: &DexSelectorPolicy,
+) -> Result<Vec<Selection>> {
+        let mut selected = vec![Selection::default(); set.units.len()];
+        if policy.includes().is_empty() {
+            for (slot, unit) in selected.iter_mut().zip(&set.units) {
+                *slot = SelectorResolver::resolve(&unit.dex, &[]).map_err(|error| {
+                    CoreError::InvalidRequest(format!("DEX selector resolution: {error}"))
+                })?;
+            }
+        }
+        for selector in policy.includes() {
+            let matches = resolve_selector_across_dex(&set, selector)?;
+            if matches.iter().all(Selection::is_empty) {
+                return Err(CoreError::InvalidRequest(format!(
+                    "include selector matched no defined DEX symbols: {}",
+                    selector.class_pattern
+                )));
+            }
+            for (slot, matches) in selected.iter_mut().zip(matches) {
+                slot.union_with(&matches);
+            }
+        }
+        for selector in policy.excludes() {
+            let matches = resolve_selector_across_dex(&set, selector)?;
+            if matches.iter().all(Selection::is_empty) {
+                return Err(CoreError::InvalidRequest(format!(
+                    "exclude selector matched no defined DEX symbols: {}",
+                    selector.class_pattern
+                )));
+            }
+            for (slot, matches) in selected.iter_mut().zip(matches) {
+                slot.subtract(&matches);
+            }
+        }
+        if selected.iter().all(Selection::is_empty) {
+            return Err(CoreError::InvalidRequest(
+                "effective DEX selector selection is empty".into(),
+            ));
+        }
+
+    Ok(selected)
 }
 
 fn resolve_selector_across_dex(

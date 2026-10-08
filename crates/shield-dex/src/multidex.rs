@@ -136,7 +136,13 @@ impl MultiDexSet {
                     rename_skipped = true;
                 } else {
                     let parsed = DexParser::parse(&current)?;
-                    let result = RenamePass::apply(&parsed, rename)?;
+                    // Separate the deterministic rename stream per DEX unit.
+                    // Shared seeds formerly generated equal one-letter class
+                    // descriptors across classes.dex/classes2.dex.
+                    let mut unique_rename = rename.clone();
+                    unique_rename.seed ^= u64::from(unit.index)
+                        .wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                    let result = RenamePass::apply(&parsed, &unique_rename)?;
                     current = result.bytes;
                     rename_report = Some(result.report);
                 }
@@ -160,6 +166,16 @@ impl MultiDexSet {
             });
         }
 
+        // Reparse the output as a complete set, not independent DEX units.
+        // Never publish diagnostics with duplicated class ownership.
+        let rewritten_inputs = outputs
+            .iter()
+            .map(|output| DexInput {
+                name: output.name.clone(),
+                bytes: output.bytes.clone(),
+            })
+            .collect();
+        let _ = Self::parse(rewritten_inputs)?;
         Ok(outputs)
     }
 }

@@ -126,7 +126,8 @@ fn multidex_parser_rejects_duplicate_class_ownership() {
             name: "classes2.dex".into(),
             bytes: primary,
         },
-    ]).expect_err("two canonical DEX units cannot own the same class");
+    ])
+    .expect_err("two canonical DEX units cannot own the same class");
     assert!(err.to_string().contains("duplicate class definition"));
 }
 
