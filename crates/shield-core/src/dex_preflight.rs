@@ -90,7 +90,8 @@ impl ProductionBuildContext {
             }
             if crc32_ieee(&bytes) != entry.crc32 {
                 return Err(CoreError::InvalidRequest(format!(
-                    "DEX '{}' has an invalid ZIP CRC", entry.name
+                    "DEX '{}' has an invalid ZIP CRC",
+                    entry.name
                 )));
             }
             inputs.push(DexInput {
