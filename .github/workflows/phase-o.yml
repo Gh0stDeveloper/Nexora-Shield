@@ -56,10 +56,11 @@ jobs:
               for name in ("classes.dex", "classes2.dex"):
                   assert original.read(name) != rebuilt.read(name)
                   assert rebuilt.getinfo(name).compress_type == zipfile.ZIP_STORED
-                  (folder / f"rewritten-{name}").write_bytes(rebuilt.read(name))
+                  (folder / "rewritten").mkdir(exist_ok=True)
+                  (folder / "rewritten" / name).write_bytes(rebuilt.read(name))
           PY
           cargo run --locked --quiet -p nexora-shield -- dex-multidex-verify \
-            build/phase-o1/rewritten-classes.dex build/phase-o1/rewritten-classes2.dex
+            build/phase-o1/rewritten/classes.dex build/phase-o1/rewritten/classes2.dex
       - name: Reject malformed, compressed and duplicate-class DEX inputs
         shell: bash
         run: |
