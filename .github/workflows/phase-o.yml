@@ -96,6 +96,48 @@ jobs:
           test ! -e build/phase-o1/o11-forbidden.apk
           cargo test --locked -p nexora-shield-core policy::tests
 
+      - name: O.1.2 multidex selector contract and invalid-policy rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk \
+            --output build/phase-o1/o12-not-created.apk \
+            --profile hardened --unsigned --no-align --plan-only \
+            --method 'Lcom/test/A;#run' --class 'Lcom/test/B;' \
+            > build/phase-o1/o12-selection.txt
+          grep -q 'DEX units: 2' build/phase-o1/o12-selection.txt
+          grep -q 'classes.dex: classes=1, methods=1, fields=0, selected=0/1/0' build/phase-o1/o12-selection.txt
+          grep -q 'classes2.dex: classes=1, methods=1, fields=0, selected=1/0/0' build/phase-o1/o12-selection.txt
+          grep -q 'Cross-DEX reflection risk: false' build/phase-o1/o12-selection.txt
+          grep -q 'Production ready: false' build/phase-o1/o12-selection.txt
+          test ! -e build/phase-o1/o12-not-created.apk
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk --output build/phase-o1/o12-excluded.apk \
+            --profile hardened --unsigned --no-align --plan-only \
+            --exclude-class 'Lcom/test/B;' > build/phase-o1/o12-exclusion.txt
+          grep -q 'classes2.dex: classes=1, methods=1, fields=0, selected=0/1/0' build/phase-o1/o12-exclusion.txt
+          test ! -e build/phase-o1/o12-excluded.apk
+          for mode in unmatched empty duplicate; do
+            args=(--profile hardened --unsigned --no-align --plan-only)
+            case "$mode" in
+              unmatched) args+=(--class 'Lmissing/NotDefined;') ;;
+              empty) args+=(--class 'Lcom/test/A;' --exclude-class 'Lcom/test/A;') ;;
+              duplicate) args+=(--method 'Lcom/test/A;#run' --method 'Lcom/test/A;#run') ;;
+            esac
+            if cargo run --locked --quiet -p nexora-shield -- \
+                protect build/phase-o1/valid.apk --output build/phase-o1/o12-forbidden.apk \
+                "${args[@]}" > "build/phase-o1/o12-${mode}.txt" 2>&1; then
+              echo "O.1.2 accepted invalid selector request: $mode" >&2
+              exit 1
+            fi
+            test ! -e build/phase-o1/o12-forbidden.apk
+          done
+          grep -q 'include selector matched no defined DEX symbols' build/phase-o1/o12-unmatched.txt
+          grep -q 'effective DEX selector selection is empty' build/phase-o1/o12-empty.txt
+          grep -q 'duplicate DEX selector rule' build/phase-o1/o12-duplicate.txt
+          cargo test --locked -p nexora-shield-core dex_selection::tests
+          cargo test --locked -p nexora-shield-dex multidex_parser_rejects
       - name: Production protect must never return a Phase A packaging-only APK
         shell: bash
         run: |
