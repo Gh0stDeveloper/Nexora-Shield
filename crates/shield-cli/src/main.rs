@@ -699,7 +699,8 @@ fn print_help() {
 Android application protection and RASP platform.\n\n\
 USAGE:\n  nexora-shield <COMMAND> [OPTIONS]\n\n\
 COMMANDS:\n\
-  protect      Production protection (fails closed until all required controls exist)\n\\\n  package-apk  Legacy Phase A normalization, alignment and signing ONLY\n\
+  protect      Production protection (fails closed until all required controls exist)\n\
+  package-apk  Legacy Phase A normalization, alignment and signing ONLY\n\
   inspect      Inspect APK structure, manifest and multi-DEX layout\n\
   verify           Verify APK structure and optionally Android signatures\n\
   data-protect     Protect one string/constant/resource/generic data item\n\
@@ -742,7 +743,9 @@ OPTIONS:\n\
 fn print_protect_help() {
     println!(
         "USAGE:\n  nexora-shield protect <input.apk> --output <output.apk> [OPTIONS]\n\n\
-Production protection fails closed while O.1 is unfinished. Use --plan-only for\n\\\nread-only inspection. package-apk is legacy Phase A packaging ONLY.\n\\\nSigning and alignment are required unless disabled explicitly.\n\n\
+Production protection fails closed while O.1 is unfinished. Use --plan-only for\n\
+read-only inspection. package-apk is legacy Phase A packaging ONLY.\n\
+Signing and alignment are required unless disabled explicitly.\n\n\
 OPTIONS:\n\
   -o, --output <apk>          Output APK\n\
   --profile <name>            standard|hardened|maximum (default: hardened)\n\
