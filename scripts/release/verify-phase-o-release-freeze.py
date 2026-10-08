@@ -79,9 +79,23 @@ def validate_status(status: dict) -> None:
 
     o0 = status.get("o0")
     require(isinstance(o0, dict), "o0 metadata is required")
+    require(o0.get("status") in {"in-progress", "complete"}, "O.0 status must be in-progress or complete")
     require(o0.get("owner") == "repository-maintainers", "O.0 owner must be repository-maintainers")
     require(o0.get("finalApprovalPhase") == "O.14", "final approval must remain O.14")
     require(o0.get("publicationPhase") == "O.15", "publication phase must remain O.15")
+
+    if o0["status"] == "complete":
+        evidence = o0.get("completedEvidence")
+        require(isinstance(evidence, dict), "completed O.0 requires completedEvidence")
+        require(evidence.get("workflow") == "Phase O", "O.0 evidence workflow must be Phase O")
+        require(evidence.get("job") == "O.0 release freeze and audit baseline", "O.0 evidence job mismatch")
+        require(evidence.get("conclusion") == "success", "O.0 completion evidence must be successful")
+        evidence_sha = evidence.get("headSha")
+        require(
+            isinstance(evidence_sha, str) and SHA_RE.fullmatch(evidence_sha),
+            "O.0 evidence headSha must be a full SHA",
+        )
+        require(isinstance(evidence.get("runId"), int) and evidence["runId"] > 0, "O.0 evidence runId is required")
 
 
 def validate_findings(findings_doc: dict) -> tuple[list[dict], dict[str, int]]:
