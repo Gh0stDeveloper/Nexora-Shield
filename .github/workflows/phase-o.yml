@@ -40,6 +40,26 @@ jobs:
           grep -q 'Production ready: false' build/phase-o1/plan.txt
           grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan.txt
           test ! -e build/phase-o1/not-created.apk
+      - name: Resolve standard hardened and maximum profiles without mutating APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for profile in standard hardened maximum; do
+            cargo run --locked --quiet -p nexora-shield -- \
+              protect build/phase-o1/valid.apk \
+              --output "build/phase-o1/not-created-${profile}.apk" \
+              --profile "${profile}" --unsigned --no-align --plan-only \
+              > "build/phase-o1/plan-${profile}.txt"
+            grep -q "Profile: ${profile}" "build/phase-o1/plan-${profile}.txt"
+            grep -q 'Stage dex-transform: Required, DiagnosticOnly' "build/phase-o1/plan-${profile}.txt"
+            grep -q 'Production ready: false' "build/phase-o1/plan-${profile}.txt"
+            test ! -e "build/phase-o1/not-created-${profile}.apk"
+          done
+          grep -q 'Stage data-protection: WhenSelected, NotIntegrated' build/phase-o1/plan-standard.txt
+          grep -q 'Stage data-protection: Required, NotIntegrated' build/phase-o1/plan-hardened.txt
+          grep -q 'Stage native-shield: Required, NotIntegrated' build/phase-o1/plan-maximum.txt
+          grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan-maximum.txt
+
       - name: Production protect must never return a Phase A packaging-only APK
         shell: bash
         run: |
