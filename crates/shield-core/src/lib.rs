@@ -8,6 +8,7 @@
 mod error;
 mod pipeline;
 mod plan;
+mod production;
 mod report;
 
 use core::fmt;
@@ -16,6 +17,7 @@ use core::str::FromStr;
 pub use error::{CoreError, Result};
 pub use pipeline::{protect_apk, PipelineResult, PipelineStage, ProtectionRequest};
 pub use plan::BuildPlan;
+pub use production::{PlannedStage, ProductionBuildContext, ProductionStage, StageIntegration, StageRequirement};
 pub use report::{apk_inspection_json, write_report_atomic, PrivateBuildReport, PublicBuildReport};
 
 /// Current configuration schema supported by the foundation.
