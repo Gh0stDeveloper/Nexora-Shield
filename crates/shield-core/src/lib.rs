@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod dex_preflight;
 mod error;
 mod pipeline;
 mod plan;
@@ -14,6 +15,7 @@ mod report;
 use core::fmt;
 use core::str::FromStr;
 
+pub use dex_preflight::{DexPreflight, DexUnitPreflight, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
 pub use error::{CoreError, Result};
 pub use pipeline::{protect_apk, PipelineResult, PipelineStage, ProtectionRequest};
 pub use plan::BuildPlan;
