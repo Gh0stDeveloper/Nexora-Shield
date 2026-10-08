@@ -4,7 +4,7 @@
 use crate::{CoreError, PipelineResult, ProtectionProfile, ProtectionRequest, Result};
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StageRequirement {
@@ -119,22 +119,10 @@ pub(crate) fn normalized_destination(path: &Path) -> Result<PathBuf> {
     } else {
         std::env::current_dir()?.join(path)
     };
-    let mut normalized = PathBuf::new();
-    for part in absolute.components() {
-        match part {
-            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
-                normalized.push(part.as_os_str());
-            }
-            Component::CurDir => {}
-            Component::ParentDir => {
-                // Lexical traversal cannot climb above an absolute path root.
-                if normalized.parent().is_some() {
-                    normalized.pop();
-                }
-            }
-        }
-    }
-    let mut cursor = normalized.as_path();
+    // Resolve the longest EXISTING prefix using OS path semantics before
+    // appending any missing suffix. Lexical '..' collapsing before symlink
+    // resolution is incorrect and may miss a clobbering alias.
+    let mut cursor = absolute.as_path();
     let mut suffix = Vec::new();
     while !cursor.exists() {
         let name = cursor
