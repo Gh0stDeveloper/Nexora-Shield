@@ -658,6 +658,20 @@ private fun BuildScreen(state: StudioState) {
         }
 
         Panel(
+            title = "Production readiness (Phase O.1)",
+            subtitle = "Runs protect --plan-only through the authoritative Rust orchestrator. This generates NO APK and grants NO production approval.",
+        ) {
+            OutlinedButton(
+                onClick = { scope.launch { state.runProductionReadinessCheck() } },
+                enabled = !state.busy && state.project != null && state.selectedArtifact != null,
+            ) {
+                Icon(Icons.Outlined.VerifiedUser, contentDescription = null)
+                Spacer(Modifier.width(7.dp))
+                Text("Inspect production readiness")
+            }
+        }
+
+        Panel(
             title = "Output",
             subtitle = "Captured output is bounded to protect Studio responsiveness.",
         ) {
