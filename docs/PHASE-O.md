@@ -294,6 +294,17 @@ The final audit contains machine-readable or captured repository-setting evidenc
 
 ## O.0 — Release freeze and audit baseline
 
+Status: **COMPLETED** — Phase O #9 (`37710584139`) success
+
+Authoritative O.0 evidence:
+- `release/phase-o-status.json`
+- `release/phase-o-findings.json`
+- `release/phase-o-accepted-risks.json`
+- `docs/PHASE-O0-BASELINE.md`
+- `docs/PHASE-O-ACCEPTED-RISK.md`
+- `scripts/release/verify-phase-o-release-freeze.py`
+- `.github/workflows/phase-o.yml`
+
 Purpose: prevent publication while remediation is in progress.
 
 Tasks:

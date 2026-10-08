@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "baselineSha": "d8e436d3d49efad417f501e229d8cd57b0e86b95",
+  "releaseDecision": "no-go",
+  "findings": [
+    {
+      "id": "O-P0-01",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.1",
+      "title": "Production protect path does not orchestrate B-I end-to-end"
+    },
+    {
+      "id": "O-P0-02",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.3",
+      "title": "AAB/APKS path does not prove delivered full-stack protection"
+    },
+    {
+      "id": "O-P0-03",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.4",
+      "title": "AAR/library mode does not prove final consumer protection semantics"
+    },
+    {
+      "id": "O-P0-04",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.6",
+      "title": "Public repository has no selected license"
+    },
+    {
+      "id": "O-P0-05",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.6",
+      "title": "Stable tag is not mechanically bound to validated main"
+    },
+    {
+      "id": "O-P0-06",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.6",
+      "title": "CodeQL workflow success is not an open-finding severity gate"
+    },
+    {
+      "id": "O-P0-07",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.6",
+      "title": "Main branch protection is not proven by auditable repository evidence"
+    },
+    {
+      "id": "O-P0-08",
+      "severity": "P0",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.5",
+      "title": "Protection profiles are not yet proven as executable end-to-end production contracts"
+    },
+    {
+      "id": "O-P1-01",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.7",
+      "title": "External plugin/CLI/Studio distribution is incomplete"
+    },
+    {
+      "id": "O-P1-02",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.8",
+      "title": "GitHub Actions are referenced by mutable version tags"
+    },
+    {
+      "id": "O-P1-03",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.8",
+      "title": "Release toolchain uses floating stable Rust in release paths"
+    },
+    {
+      "id": "O-P1-04",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.8",
+      "title": "Release SBOM is Rust-centric and does not cover JVM/Gradle product graphs"
+    },
+    {
+      "id": "O-P1-05",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.9",
+      "title": "Security Lab fuzzing is deterministic mutation smoke rather than coverage-guided fuzzing"
+    },
+    {
+      "id": "O-P1-06",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.9",
+      "title": "Hand-written SHA/checksum implementations increase audit burden"
+    },
+    {
+      "id": "O-P1-07",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.9",
+      "title": "Output/report publication lacks full crash-interruption recovery proof"
+    },
+    {
+      "id": "O-P1-08",
+      "severity": "P1",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.10",
+      "title": "Android real-device/API/OEM compatibility matrix is incomplete"
+    },
+    {
+      "id": "O-P2-01",
+      "severity": "P2",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.12",
+      "title": "Documentation still requires full consistency cleanup and stronger drift gates"
+    },
+    {
+      "id": "O-P2-02",
+      "severity": "P2",
+      "status": "open",
+      "releaseBlocking": true,
+      "releaseRequired": true,
+      "remediationPhase": "O.12",
+      "title": "Public repository metadata and production-facing onboarding remain incomplete"
+    }
+  ]
+}

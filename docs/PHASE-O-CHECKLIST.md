@@ -5,13 +5,13 @@ Status: **OPEN — blocks stable v1.0.0 publication**
 The checklist is intentionally strict. A checked implementation item is not enough by itself; its corresponding verification/evidence item must also be checked.
 
 ## O.0 Release freeze and baseline
-- [ ] Record Phase O audit baseline commit
-- [ ] Mark stable v1.0.0 publication blocked
-- [ ] Preserve Phase N historical evidence
-- [ ] Prevent accidental stable publication while Phase O is open
-- [ ] Publish P0/P1/P2 finding inventory
-- [ ] Define accepted-risk process for non-release-blocking P2 only
-- [ ] Final O.0 documentation/CI gate
+- [x] Record Phase O audit baseline commit
+- [x] Mark stable v1.0.0 publication blocked
+- [x] Preserve Phase N historical evidence
+- [x] Prevent accidental stable publication while Phase O is open
+- [x] Publish P0/P1/P2 finding inventory
+- [x] Define accepted-risk process for non-release-blocking P2 only
+- [x] Final O.0 documentation/CI gate
 
 ## O.1 Production Protection Orchestrator
 - [ ] Define authoritative production stage graph

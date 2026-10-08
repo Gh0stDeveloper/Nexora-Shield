@@ -18,6 +18,8 @@ REQUIRED = [
     "docs/PHASE-N.md",
     "docs/PHASE-O.md",
     "docs/PHASE-O-CHECKLIST.md",
+    "docs/PHASE-O0-BASELINE.md",
+    "docs/PHASE-O-ACCEPTED-RISK.md",
     "docs/PRODUCTION-READINESS-AUDIT.md",
     "docs/API-STABILITY.md",
     "docs/RELEASE-PROCESS.md",
@@ -58,6 +60,8 @@ def main() -> int:
         "docs/RELEASE-PROCESS.md": ["Stable release freeze", "Phase O"],
         "docs/PHASE-O.md": ["OPEN — RELEASE BLOCKING", "NO-GO for public stable"],
         "docs/PHASE-O-CHECKLIST.md": ["Current decision: **NO-GO for public stable v1.0.0**"],
+        "docs/PHASE-O0-BASELINE.md": ["stable publication: **BLOCKED**", "18"],
+        "docs/PHASE-O-ACCEPTED-RISK.md": ["P0", "P1", "P2"],
         "docs/PRODUCTION-READINESS-AUDIT.md": ["NO-GO for public stable"],
     }
     for path, markers in required_release_markers.items():

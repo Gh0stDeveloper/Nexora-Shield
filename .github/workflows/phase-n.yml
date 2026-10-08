@@ -58,6 +58,7 @@ jobs:
           python scripts/release/verify-docs.py
           python scripts/release/verify-supply-chain.py
           python scripts/release/verify-release-workflow.py
+          python scripts/release/verify-phase-o-release-freeze.py
 
       - name: Validate version synchronization
         run: python scripts/release/verify-version-sync.py 1.0.0

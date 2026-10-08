@@ -45,6 +45,9 @@ jobs:
           echo "NEXORA_RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "NEXORA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
 
+      - name: Enforce Phase O release freeze
+        run: python scripts/release/verify-phase-o-release-freeze.py --channel "$NEXORA_RELEASE_CHANNEL"
+
       - name: Validate release contracts
         run: |
           python scripts/release/verify-version-sync.py "$NEXORA_RELEASE_VERSION"
