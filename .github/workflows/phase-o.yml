@@ -40,6 +40,26 @@ jobs:
           grep -q 'Production ready: false' build/phase-o1/plan.txt
           grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan.txt
           test ! -e build/phase-o1/not-created.apk
+      - name: Rebuild and verify a diagnostic APK with real transformed DEX
+        run: |
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/valid.apk build/phase-o1/dex-staged.apk > build/phase-o1/staging.txt
+          grep -q 'DEX STAGING ONLY' build/phase-o1/staging.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/staging.txt
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          folder = Path("build/phase-o1")
+          with zipfile.ZipFile(folder / "valid.apk") as original, zipfile.ZipFile(folder / "dex-staged.apk") as rebuilt:
+              assert set(original.namelist()) == set(rebuilt.namelist())
+              assert original.read("AndroidManifest.xml") == rebuilt.read("AndroidManifest.xml")
+              for name in ("classes.dex", "classes2.dex"):
+                  assert original.read(name) != rebuilt.read(name)
+                  assert rebuilt.getinfo(name).compress_type == zipfile.ZIP_STORED
+                  (folder / f"rewritten-{name}").write_bytes(rebuilt.read(name))
+          PY
+          cargo run --locked --quiet -p nexora-shield -- dex-multidex-verify \
+            build/phase-o1/rewritten-classes.dex build/phase-o1/rewritten-classes2.dex
       - name: Reject malformed, compressed and duplicate-class DEX inputs
         shell: bash
         run: |
