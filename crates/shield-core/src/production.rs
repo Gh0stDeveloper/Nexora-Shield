@@ -2,7 +2,8 @@
 //! No stage is reported as executed without final-artifact evidence.
 
 use crate::{
-    CoreError, EffectiveProductionPolicy, PipelineResult, ProductionControl, ProductionOverrides,
+    CoreError, DexSelectorPolicy, EffectiveProductionPolicy, PipelineResult, ProductionControl,
+    ProductionOverrides,
     ProtectionProfile, ProtectionRequest, Result,
 };
 use nexora_shield_package::verify_apk_structure;
@@ -115,8 +116,22 @@ pub fn protect_production_apk_with_overrides(
     request: &ProtectionRequest,
     overrides: &ProductionOverrides,
 ) -> Result<PipelineResult> {
+    protect_production_apk_with_selection(request, overrides, &DexSelectorPolicy::default())
+}
+
+/// Shared immutable selector-aware preflight used by production calls and CLI.
+/// This does not authorize output creation until downstream controls exist.
+///
+/// # Errors
+///
+/// Returns an error for invalid inputs/selection or missing production stages.
+pub fn protect_production_apk_with_selection(
+    request: &ProtectionRequest,
+    overrides: &ProductionOverrides,
+    selectors: &DexSelectorPolicy,
+) -> Result<PipelineResult> {
     let plan = ProductionBuildContext::prepare_with_overrides(request, overrides)?;
-    let _ = plan.inspect_dex()?;
+    let _ = plan.inspect_dex_with_selectors(selectors)?;
     plan.ensure_ready()?;
     // Even if the stage-status graph is mistakenly marked complete in future,
     // no output may be published until the actual executor is implemented.

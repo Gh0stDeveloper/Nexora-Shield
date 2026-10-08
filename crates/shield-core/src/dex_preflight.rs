@@ -3,12 +3,13 @@
 //! Extraction is bounded. ZIP STORE and DEFLATE are decoded with byte limits
 //! and checksum verification; unsupported/malformed DEX fails closed.
 
-use crate::{CoreError, ProductionBuildContext, Result};
+use crate::{CoreError, DexSelectorPolicy, ProductionBuildContext, Result};
 use nexora_shield_dex::{
-    canonical_dex_index, CompatibilityAnalyzer, DexInput, MultiDexSet, SelectorResolver,
+    canonical_dex_index, CompatibilityAnalyzer, DexInput, MultiDexSet, Selection, Selector,
+    SelectorResolver,
 };
 use nexora_shield_package::{read_decoded_entry, read_zip_directory, sha256_file};
-use std::collections::BTreeSet;
+
 
 /// Maximum decoded size accepted for one DEX file in this first O.1 pass.
 pub const MAX_DEX_BYTES: usize = 64 * 1024 * 1024;
@@ -27,6 +28,7 @@ pub struct DexUnitPreflight {
     pub reflection_detected: bool,
     pub native_method_count: usize,
     pub protected_string_count: usize,
+    pub dex_version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +36,9 @@ pub struct DexPreflight {
     pub units: Vec<DexUnitPreflight>,
     pub total_decoded_bytes: usize,
     pub inspected_input_sha256: String,
+    /// Reflection detected in any unit of a multidex APK requires conservative
+    /// cross-unit transformation policy; this is only an advisory preflight bit.
+    pub cross_dex_reflection_risk: bool,
 }
 
 impl ProductionBuildContext {
@@ -49,6 +54,18 @@ impl ProductionBuildContext {
     /// Fails on input substitution, unsupported compression, size limits, malformed DEX,
     /// duplicated class definitions or inconsistent DEX inventory.
     pub fn inspect_dex(&self) -> Result<DexPreflight> {
+        self.inspect_dex_with_selectors(&DexSelectorPolicy::default())
+    }
+
+    /// Inspect with bounded, explicit include/exclude rules. Selector matching
+    /// is resolved globally across all DEX units; unmatched rules and empty
+    /// effective selections are refused, rather than silently ignoring typos.
+    ///
+    /// # Errors
+    ///
+    /// Rejects malformed APK/DEX, stale inputs, unsupported selectors or
+    /// empty effective selection without creating output or report files.
+    pub fn inspect_dex_with_selectors(&self, policy: &DexSelectorPolicy) -> Result<DexPreflight> {
         self.verify_input_unchanged()?;
         let directory = read_zip_directory(self.input())?;
         let mut inputs = Vec::new();
@@ -88,33 +105,56 @@ impl ProductionBuildContext {
         }
         let set = MultiDexSet::parse(inputs)
             .map_err(|error| CoreError::InvalidRequest(format!("DEX validation: {error}")))?;
-        let mut descriptors = BTreeSet::new();
-        let mut units = Vec::with_capacity(set.units.len());
-        for unit in &set.units {
-            for class in &unit.dex.classes {
-                let descriptor = unit.dex.type_descriptor(class.class_idx).ok_or_else(|| {
-                    CoreError::InvalidRequest(format!(
-                        "DEX '{}' contains a class without a descriptor",
-                        unit.name
-                    ))
+        let mut selected = vec![Selection::default(); set.units.len()];
+        if policy.includes().is_empty() {
+            for (slot, unit) in selected.iter_mut().zip(&set.units) {
+                *slot = SelectorResolver::resolve(&unit.dex, &[]).map_err(|error| {
+                    CoreError::InvalidRequest(format!("DEX selector resolution: {error}"))
                 })?;
-                if !descriptors.insert(descriptor.to_owned()) {
-                    return Err(CoreError::InvalidRequest(format!(
-                        "duplicate class definition across DEX: {descriptor}"
-                    )));
-                }
             }
+        }
+        for selector in policy.includes() {
+            let matches = resolve_selector_across_dex(&set, selector)?;
+            if matches.iter().all(Selection::is_empty) {
+                return Err(CoreError::InvalidRequest(format!(
+                    "include selector matched no defined DEX symbols: {}",
+                    selector.class_pattern
+                )));
+            }
+            for (slot, matches) in selected.iter_mut().zip(matches) {
+                slot.union_with(&matches);
+            }
+        }
+        for selector in policy.excludes() {
+            let matches = resolve_selector_across_dex(&set, selector)?;
+            if matches.iter().all(Selection::is_empty) {
+                return Err(CoreError::InvalidRequest(format!(
+                    "exclude selector matched no defined DEX symbols: {}",
+                    selector.class_pattern
+                )));
+            }
+            for (slot, matches) in selected.iter_mut().zip(matches) {
+                slot.subtract(&matches);
+            }
+        }
+        if selected.iter().all(Selection::is_empty) {
+            return Err(CoreError::InvalidRequest(
+                "effective DEX selector selection is empty".into(),
+            ));
+        }
+
+        let mut units = Vec::with_capacity(set.units.len());
+        let mut reflection_count = 0_usize;
+        for (unit, selection) in set.units.iter().zip(selected) {
             let compatibility = CompatibilityAnalyzer::analyze(&unit.dex).map_err(|error| {
                 CoreError::InvalidRequest(format!(
                     "DEX '{}' compatibility analysis: {error}",
                     unit.name
                 ))
             })?;
-            // No configured selectors yet: the current contract selects all
-            // available user-code targets. This is not a transform.
-            let selection = SelectorResolver::resolve(&unit.dex, &[]).map_err(|error| {
-                CoreError::InvalidRequest(format!("DEX '{}' selector analysis: {error}", unit.name))
-            })?;
+            if compatibility.reflection_detected {
+                reflection_count += 1;
+            }
             units.push(DexUnitPreflight {
                 name: unit.name.clone(),
                 class_count: unit.dex.classes.len(),
@@ -126,6 +166,7 @@ impl ProductionBuildContext {
                 reflection_detected: compatibility.reflection_detected,
                 native_method_count: compatibility.native_methods.len(),
                 protected_string_count: compatibility.protected_string_indices.len(),
+                dex_version: unit.dex.header.version.clone(),
             });
         }
 
@@ -136,6 +177,7 @@ impl ProductionBuildContext {
             units,
             total_decoded_bytes,
             inspected_input_sha256: self.input_sha256().to_owned(),
+            cross_dex_reflection_risk: set.units.len() > 1 && reflection_count > 0,
         })
     }
 
@@ -153,4 +195,22 @@ impl ProductionBuildContext {
         }
         Ok(())
     }
+}
+
+fn resolve_selector_across_dex(
+    set: &MultiDexSet,
+    selector: &Selector,
+) -> Result<Vec<Selection>> {
+    let mut selections = Vec::with_capacity(set.units.len());
+    for unit in &set.units {
+        let matched = SelectorResolver::resolve(&unit.dex, std::slice::from_ref(selector))
+            .map_err(|error| {
+                CoreError::InvalidRequest(format!(
+                    "DEX '{}' selector resolution: {error}",
+                    unit.name
+                ))
+            })?;
+        selections.push(matched);
+    }
+    Ok(selections)
 }
