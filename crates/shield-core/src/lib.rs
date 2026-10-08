@@ -22,7 +22,8 @@ pub use error::{CoreError, Result};
 pub use pipeline::{protect_apk, PipelineResult, PipelineStage, ProtectionRequest};
 pub use plan::BuildPlan;
 pub use production::{
-    protect_production_apk, PlannedStage, ProductionBuildContext, ProductionStage, StageIntegration, StageRequirement,
+    protect_production_apk, PlannedStage, ProductionBuildContext, ProductionStage,
+    StageIntegration, StageRequirement,
 };
 pub use report::{apk_inspection_json, write_report_atomic, PrivateBuildReport, PublicBuildReport};
 
