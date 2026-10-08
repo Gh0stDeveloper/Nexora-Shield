@@ -4,7 +4,7 @@
 use crate::{CoreError, ProtectionProfile, ProtectionRequest, Result};
 use nexora_shield_package::verify_apk_structure;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StageRequirement {
@@ -76,15 +76,46 @@ pub struct PlannedStage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProductionBuildContext {
-    pub input: PathBuf,
-    pub output: PathBuf,
-    pub input_sha256: String,
-    pub dex_count: usize,
-    pub profile: ProtectionProfile,
-    pub stages: Vec<PlannedStage>,
+    input: PathBuf,
+    output: PathBuf,
+    input_sha256: String,
+    dex_count: usize,
+    profile: ProtectionProfile,
+    stages: Vec<PlannedStage>,
 }
 
 impl ProductionBuildContext {
+    /// The inspected input path. The snapshot must be revalidated at execution.
+    #[must_use]
+    pub fn input(&self) -> &Path {
+        &self.input
+    }
+
+    #[must_use]
+    pub fn output(&self) -> &Path {
+        &self.output
+    }
+
+    #[must_use]
+    pub fn input_sha256(&self) -> &str {
+        &self.input_sha256
+    }
+
+    #[must_use]
+    pub const fn dex_count(&self) -> usize {
+        self.dex_count
+    }
+
+    #[must_use]
+    pub const fn profile(&self) -> ProtectionProfile {
+        self.profile
+    }
+
+    #[must_use]
+    pub fn stages(&self) -> &[PlannedStage] {
+        &self.stages
+    }
+
     /// Creates an immutable, read-only plan; never creates an output or report.
     ///
     /// # Errors
