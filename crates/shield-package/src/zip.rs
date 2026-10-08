@@ -457,8 +457,9 @@ pub fn verify_preserved_entry_payload(
     destination.seek(SeekFrom::Start(destination_offset))?;
 
     let mut remaining = u64::from(original.compressed_size);
-    let mut source_chunk = [0_u8; 65_536];
-    let mut destination_chunk = [0_u8; 65_536];
+    // Keep 64 KiB buffers on the heap; Clippy forbids large stack arrays.
+    let mut source_chunk = vec![0_u8; 65_536];
+    let mut destination_chunk = vec![0_u8; 65_536];
     while remaining > 0 {
         let count = usize::try_from(remaining.min(65_536))
             .map_err(|_| PackageError::UnsupportedZip("entry size exceeds host limit".into()))?;
