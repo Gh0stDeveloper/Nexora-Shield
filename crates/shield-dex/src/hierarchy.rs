@@ -83,7 +83,10 @@ impl DexHierarchy {
             // Validate the complete local graph once and index ancestors to
             // descendants to avoid repeated O(classes x methods^2) scans.
             for ancestor in graph.closure(owner)? {
-                descendants.entry(ancestor).or_default().insert(owner.clone());
+                descendants
+                    .entry(ancestor)
+                    .or_default()
+                    .insert(owner.clone());
             }
         }
         graph.descendants = descendants;
