@@ -156,7 +156,7 @@ abi_variants = {
         {},
     ),
     "manifest-binary": (
-        b"\\x03\\x00\\x08\\x00\\x08\\x00\\x00\\x00",
+        b"\x03\x00\x08\x00\x08\x00\x00\x00",
         {},
     ),
     "resource-callback": (
@@ -169,15 +169,15 @@ abi_variants = {
     ),
     "resource-binary": (
         manifest,
-        {"res/layout/main.xml": b"\\x03\\x00\\x08\\x00\\x08\\x00\\x00\\x00"},
+        {"res/layout/main.xml": b"\x03\x00\x08\x00\x08\x00\x00\x00"},
     ),
     "resource-table": (
         manifest,
-        {"resources.arsc": b"\\x02\\x00\\x0c\\x00"},
+        {"resources.arsc": b"\x02\x00\x0c\x00"},
     ),
     "native-jni": (
         manifest,
-        {"lib/arm64-v8a/libexample.so": b"\\x7fELF\\x02\\x01"},
+        {"lib/arm64-v8a/libexample.so": b"\x7fELF\x02\x01"},
     ),
 }
 for variant, (variant_manifest, extras) in abi_variants.items():
