@@ -216,3 +216,27 @@ are not yet bound to the Rust planner. File-backed YAML parsing, versioned
 migration, budget and behavioral policy enforcement remain tracked for O.5.
 This subphase establishes the **typed request-to-effective-policy contract**,
 not a claim of implemented runtime protections or complete YAML support.
+
+## O.1.3 — compiled Android resource table inspection (read-only)
+
+Added a bounded `resources.arsc` structural analyzer alongside the binary
+XML inspector. The diagnostic APK compatibility gate now decodes the global
+string pool and package type/key pools, verifies package/type-spec/type chunk
+boundaries, validates ordinary/sparse/16-bit entry offset tables, verifies
+typed string indices, and rejects malformed or unsupported resource layouts.
+Any compiled resource string matching a proposed renamed DEX symbol blocks the
+rename **before** unsigned APK staging. No-change resource tables are copied
+byte-for-byte; fixture tests verify the exact original payload survives.
+
+This is **NOT** a resource-table linker, serializer or a remapper: resource IDs,
+string indices, references and compiled XML are never modified. Unknown ARSC
+package extensions currently **fail closed** under class/name renaming; they
+are not evidence of malicious input. Testing uses synthetic ZIP fixtures, not
+real installable Android apps. Class names referenced indirectly, including
+runtime reflection/JNI, remain guarded or unsupported. A successful structure
+scan must not be described as a complete Android compatibility contract.
+
+**Pending in O.1.3:** atomic Binary XML + ARSC rewriting with identifier
+stability, certified JNI coupling, real-device Android install/launch tests,
+and final integrated production stages. The PR stays open, `main` remains
+unchanged, O.1 stays OPEN, and stable `v1.0.0` stays NO-GO.
