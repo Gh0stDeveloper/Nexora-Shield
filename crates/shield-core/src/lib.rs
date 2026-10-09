@@ -7,6 +7,7 @@
 
 mod dex_preflight;
 mod dex_selection;
+mod apk_compat;
 mod dex_stage;
 mod error;
 mod pipeline;
