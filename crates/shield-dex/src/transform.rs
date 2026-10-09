@@ -460,7 +460,7 @@ fn symbol_enabled(symbol: SymbolUse, selection: &Selection, config: &RenameConfi
     }
 }
 
-fn is_contract_name(value: &str) -> bool {
+pub(crate) fn is_contract_name(value: &str) -> bool {
     matches!(
         value,
         "<init>"
