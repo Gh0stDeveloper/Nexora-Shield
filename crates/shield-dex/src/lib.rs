@@ -27,6 +27,7 @@ mod error;
 mod graph;
 mod ir;
 mod linked_classes;
+mod linked_members;
 mod model;
 mod multidex;
 mod parser;
