@@ -36,7 +36,12 @@ impl CompatibilityAnalyzer {
 
         report.reflection_detected = runtime_strings
             .iter()
-            .any(|index| dex.string(*index).is_some_and(is_reflection_indicator));
+            .any(|index| dex.string(*index).is_some_and(is_reflection_indicator))
+            || dex.methods.iter().any(|method| {
+                dex.type_descriptor(u32::from(method.class_idx))
+                    .zip(dex.string(method.name_idx))
+                    .is_some_and(|(owner, name)| is_dynamic_lookup_api(owner, name))
+            });
 
         for data in dex.class_data.values() {
             for encoded in data.methods() {
@@ -99,6 +104,36 @@ impl CompatibilityAnalyzer {
         }
 
         Ok(report)
+    }
+}
+
+/// A method-id referencing a runtime lookup API is enough to conservatively
+/// identify dynamic name resolution, even without a literal `const-string`.
+fn is_dynamic_lookup_api(owner: &str, name: &str) -> bool {
+    match owner {
+        "Ljava/lang/Class;" => matches!(
+            name,
+            "forName"
+                | "getMethod"
+                | "getDeclaredMethod"
+                | "getField"
+                | "getDeclaredField"
+                | "getConstructor"
+                | "getDeclaredConstructor"
+        ),
+        "Ljava/lang/ClassLoader;" => matches!(name, "loadClass" | "findClass"),
+        "Ljava/lang/invoke/MethodHandles$Lookup;" => matches!(
+            name,
+            "findVirtual"
+                | "findStatic"
+                | "findSpecial"
+                | "findGetter"
+                | "findSetter"
+                | "findStaticGetter"
+                | "findStaticSetter"
+        ),
+        "Ljava/lang/reflect/Proxy;" => name == "newProxyInstance",
+        _ => false,
     }
 }
 
