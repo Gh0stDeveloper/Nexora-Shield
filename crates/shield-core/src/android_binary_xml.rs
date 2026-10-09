@@ -1,4 +1,4 @@
-//! Strict, bounded Android ResXMLTree reader for O.1.3 name-link auditing.
+//! Strict, bounded Android `ResXMLTree` reader for O.1.3 name-link auditing.
 //! This does NOT patch compiled XML, string offsets or resource references.
 //! A malformed or unknown chunk fails closed rather than being treated as text.
 use crate::{CoreError, Result};
