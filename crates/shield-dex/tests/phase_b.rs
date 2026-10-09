@@ -820,6 +820,39 @@ fn child_implementing_interface_fixture() -> Vec<u8> {
     child
 }
 
+fn append_linked_method_data(bytes: &mut Vec<u8>, owner: bool) -> u32 {
+    let code_off = len_u32(bytes.len());
+    push_u16(&mut bytes, u16::from(!owner));
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, 0);
+    push_u32(&mut bytes, 0);
+    push_u32(&mut bytes, if owner { 1 } else { 6 });
+    if owner {
+        push_u16(&mut bytes, 0x000e);
+    } else {
+        push_u16(&mut bytes, 0x0060);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0x0071);
+        push_u16(&mut bytes, 1);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0x000e);
+    }
+    let class_data_off = len_u32(bytes.len());
+    write_uleb128(&mut bytes, u32::from(owner));
+    write_uleb128(&mut bytes, 0);
+    write_uleb128(&mut bytes, 1);
+    write_uleb128(&mut bytes, 0);
+    if owner {
+        write_uleb128(&mut bytes, 0);
+        write_uleb128(&mut bytes, 0x0009);
+    }
+    write_uleb128(&mut bytes, 0);
+    write_uleb128(&mut bytes, 0x0009);
+    write_uleb128(&mut bytes, code_off);
+    class_data_off
+}
+
 fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     let own = if owner {
         "Lcom/test/Owner;"
@@ -861,35 +894,7 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     while bytes.len() % 4 != 0 {
         bytes.push(0);
     }
-    let code_off = len_u32(bytes.len());
-    push_u16(&mut bytes, if owner { 0 } else { 1 });
-    push_u16(&mut bytes, 0);
-    push_u16(&mut bytes, 0);
-    push_u16(&mut bytes, 0);
-    push_u32(&mut bytes, 0);
-    push_u32(&mut bytes, if owner { 1 } else { 6 });
-    if owner {
-        push_u16(&mut bytes, 0x000e);
-    } else {
-        push_u16(&mut bytes, 0x0060);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0x0071);
-        push_u16(&mut bytes, 1);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0x000e);
-    }
-    let class_data_off = len_u32(bytes.len());
-    write_uleb128(&mut bytes, u32::from(owner));
-    write_uleb128(&mut bytes, 0);
-    write_uleb128(&mut bytes, 1);
-    write_uleb128(&mut bytes, 0);
-    if owner {
-        write_uleb128(&mut bytes, 0);
-        write_uleb128(&mut bytes, 0x0009);
-    }
-    write_uleb128(&mut bytes, 0);
-    write_uleb128(&mut bytes, 0x0009);
-    write_uleb128(&mut bytes, code_off);
+    let class_data_off = append_linked_method_data(&mut bytes, owner);
     let file_size = len_u32(bytes.len());
     bytes[0..8].copy_from_slice(b"dex\n035\0");
     put_u32(&mut bytes, 32, file_size);
@@ -920,7 +925,7 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     put_u16(
         &mut bytes,
         field_ids_off as usize,
-        if owner { 0 } else { 1 },
+        u16::from(!owner),
     );
     put_u16(&mut bytes, field_ids_off as usize + 2, 3);
     put_u32(&mut bytes, field_ids_off as usize + 4, 6);
