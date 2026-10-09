@@ -109,6 +109,7 @@ impl ProductionBuildContext {
         let outputs = set.rewrite(config).map_err(|error| {
             CoreError::InvalidRequest(format!("DEX transform refused: {error}"))
         })?;
+        crate::apk_compat::verify_apk_compatibility(self.input(), &directory, &set, &outputs)?;
         let (mut result, replacements, retrace_records) =
             collect_staged_outputs(outputs, &originals, retrace.is_some());
         if result.changed_dex_units == 0 {
