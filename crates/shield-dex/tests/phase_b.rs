@@ -230,14 +230,17 @@ fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
         },
     ])
     .expect("valid cross-unit link");
-    let linked = set.rewrite(&MultiDexRewriteConfig {
-        rename: Some(RenameConfig::default()),
-        strip_metadata: true,
-        ..MultiDexRewriteConfig::default()
-    })
-    .expect("cross-DEX direct/static method identities can be mapped safely");
+    let linked = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig::default()),
+            strip_metadata: true,
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("cross-DEX direct/static method identities can be mapped safely");
     assert_eq!(linked.len(), 2);
-    assert!(linked.iter().all(|output| output.audit.source_files_removed == 1));
+    assert!(linked
+        .iter()
+        .all(|output| output.audit.source_files_removed == 1));
     let metadata_only = set
         .rewrite(&MultiDexRewriteConfig {
             rename: None,
@@ -357,9 +360,22 @@ fn o13_multidex_rewrites_signature_bound_method_and_field_imports() {
     assert_eq!(owner.method_name(0), consumer.method_name(1));
     assert_eq!(owner.field_name(0), consumer.field_name(0));
     assert_ne!(consumer.method_name(0), Some("go"));
-    assert!(outputs.iter().all(|output| output.audit.preserved_code_items == 1));
-    assert!(outputs.iter().all(|output| output.audit.source_files_removed == 1));
-    assert_eq!(consumer.code_items.values().next().expect("code").insns.len(), 6);
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.preserved_code_items == 1));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.source_files_removed == 1));
+    assert_eq!(
+        consumer
+            .code_items
+            .values()
+            .next()
+            .expect("code")
+            .insns
+            .len(),
+        6
+    );
     let repeated = set
         .rewrite(&MultiDexRewriteConfig {
             rename: Some(RenameConfig {
@@ -389,8 +405,14 @@ fn o13_member_linking_rejects_alias_to_untouched_import() {
     // The actual cross-DEX import is still required by the tests above.
     refresh_integrity(&mut secondary).expect("recalculate fixture");
     let set = MultiDexSet::parse(vec![
-        DexInput { name: "classes.dex".into(), bytes: primary },
-        DexInput { name: "classes2.dex".into(), bytes: secondary },
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
     ])
     .expect("input remains structurally valid");
     // A selector that only picks the local Child.run causes the shared
@@ -402,7 +424,8 @@ fn o13_member_linking_rejects_alias_to_untouched_import() {
                 SelectorKind::Method,
                 "Lcom/test/Child;",
                 Some("run".to_owned()),
-            ).expect("selector")],
+            )
+            .expect("selector")],
             rename_classes: false,
             rename_methods: true,
             rename_fields: false,
@@ -489,8 +512,16 @@ fn selector_resolver_revalidates_public_fields_and_rule_limits() {
 }
 
 fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
-    let own = if owner { "Lcom/test/Owner;" } else { "Lcom/test/Child;" };
-    let parent = if owner { "Ljava/lang/Object;" } else { "Lcom/test/Owner;" };
+    let own = if owner {
+        "Lcom/test/Owner;"
+    } else {
+        "Lcom/test/Child;"
+    };
+    let parent = if owner {
+        "Ljava/lang/Object;"
+    } else {
+        "Lcom/test/Owner;"
+    };
     let strings = [own, parent, "V", "I", "run", "go", "flag", "A.java"];
     let string_ids_off = DEX_HEADER_SIZE;
     let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
@@ -567,12 +598,20 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     }
     put_u32(&mut bytes, proto_ids_off as usize, 2);
     put_u32(&mut bytes, proto_ids_off as usize + 4, 2);
-    put_u16(&mut bytes, field_ids_off as usize, if owner { 0 } else { 1 });
+    put_u16(
+        &mut bytes,
+        field_ids_off as usize,
+        if owner { 0 } else { 1 },
+    );
     put_u16(&mut bytes, field_ids_off as usize + 2, 3);
     put_u32(&mut bytes, field_ids_off as usize + 4, 6);
     put_u16(&mut bytes, method_ids_off as usize, 0);
     put_u16(&mut bytes, method_ids_off as usize + 2, 0);
-    put_u32(&mut bytes, method_ids_off as usize + 4, if owner { 4 } else { 5 });
+    put_u32(
+        &mut bytes,
+        method_ids_off as usize + 4,
+        if owner { 4 } else { 5 },
+    );
     if !owner {
         put_u16(&mut bytes, method_ids_off as usize + 8, 1);
         put_u16(&mut bytes, method_ids_off as usize + 10, 0);
