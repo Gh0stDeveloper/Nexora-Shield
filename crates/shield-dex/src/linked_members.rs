@@ -271,10 +271,10 @@ fn reject_unmapped_inherited(
     if defined.contains_key(member) {
         return Ok(());
     }
-    let mut current = member.owner();
+    let mut current = member.owner().to_owned();
     let mut visited = BTreeSet::new();
-    while let Some(parent) = superclass.get(current) {
-        if !visited.insert(current.to_owned()) {
+    while let Some(parent) = superclass.get(&current) {
+        if !visited.insert(current.clone()) {
             return Err(DexError::UnsafeRename(
                 "cyclic class hierarchy during linked member resolution".into(),
             ));
@@ -288,7 +288,7 @@ fn reject_unmapped_inherited(
         if defined.contains_key(&ancestor) {
             return Ok(());
         }
-        current = parent;
+        current.clone_from(parent);
     }
     Ok(())
 }
