@@ -41,8 +41,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if map_info.len() > (MAX_RETRACE_PLAINTEXT + 128) as u64 {
         return Err("encrypted retrace sidecar exceeds expected size".into());
     }
+    let identity = BuildIdentity::new(application_id, build_id)?;
     let mut root = fs::read(&key_path)?;
-    let schedule = KeySchedule::new(&root, BuildIdentity::new(application_id, build_id)?);
+    let schedule = KeySchedule::new(&root, identity);
     root.fill(0);
     let schedule = schedule?;
 
