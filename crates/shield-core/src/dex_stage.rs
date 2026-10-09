@@ -2,9 +2,7 @@
 //! This unsigned staging artifact is never a production protection result.
 
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
-use nexora_shield_crypto::{
-    seal_retrace_map, KeySchedule, RetraceMap, RetraceRecord,
-};
+use nexora_shield_crypto::{seal_retrace_map, KeySchedule, RetraceMap, RetraceRecord};
 use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
     crc32_ieee, is_legacy_signature_entry, read_decoded_entry, read_stored_entry,
@@ -97,13 +95,10 @@ impl ProductionBuildContext {
                 "private retrace file permissions require Unix secure creation".into(),
             ));
             if fs::symlink_metadata(map_path).is_ok()
-                || [destination, self.input(), self.output()]
-                    .iter()
-                    .any(|p| {
-                        crate::production::normalized_destination(map_path)
-                            .ok()
-                            == crate::production::normalized_destination(p).ok()
-                    })
+                || [destination, self.input(), self.output()].iter().any(|p| {
+                    crate::production::normalized_destination(map_path).ok()
+                        == crate::production::normalized_destination(p).ok()
+                })
             {
                 return Err(CoreError::InvalidRequest(
                     "private retrace destination must be new and disjoint from APK files".into(),
@@ -140,12 +135,14 @@ impl ProductionBuildContext {
             if let Some(report) = unit.rename_report {
                 result.name_records += report.records.len();
                 if retrace.is_some() {
-                    retrace_records.extend(report.records.into_iter().map(|record| RetraceRecord {
-                        dex_name: unit.name.clone(),
-                        string_idx: record.string_idx,
-                        original: record.old,
-                        obfuscated: record.new,
-                        symbols: record.symbols,
+                    retrace_records.extend(report.records.into_iter().map(|record| {
+                        RetraceRecord {
+                            dex_name: unit.name.clone(),
+                            string_idx: record.string_idx,
+                            original: record.old,
+                            obfuscated: record.new,
+                            symbols: record.symbols,
+                        }
                     }));
                 }
             }
@@ -177,12 +174,21 @@ impl ProductionBuildContext {
             Ok(output_hash) => {
                 if let Some((map_path, schedule)) = retrace {
                     let encrypted = (|| -> Result<Vec<u8>> {
-                        let document = RetraceMap::new(schedule, output_hash.clone(), retrace_records)
-                            .map_err(|_| CoreError::InvalidRequest("invalid private retrace mapping".into()))?;
-                        seal_retrace_map(schedule, &document)
-                            .map_err(|_| CoreError::InvalidRequest("unable to seal private retrace mapping".into()))
+                        let document =
+                            RetraceMap::new(schedule, output_hash.clone(), retrace_records)
+                                .map_err(|_| {
+                                    CoreError::InvalidRequest(
+                                        "invalid private retrace mapping".into(),
+                                    )
+                                })?;
+                        seal_retrace_map(schedule, &document).map_err(|_| {
+                            CoreError::InvalidRequest(
+                                "unable to seal private retrace mapping".into(),
+                            )
+                        })
                     })();
-                    let written = encrypted.and_then(|bytes| write_private_retrace(map_path, &bytes));
+                    let written =
+                        encrypted.and_then(|bytes| write_private_retrace(map_path, &bytes));
                     if let Err(error) = written {
                         let _ = fs::remove_file(destination);
                         return Err(error);
@@ -375,7 +381,10 @@ mod retrace_tests {
         assert_eq!(permissions & 0o077, 0, "no group or world permissions");
         assert_eq!(fs::read(&path).expect("read"), b"authenticated-container");
         assert!(write_private_retrace(&path, b"overwrite-attempt").is_err());
-        assert_eq!(fs::read(&path).expect("preserved"), b"authenticated-container");
+        assert_eq!(
+            fs::read(&path).expect("preserved"),
+            b"authenticated-container"
+        );
         fs::remove_dir_all(dir).expect("cleanup");
     }
 
