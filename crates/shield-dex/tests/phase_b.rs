@@ -440,6 +440,45 @@ fn o13_member_linking_rejects_alias_to_untouched_import() {
 }
 
 #[test]
+fn o13_member_linker_rejects_inherited_import_without_hierarchy_binding() {
+    let owner = build_linked_member_fixture(true);
+    let mut child = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&child).expect("child fixture");
+    // Change imported IDs from Owner.run / Owner.flag to Child.run /
+    // Child.flag. Both may resolve to inherited definitions at runtime.
+    let method_offset = parsed.header.method_ids_off as usize + 8;
+    put_u16(&mut child, method_offset, 0);
+    let field_offset = parsed.header.field_ids_off as usize;
+    put_u16(&mut child, field_offset, 0);
+    refresh_integrity(&mut child).expect("refresh IDs");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child,
+        },
+    ])
+    .expect("superclass linked input");
+    let error = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: true,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect_err("inherited member alias must not be left unchanged");
+    assert!(error
+        .to_string()
+        .contains("hierarchy-aware linking"));
+}
+
+#[test]
 fn multidex_parser_rejects_duplicate_class_ownership() {
     let primary = build_test_dex("Lcom/test/A;", "run");
     let err = MultiDexSet::parse(vec![
