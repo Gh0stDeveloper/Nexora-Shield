@@ -189,7 +189,9 @@ pub(crate) fn rewrite_linked_classes(
                 symbols: member.symbols.clone(),
             });
         }
-        report.skipped_contract_names.extend(&member_plan.skipped[unit_index]);
+        report
+            .skipped_contract_names
+            .extend(&member_plan.skipped[unit_index]);
         report.skipped_contract_names.sort_unstable();
         report.skipped_contract_names.dedup();
         report.records.sort_by_key(|record| record.string_idx);
