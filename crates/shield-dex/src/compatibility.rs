@@ -166,6 +166,32 @@ fn is_reflection_indicator(value: &str) -> bool {
     )
 }
 
+#[cfg(test)]
+mod android_reflection_tests {
+    use super::is_dynamic_lookup_api;
+
+    #[test]
+    fn o13_reflective_api_id_without_const_string_is_detected() {
+        for (owner, name) in [
+            ("Ljava/lang/Class;", "forName"),
+            ("Ljava/lang/Class;", "getDeclaredMethod"),
+            ("Ljava/lang/Class;", "getDeclaredField"),
+            ("Ljava/lang/ClassLoader;", "loadClass"),
+            ("Ljava/lang/invoke/MethodHandles$Lookup;", "findVirtual"),
+            ("Ljava/lang/reflect/Proxy;", "newProxyInstance"),
+        ] {
+            assert!(is_dynamic_lookup_api(owner, name));
+        }
+    }
+
+    #[test]
+    fn o13_non_reflective_method_ids_do_not_trigger_global_guard() {
+        assert!(!is_dynamic_lookup_api("Lcom/test/A;", "run"));
+        assert!(!is_dynamic_lookup_api("Ljava/lang/Class;", "getName"));
+        assert!(!is_dynamic_lookup_api("Ljava/lang/ClassLoader;", "getParent"));
+    }
+}
+
 fn descriptor_to_dotted(descriptor: &str) -> String {
     descriptor
         .strip_prefix('L')
