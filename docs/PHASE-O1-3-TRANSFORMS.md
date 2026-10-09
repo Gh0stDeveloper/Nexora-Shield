@@ -24,12 +24,14 @@ Status: **PARTIAL ON FEATURE BRANCH — EXACT-HEAD CI VERIFICATION PENDING**.
   for methods; declaring class + name + field type for fields. Eligible
   direct/static/private method and field names have one deterministic rename
   across every DEX's referencing IDs. Unsafe shared string aliases fail closed.
-- **Virtual/interface method renaming remains disabled** unless full override
-  and Android/SDK contract resolution can be established. External and
-  unresolved references retain their original identities. Metadata-only rewrite
-  remains available. Class remapping rejects name collisions, protected
-  runtime/JNI aliases and class-name literals. Conservative reflection mode
-  skips renaming rather than assuming dynamic calls safe.
+- **Closed local virtual/interface families** are now linked by a validated
+  superclass-and-interface graph. Related declarations must have consistent
+  rename eligibility; a partially selected family fails closed. Imported
+  subclass method/field references resolve to the closest local owner, while
+  inherited private members, cyclic hierarchies and ambiguous interface
+  resolution are rejected. Unknown external ancestor/interface contracts,
+  lifecycle/Object special names, JNI and reflection-sensitive strings
+  remain conservative. Metadata-only rewrite is still available.
 - DEX string IDs directly loaded with const-string are protected against
   automatic renaming, including when a symbol shares that same string index.
 - The unsigned `stage_dex` example reports verified unchanged code items, and
@@ -48,8 +50,10 @@ Production `protect` therefore remains fail-closed, Phase O.1 stays OPEN, and
 
 ## O.1.3 linked-class slice — acceptance boundary
 
-- The new `linked_classes` pass is entered only for cross-DEX-linked renames;
-  it requires `rename_methods=false` and `rename_fields=false`.
+- The `linked_classes` pass is entered for cross-DEX-linked renames and now
+  invokes the `linked_members` binding planner for direct, field, inherited
+  and closed-world virtual/interface members. A fixed-layout pass does not
+  support arbitrary relinking or duplicating aliased string slots.
 - Generated class names must not capture any original global DEX string, and
   the complete output multidex set is reparsed to enforce unique ownership.
 - References in DEX type IDs (including array descriptors) are remapped to
@@ -59,14 +63,15 @@ Production `protect` therefore remains fail-closed, Phase O.1 stays OPEN, and
   repeatability, method/field fail-closed and metadata/bytecode preservation.
   These are **not** Android installation tests or a proof of all Android
   runtime/linker behavior.
-- Signature-bound direct/static method and field reference binding has a
-  positive executable-reference fixture (invoke-static + sget) and a negative
-  shared-name/selector collision fixture, plus determinism and immutable
-  code-item audits. Full virtual/interface method remapping, inherited member
-  dispatch and reflection compatibility still require an independently
-  verified class/interface graph; the fixed-layout writer does not support
-  cloning aliased string slots.
-- Remaining: hierarchy-aware safe virtual/inherited method handling,
+- Signature-bound direct/static method and field references have executable
+  synthetic fixtures (invoke-static + sget), alias-collision tests, determinism
+  and unchanged-code audits. Additional synthetic fixtures cover inherited
+  aliases, closed virtual overrides, interface coherence, partial-selection
+  refusal, inaccessible private inheritance, external superclass keep rules
+  and cycle detection. These fixtures are **not** a verified Android runtime
+  compatibility matrix or proof of JNI/SDK override binding.
+- Remaining: broader Android-compatible override/bridge contract qualification
+  (including covariant returns, SDK interfaces and unresolved dependencies),
   independent retrace mapping with restricted/encrypted storage,
   manifest/resource/JNI/reflection contract checks, production executor
   integration and physical Android installation/launch matrix. No release
@@ -83,3 +88,19 @@ Android lifecycle/Parcelable contract names and ambiguous shared string slots
 cannot be renamed. Output is always staged and unsigned, not a production
 protected APK.
 
+
+## O.1.3 hierarchy contract (synthetic diagnostic validation)
+
+- The graph is bounded, rejects cycles, and reads implemented interfaces from
+  validated DEX class type-lists; ancestors/descendants are indexed once for
+  deterministic family matching.
+- Virtual methods are renamed only when the full reachable parent/interface
+  graph is local (except java.lang.Object), names are non-contract-sensitive
+  and every related override/implementation agrees on selection. Covariant
+  return/bridge ambiguity fails closed; SDK/external overrides stay unchanged.
+- Inherited member-ID references are linked by owner and full member identity.
+  Private/inaccessible inherited aliases cannot silently bind to a renamed
+  superclass member. Method instruction operands and offsets are unchanged.
+- This is **diagnostic and unsigned**. Interface/virtual fixtures are synthetic
+  and should not be mistaken for ART installation, verification, invocation
+  or instrumented behavior evidence.
