@@ -33,9 +33,6 @@ impl Member {
         }
     }
 
-    fn is_method(&self) -> bool {
-        matches!(self, Self::Method { .. })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
