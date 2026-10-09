@@ -43,7 +43,8 @@ impl Member {
         let mut key = self.clone();
         match &mut key {
             Self::Method { owner, .. } | Self::Field { owner, .. } => {
-                *owner = replacement.to_owned();
+                owner.clear();
+                owner.push_str(replacement);
             }
         }
         key
