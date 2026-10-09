@@ -202,6 +202,7 @@ dependencies = [
 name = "nexora-shield-core"
 version = "1.0.0"
 dependencies = [
+ "nexora-shield-crypto",
  "nexora-shield-dex",
  "nexora-shield-package",
 ]
