@@ -562,6 +562,83 @@ fn o13_virtual_method_with_external_superclass_is_kept() {
 
 
 #[test]
+fn o13_interface_method_and_inherited_implementation_share_one_name() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: virtual_owner_fixture(),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child_implementing_interface_fixture(),
+        },
+        DexInput {
+            name: "classes3.dex".into(),
+            bytes: interface_fixture(),
+        },
+    ])
+    .expect("local parent and interface declarations");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("connected virtual/interface family maps atomically");
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner");
+    let implementation = DexParser::parse(&outputs[1].bytes).expect("child");
+    let interface = DexParser::parse(&outputs[2].bytes).expect("interface");
+    assert_ne!(owner.method_name(0), Some("run"));
+    assert_eq!(owner.method_name(0), interface.method_name(0));
+    assert_eq!(owner.method_name(0), implementation.method_name(1));
+    assert_eq!(set.units[1].dex.code_items, implementation.code_items);
+}
+
+#[test]
+fn o13_interface_override_family_rejects_partial_selection() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: virtual_owner_fixture(),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child_implementing_interface_fixture(),
+        },
+        DexInput {
+            name: "classes3.dex".into(),
+            bytes: interface_fixture(),
+        },
+    ])
+    .expect("interfaces");
+    let policy = RenameConfig {
+        selectors: vec![
+            Selector::new(
+                SelectorKind::Method,
+                "Lcom/test/Owner;",
+                Some("run".to_owned()),
+            )
+            .expect("only owner"),
+        ],
+        rename_classes: false,
+        rename_fields: false,
+        ..RenameConfig::default()
+    };
+    let error = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(policy),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect_err("interface implementer and declaration cannot diverge");
+    assert!(error
+        .to_string()
+        .contains("virtual/interface override family"));
+}
+
+#[test]
 fn multidex_parser_rejects_duplicate_class_ownership() {
     let primary = build_test_dex("Lcom/test/A;", "run");
     let err = MultiDexSet::parse(vec![
@@ -650,6 +727,39 @@ fn virtual_owner_fixture() -> Vec<u8> {
     bytes
 }
 
+fn interface_fixture() -> Vec<u8> {
+    let bytes = virtual_owner_fixture();
+    let parsed = DexParser::parse(&bytes).expect("virtual owner");
+    let mut patches = std::collections::BTreeMap::new();
+    patches.insert(0_u32, "Lcom/test/Iface;".to_owned());
+    let mut renamed = DexWriter::patch_strings(&parsed, &patches)
+        .expect("interface descriptor same width as owner descriptor");
+    let reparsed = DexParser::parse(&renamed).expect("renamed interface");
+    let class_def = reparsed.header.class_defs_off as usize;
+    put_u32(&mut renamed, class_def + 4, 0x0201);
+    refresh_integrity(&mut renamed).expect("interface fixture integrity");
+    renamed
+}
+
+fn child_implementing_interface_fixture() -> Vec<u8> {
+    let mut child = build_linked_member_fixture(false);
+    while child.len() % 4 != 0 {
+        child.push(0);
+    }
+    let interfaces_off = len_u32(child.len());
+    push_u32(&mut child, 1);
+    push_u16(&mut child, 4);
+    push_u16(&mut child, 0);
+    let parsed = DexParser::parse(&build_linked_member_fixture(false))
+        .expect("original child");
+    let class_off = parsed.header.class_defs_off as usize;
+    put_u32(&mut child, class_off + 12, interfaces_off);
+    put_u32(&mut child, 32, len_u32(child.len()));
+    put_u32(&mut child, 104, len_u32(child.len()) - parsed.header.data_off);
+    refresh_integrity(&mut child).expect("interface implementing fixture");
+    child
+}
+
 fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     let own = if owner {
         "Lcom/test/Owner;"
@@ -661,10 +771,10 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     } else {
         "Lcom/test/Owner;"
     };
-    let strings = [own, parent, "V", "I", "run", "go", "flag", "A.java"];
+    let strings = [own, parent, "V", "I", "run", "go", "flag", "A.java", "Lcom/test/Iface;"];
     let string_ids_off = DEX_HEADER_SIZE;
     let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
-    let proto_ids_off = type_ids_off + 4 * 4;
+    let proto_ids_off = type_ids_off + 5 * 4;
     let field_ids_off = proto_ids_off + 12;
     let method_ids_off = field_ids_off + 8;
     let method_count = if owner { 1 } else { 2 };
@@ -717,7 +827,7 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     put_u32(&mut bytes, 40, DEX_ENDIAN_CONSTANT);
     put_u32(&mut bytes, 56, len_u32(strings.len()));
     put_u32(&mut bytes, 60, string_ids_off);
-    put_u32(&mut bytes, 64, 4);
+    put_u32(&mut bytes, 64, 5);
     put_u32(&mut bytes, 68, type_ids_off);
     put_u32(&mut bytes, 72, 1);
     put_u32(&mut bytes, 76, proto_ids_off);
@@ -732,7 +842,7 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     for (index, offset) in offsets.iter().enumerate() {
         put_u32(&mut bytes, string_ids_off as usize + index * 4, *offset);
     }
-    for (i, string_index) in [0, 1, 2, 3].iter().enumerate() {
+    for (i, string_index) in [0, 1, 2, 3, 8].iter().enumerate() {
         put_u32(&mut bytes, type_ids_off as usize + i * 4, *string_index);
     }
     put_u32(&mut bytes, proto_ids_off as usize, 2);
