@@ -256,6 +256,25 @@ jobs:
             exit 1
           fi
           test ! -e build/phase-o1/refused-stage.apk
+      - name: O.1.3 reject unsafe Manifest resources JNI and binary XML remaps
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core apk_compat::tests
+          for variant in manifest-component manifest-fully-qualified manifest-binary resource-callback resource-config resource-binary resource-table native-jni; do
+            target="build/phase-o1/o13-refused-${variant}.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${variant}.apk" "${target}" \
+              > "build/phase-o1/o13-${variant}.txt" 2>&1; then
+              echo "O.1.3 allowed an unsafe external Android ABI rename: ${variant}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3' "build/phase-o1/o13-${variant}.txt"
+            test ! -e "${target}"
+          done
+          # The ordinary plain-text manifest with no external aliases must
+          # remain an allowed diagnostic transform. Previous step covers it.
+          test -f build/phase-o1/dex-staged.apk
       - name: Accept bounded DEFLATE DEX and preserve compression-safe reconstruction
         shell: bash
         run: |
