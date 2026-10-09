@@ -142,7 +142,8 @@ impl DexHierarchy {
             }
             if let Some(parent) = node.parent.as_deref() {
                 chain.push(parent.to_owned());
-                cursor.clone_from(parent);
+                cursor.clear();
+                cursor.push_str(parent);
             } else {
                 break;
             }
@@ -186,15 +187,23 @@ fn descriptor(dex: &DexFile, index: u32) -> Result<&str> {
 }
 
 fn read_u32(bytes: &[u8], at: usize) -> Result<u32> {
-    let raw = bytes.get(at..at.checked_add(4).ok_or_else(|| {
-        DexError::UnsafeRename("interface size offset overflow".into())
-    })?).ok_or_else(|| DexError::UnsafeRename("invalid interface type-list size".into()))?;
+    let raw = bytes
+        .get(
+            at..at
+                .checked_add(4)
+                .ok_or_else(|| DexError::UnsafeRename("interface size offset overflow".into()))?,
+        )
+        .ok_or_else(|| DexError::UnsafeRename("invalid interface type-list size".into()))?;
     Ok(u32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]))
 }
 
 fn read_u16(bytes: &[u8], at: usize) -> Result<u16> {
-    let raw = bytes.get(at..at.checked_add(2).ok_or_else(|| {
-        DexError::UnsafeRename("interface item offset overflow".into())
-    })?).ok_or_else(|| DexError::UnsafeRename("invalid interface type-list item".into()))?;
+    let raw = bytes
+        .get(
+            at..at
+                .checked_add(2)
+                .ok_or_else(|| DexError::UnsafeRename("interface item offset overflow".into()))?,
+        )
+        .ok_or_else(|| DexError::UnsafeRename("invalid interface type-list item".into()))?;
     Ok(u16::from_le_bytes([raw[0], raw[1]]))
 }
