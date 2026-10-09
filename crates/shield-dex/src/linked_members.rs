@@ -33,6 +33,22 @@ impl Member {
         }
     }
 
+    fn owner(&self) -> &str {
+        match self {
+            Self::Method { owner, .. } | Self::Field { owner, .. } => owner,
+        }
+    }
+
+    fn with_owner(&self, replacement: &str) -> Self {
+        let mut key = self.clone();
+        match &mut key {
+            Self::Method { owner, .. } | Self::Field { owner, .. } => {
+                *owner = replacement.to_owned();
+            }
+        }
+        key
+    }
+
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -155,11 +171,28 @@ pub(crate) fn plan(
         new_by_name.insert(old, replacement);
     }
 
+    // Method/field IDs may encode a subclass even when runtime resolution
+    // binds an inherited superclass member. Do not leave such a reference
+    // unchanged while renaming its defining member. A complete hierarchy
+    // resolver must handle this before the case can be enabled.
+    let mut superclass = BTreeMap::<String, String>::new();
+    for unit in &set.units {
+        for class in &unit.dex.classes {
+            if class.superclass_idx == crate::model::NO_INDEX {
+                continue;
+            }
+            let owner = type_name(&unit.dex, class.class_idx)?;
+            let parent = type_name(&unit.dex, class.superclass_idx)?;
+            superclass.insert(owner.to_owned(), parent.to_owned());
+        }
+    }
+
     let mut result = MemberPlan::default();
     for (unit, report) in set.units.iter().zip(compatibility) {
         let mut usage = BTreeMap::<u32, Vec<(Member, bool, String)>>::new();
         for (index, method) in unit.dex.methods.iter().enumerate() {
             let key = method_key(&unit.dex, index as u32)?;
+            reject_unmapped_inherited(&key, &defined, &superclass)?;
             let change = defined.get(&key).copied().unwrap_or(false);
             usage.entry(method.name_idx).or_default().push((
                 key,
@@ -169,6 +202,7 @@ pub(crate) fn plan(
         }
         for (index, field) in unit.dex.fields.iter().enumerate() {
             let key = field_key(&unit.dex, index as u32)?;
+            reject_unmapped_inherited(&key, &defined, &superclass)?;
             let change = defined.get(&key).copied().unwrap_or(false);
             usage.entry(field.name_idx).or_default().push((
                 key,
@@ -227,6 +261,36 @@ pub(crate) fn plan(
         result.skipped.push(skipped);
     }
     Ok(result)
+}
+
+fn reject_unmapped_inherited(
+    member: &Member,
+    defined: &BTreeMap<Member, bool>,
+    superclass: &BTreeMap<String, String>,
+) -> Result<()> {
+    if defined.contains_key(member) {
+        return Ok(());
+    }
+    let mut current = member.owner();
+    let mut visited = BTreeSet::new();
+    while let Some(parent) = superclass.get(current) {
+        if !visited.insert(current.to_owned()) {
+            return Err(DexError::UnsafeRename(
+                "cyclic class hierarchy during linked member resolution".into(),
+            ));
+        }
+        let ancestor = member.with_owner(parent);
+        if defined.get(&ancestor).copied().unwrap_or(false) {
+            return Err(DexError::UnsafeRename(
+                "inherited method/field reference requires hierarchy-aware linking".into(),
+            ));
+        }
+        if defined.contains_key(&ancestor) {
+            return Ok(());
+        }
+        current = parent;
+    }
+    Ok(())
 }
 
 fn method_key(dex: &DexFile, index: u32) -> Result<Member> {
