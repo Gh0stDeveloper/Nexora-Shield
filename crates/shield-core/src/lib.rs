@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod android_binary_xml;
 mod apk_compat;
 mod dex_preflight;
 mod dex_selection;
