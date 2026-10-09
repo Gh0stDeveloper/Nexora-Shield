@@ -144,6 +144,50 @@ with zipfile.ZipFile(directory / "compressed-dex.apk", "w", compression=zipfile.
     output.writestr("AndroidManifest.xml", manifest)
     output.writestr("classes.dex", first)
 
+# O.1.3: non-DEX Android ABI regressions. These fixture APKs must be
+# rejected by the diagnostic staging gate before it writes an output file.
+abi_variants = {
+    "manifest-component": (
+        b'<manifest package="com.test"><application android:name=".A"/></manifest>',
+        {},
+    ),
+    "manifest-fully-qualified": (
+        b'<manifest package="com.test"><activity android:name="com.test.A"/></manifest>',
+        {},
+    ),
+    "manifest-binary": (
+        b"\\x03\\x00\\x08\\x00\\x08\\x00\\x00\\x00",
+        {},
+    ),
+    "resource-callback": (
+        manifest,
+        {"res/layout/screen.xml": b'<Button android:onClick="run"/>'},
+    ),
+    "resource-config": (
+        manifest,
+        {"assets/config.json": b'{"entryClass":"com.test.A"}'},
+    ),
+    "resource-binary": (
+        manifest,
+        {"res/layout/main.xml": b"\\x03\\x00\\x08\\x00\\x08\\x00\\x00\\x00"},
+    ),
+    "resource-table": (
+        manifest,
+        {"resources.arsc": b"\\x02\\x00\\x0c\\x00"},
+    ),
+    "native-jni": (
+        manifest,
+        {"lib/arm64-v8a/libexample.so": b"\\x7fELF\\x02\\x01"},
+    ),
+}
+for variant, (variant_manifest, extras) in abi_variants.items():
+    with zipfile.ZipFile(directory / f"{variant}.apk", "w", compression=zipfile.ZIP_STORED) as output:
+        output.writestr("AndroidManifest.xml", variant_manifest)
+        output.writestr("classes.dex", first)
+        output.writestr("classes2.dex", second)
+        for extra_name, payload in extras.items():
+            output.writestr(extra_name, payload)
+
 # Corrupt only the raw compressed stream (not ZIP CRC or length metadata).
 corrupted = bytearray((directory / "compressed-dex.apk").read_bytes())
 with zipfile.ZipFile(directory / "compressed-dex.apk") as compressed_apk:
