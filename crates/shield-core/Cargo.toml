@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 nexora-shield-package = { path = "../shield-package" }
 nexora-shield-dex = { path = "../shield-dex" }
+nexora-shield-crypto = { path = "../shield-crypto" }
 
 [lints]
 workspace = true
