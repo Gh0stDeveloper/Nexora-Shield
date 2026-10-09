@@ -70,9 +70,15 @@ Production `protect` therefore remains fail-closed, Phase O.1 stays OPEN, and
   refusal, inaccessible private inheritance, external superclass keep rules
   and cycle detection. These fixtures are **not** a verified Android runtime
   compatibility matrix or proof of JNI/SDK override binding.
+- The retrace map is now generated from verified DEX rename reports and
+  sealed into an independently stored authenticated private sidecar, bound
+  to build identity and verified staged APK SHA-256. Unix exclusive creation
+  enforces 0600 mode; keys/plaintext are not written to the APK. Open/tamper,
+  wrong-key/build/APK and filesystem-conflict tests are integrated in Phase O.
+  See [private retrace documentation](PHASE-O1-3-RETRACE.md).
 - Remaining: broader Android-compatible override/bridge contract qualification
   (including covariant returns, SDK interfaces and unresolved dependencies),
-  independent retrace mapping with restricted/encrypted storage,
+  end-to-end stack-frame retracing and operational vault custody,
   manifest/resource/JNI/reflection contract checks, production executor
   integration and physical Android installation/launch matrix. No release
   gate changes.
