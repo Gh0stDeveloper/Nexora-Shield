@@ -230,15 +230,14 @@ fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
         },
     ])
     .expect("valid cross-unit link");
-    let rejected = set.rewrite(&MultiDexRewriteConfig {
+    let linked = set.rewrite(&MultiDexRewriteConfig {
         rename: Some(RenameConfig::default()),
         strip_metadata: true,
         ..MultiDexRewriteConfig::default()
-    });
-    assert!(rejected
-        .expect_err("unsafe remapping must be rejected")
-        .to_string()
-        .contains("signature-bound global remapping"));
+    })
+    .expect("cross-DEX direct/static method identities can be mapped safely");
+    assert_eq!(linked.len(), 2);
+    assert!(linked.iter().all(|output| output.audit.source_files_removed == 1));
     let metadata_only = set
         .rewrite(&MultiDexRewriteConfig {
             rename: None,
@@ -326,6 +325,98 @@ fn o13_linked_class_remapping_is_deterministic() {
 }
 
 #[test]
+fn o13_multidex_rewrites_signature_bound_method_and_field_imports() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: build_linked_member_fixture(true),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_linked_member_fixture(false),
+        },
+    ])
+    .expect("canonical cross-DEX member fixture");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: true,
+                ..RenameConfig::default()
+            }),
+            strip_metadata: true,
+            conservative_cross_dex_reflection: true,
+        })
+        .expect("cross-DEX method and field IDs link by identity and signature");
+    assert_eq!(outputs.len(), 2);
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner parsed");
+    let consumer = DexParser::parse(&outputs[1].bytes).expect("consumer parsed");
+    assert_ne!(owner.method_name(0), Some("run"));
+    assert_ne!(owner.field_name(0), Some("flag"));
+    assert_eq!(owner.method_name(0), consumer.method_name(1));
+    assert_eq!(owner.field_name(0), consumer.field_name(0));
+    assert_ne!(consumer.method_name(0), Some("go"));
+    assert!(outputs.iter().all(|output| output.audit.preserved_code_items == 1));
+    assert!(outputs.iter().all(|output| output.audit.source_files_removed == 1));
+    assert_eq!(consumer.code_items.values().next().expect("code").insns.len(), 6);
+    let repeated = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: true,
+                ..RenameConfig::default()
+            }),
+            strip_metadata: true,
+            conservative_cross_dex_reflection: true,
+        })
+        .expect("repeat");
+    assert_eq!(outputs, repeated);
+}
+
+#[test]
+fn o13_member_linking_rejects_alias_to_untouched_import() {
+    let primary = build_linked_member_fixture(true);
+    let mut secondary = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&secondary).expect("consumer");
+    // Give the local method and imported method the *same string ID*
+    // but a different method identity (different declaring class).
+    let own_method_name_offset = parsed.header.method_ids_off as usize + 4;
+    put_u32(&mut secondary, own_method_name_offset, 4);
+    // Also make the foreign method signature impossible to bind by using
+    // the same name but a different prototype with return I.
+    // The actual cross-DEX import is still required by the tests above.
+    refresh_integrity(&mut secondary).expect("recalculate fixture");
+    let set = MultiDexSet::parse(vec![
+        DexInput { name: "classes.dex".into(), bytes: primary },
+        DexInput { name: "classes2.dex".into(), bytes: secondary },
+    ])
+    .expect("input remains structurally valid");
+    // A selector that only picks the local Child.run causes the shared
+    // string to also name the Owner.run import: conflicting definitions
+    // must not be partially rewritten.
+    let reject = set.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig {
+            selectors: vec![Selector::new(
+                SelectorKind::Method,
+                "Lcom/test/Child;",
+                Some("run".to_owned()),
+            ).expect("selector")],
+            rename_classes: false,
+            rename_methods: true,
+            rename_fields: false,
+            ..RenameConfig::default()
+        }),
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(reject
+        .expect_err("shared selected/unselected identity must reject")
+        .to_string()
+        .contains("shared member string ID"));
+}
+
+#[test]
 fn multidex_parser_rejects_duplicate_class_ownership() {
     let primary = build_test_dex("Lcom/test/A;", "run");
     let err = MultiDexSet::parse(vec![
@@ -395,6 +486,105 @@ fn selector_resolver_revalidates_public_fields_and_rule_limits() {
         129
     ];
     assert!(SelectorResolver::resolve(&dex, &many).is_err());
+}
+
+fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
+    let own = if owner { "Lcom/test/Owner;" } else { "Lcom/test/Child;" };
+    let parent = if owner { "Ljava/lang/Object;" } else { "Lcom/test/Owner;" };
+    let strings = [own, parent, "V", "I", "run", "go", "flag", "A.java"];
+    let string_ids_off = DEX_HEADER_SIZE;
+    let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
+    let proto_ids_off = type_ids_off + 4 * 4;
+    let field_ids_off = proto_ids_off + 12;
+    let method_ids_off = field_ids_off + 8;
+    let method_count = if owner { 1 } else { 2 };
+    let class_defs_off = method_ids_off + method_count * 8;
+    let data_off = class_defs_off + 32;
+    let mut bytes = vec![0_u8; data_off as usize];
+    let mut offsets = Vec::new();
+    for string in strings {
+        offsets.push(len_u32(bytes.len()));
+        write_uleb128(&mut bytes, len_u32(string.encode_utf16().count()));
+        bytes.extend_from_slice(string.as_bytes());
+        bytes.push(0);
+    }
+    while bytes.len() % 4 != 0 {
+        bytes.push(0);
+    }
+    let code_off = len_u32(bytes.len());
+    push_u16(&mut bytes, if owner { 0 } else { 1 });
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, 0);
+    push_u32(&mut bytes, 0);
+    push_u32(&mut bytes, if owner { 1 } else { 6 });
+    if owner {
+        push_u16(&mut bytes, 0x000e);
+    } else {
+        push_u16(&mut bytes, 0x0060);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0x0071);
+        push_u16(&mut bytes, 1);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0x000e);
+    }
+    let class_data_off = len_u32(bytes.len());
+    write_uleb128(&mut bytes, u32::from(owner));
+    write_uleb128(&mut bytes, 0);
+    write_uleb128(&mut bytes, 1);
+    write_uleb128(&mut bytes, 0);
+    if owner {
+        write_uleb128(&mut bytes, 0);
+        write_uleb128(&mut bytes, 0x0009);
+    }
+    write_uleb128(&mut bytes, 0);
+    write_uleb128(&mut bytes, 0x0009);
+    write_uleb128(&mut bytes, code_off);
+    let file_size = len_u32(bytes.len());
+    bytes[0..8].copy_from_slice(b"dex\n035\0");
+    put_u32(&mut bytes, 32, file_size);
+    put_u32(&mut bytes, 36, DEX_HEADER_SIZE);
+    put_u32(&mut bytes, 40, DEX_ENDIAN_CONSTANT);
+    put_u32(&mut bytes, 56, len_u32(strings.len()));
+    put_u32(&mut bytes, 60, string_ids_off);
+    put_u32(&mut bytes, 64, 4);
+    put_u32(&mut bytes, 68, type_ids_off);
+    put_u32(&mut bytes, 72, 1);
+    put_u32(&mut bytes, 76, proto_ids_off);
+    put_u32(&mut bytes, 80, 1);
+    put_u32(&mut bytes, 84, field_ids_off);
+    put_u32(&mut bytes, 88, method_count);
+    put_u32(&mut bytes, 92, method_ids_off);
+    put_u32(&mut bytes, 96, 1);
+    put_u32(&mut bytes, 100, class_defs_off);
+    put_u32(&mut bytes, 104, file_size - data_off);
+    put_u32(&mut bytes, 108, data_off);
+    for (index, offset) in offsets.iter().enumerate() {
+        put_u32(&mut bytes, string_ids_off as usize + index * 4, *offset);
+    }
+    for (i, string_index) in [0, 1, 2, 3].iter().enumerate() {
+        put_u32(&mut bytes, type_ids_off as usize + i * 4, *string_index);
+    }
+    put_u32(&mut bytes, proto_ids_off as usize, 2);
+    put_u32(&mut bytes, proto_ids_off as usize + 4, 2);
+    put_u16(&mut bytes, field_ids_off as usize, if owner { 0 } else { 1 });
+    put_u16(&mut bytes, field_ids_off as usize + 2, 3);
+    put_u32(&mut bytes, field_ids_off as usize + 4, 6);
+    put_u16(&mut bytes, method_ids_off as usize, 0);
+    put_u16(&mut bytes, method_ids_off as usize + 2, 0);
+    put_u32(&mut bytes, method_ids_off as usize + 4, if owner { 4 } else { 5 });
+    if !owner {
+        put_u16(&mut bytes, method_ids_off as usize + 8, 1);
+        put_u16(&mut bytes, method_ids_off as usize + 10, 0);
+        put_u32(&mut bytes, method_ids_off as usize + 12, 4);
+    }
+    put_u32(&mut bytes, class_defs_off as usize, 0);
+    put_u32(&mut bytes, class_defs_off as usize + 4, 1);
+    put_u32(&mut bytes, class_defs_off as usize + 8, 1);
+    put_u32(&mut bytes, class_defs_off as usize + 16, 7);
+    put_u32(&mut bytes, class_defs_off as usize + 24, class_data_off);
+    refresh_integrity(&mut bytes).expect("fixture SHA-1 / Adler-32");
+    bytes
 }
 
 fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
