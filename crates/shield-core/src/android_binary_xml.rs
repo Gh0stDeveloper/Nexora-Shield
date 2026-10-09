@@ -424,7 +424,9 @@ mod tests {
         for utf8 in [true, false] {
             let source = sample(utf8, "manifest");
             let pool = inspect_binary_xml(&source);
-            assert_eq!(pool.as_deref(), Ok(["manifest"].as_slice()));
+            assert!(pool
+                .as_ref()
+                .is_ok_and(|strings| strings.len() == 1 && strings[0] == "manifest"));
         }
     }
 
