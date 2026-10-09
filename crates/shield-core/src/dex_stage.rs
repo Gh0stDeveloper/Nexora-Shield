@@ -90,22 +90,7 @@ impl ProductionBuildContext {
             ));
         }
         if let Some((map_path, _)) = retrace {
-            #[cfg(not(unix))]
-            return Err(CoreError::InvalidRequest(
-                "private retrace file permissions require Unix secure creation".into(),
-            ));
-            let normalized_map = crate::production::normalized_destination(map_path)?;
-            if fs::symlink_metadata(map_path).is_ok()
-                || [destination, self.input(), self.output()]
-                    .iter()
-                    .map(|path| crate::production::normalized_destination(path))
-                    .collect::<Result<Vec<_>>>()?
-                    .contains(&normalized_map)
-            {
-                return Err(CoreError::InvalidRequest(
-                    "private retrace destination must be new and disjoint from APK files".into(),
-                ));
-            }
+            validate_retrace_destination(map_path, destination, self.input(), self.output())?;
         }
         // The preflight enforces conservative compatibility and class ownership.
         let _ = self.inspect_dex()?;
@@ -175,23 +160,9 @@ impl ProductionBuildContext {
         match reconstruction {
             Ok(output_hash) => {
                 if let Some((map_path, schedule)) = retrace {
-                    let encrypted = (|| -> Result<Vec<u8>> {
-                        let document =
-                            RetraceMap::new(schedule, output_hash.clone(), retrace_records)
-                                .map_err(|_| {
-                                    CoreError::InvalidRequest(
-                                        "invalid private retrace mapping".into(),
-                                    )
-                                })?;
-                        seal_retrace_map(schedule, &document).map_err(|_| {
-                            CoreError::InvalidRequest(
-                                "unable to seal private retrace mapping".into(),
-                            )
-                        })
-                    })();
-                    let written =
-                        encrypted.and_then(|bytes| write_private_retrace(map_path, &bytes));
-                    if let Err(error) = written {
+                    if let Err(error) =
+                        seal_and_store_retrace(map_path, schedule, &output_hash, retrace_records)
+                    {
                         let _ = fs::remove_file(destination);
                         return Err(error);
                     }
@@ -274,6 +245,44 @@ impl ProductionBuildContext {
         self.verify_input_unchanged()?;
         Ok(inspection.sha256)
     }
+}
+
+fn validate_retrace_destination(
+    map_path: &Path,
+    staging: &Path,
+    input: &Path,
+    planned_output: &Path,
+) -> Result<()> {
+    #[cfg(not(unix))]
+    return Err(CoreError::InvalidRequest(
+        "private retrace file permissions require Unix secure creation".into(),
+    ));
+    let normalized_map = crate::production::normalized_destination(map_path)?;
+    if fs::symlink_metadata(map_path).is_ok()
+        || [staging, input, planned_output]
+            .iter()
+            .map(|path| crate::production::normalized_destination(path))
+            .collect::<Result<Vec<_>>>()?
+            .contains(&normalized_map)
+    {
+        return Err(CoreError::InvalidRequest(
+            "private retrace destination must be new and disjoint from APK files".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn seal_and_store_retrace(
+    map_path: &Path,
+    schedule: &KeySchedule,
+    output_hash: &str,
+    records: Vec<RetraceRecord>,
+) -> Result<()> {
+    let document = RetraceMap::new(schedule, output_hash, records)
+        .map_err(|_| CoreError::InvalidRequest("invalid private retrace mapping".into()))?;
+    let encrypted = seal_retrace_map(schedule, &document)
+        .map_err(|_| CoreError::InvalidRequest("unable to seal private retrace mapping".into()))?;
+    write_private_retrace(map_path, &encrypted)
 }
 
 /// Atomic no-overwrite semantics for the private sidecar's leaf. Never emit
