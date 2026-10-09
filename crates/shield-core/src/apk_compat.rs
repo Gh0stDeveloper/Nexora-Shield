@@ -181,7 +181,7 @@ fn verify_non_dex_entries(
                 // Treat every string-pool entry as potentially referenced:
                 // string-ID aliases and XML attribute semantics are external
                 // contracts, so no unknown binding may be silently rewritten.
-                guard_text_reference(&format!("\\\"{value}\\\""), changed, name)?;
+                guard_text_reference(&format!("\"{value}\""), changed, name)?;
             }
             continue;
         }
