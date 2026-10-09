@@ -198,7 +198,7 @@ fn parse_pool(data: &[u8], at: usize, item: Chunk) -> Result<Vec<String>> {
     Ok(result)
 }
 
-/// Strictly decode a standalone Android ResStringPool chunk. Shared by
+/// Strictly decode a standalone Android `ResStringPool` chunk. Shared by
 /// compiled XML and resources.arsc, without allowing either parser to mutate it.
 pub(crate) fn inspect_string_pool(bytes: &[u8]) -> Result<Vec<String>> {
     let item = chunk(bytes, 0)?;
