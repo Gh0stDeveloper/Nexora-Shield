@@ -91,8 +91,9 @@ fn read_private_schedule(
         let _ = (secret_path, application_id, build_id);
         return Err("private retrace map output requires Unix secure file handling".into());
     }
+    let identity = BuildIdentity::new(application_id, build_id)?;
     let mut root_secret = fs::read(secret_path)?;
-    let schedule = KeySchedule::new(&root_secret, BuildIdentity::new(application_id, build_id)?);
+    let schedule = KeySchedule::new(&root_secret, identity);
     root_secret.fill(0);
     Ok(schedule?)
 }
