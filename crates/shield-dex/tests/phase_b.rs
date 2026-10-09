@@ -480,8 +480,7 @@ fn o13_member_linker_updates_inherited_method_and_field_aliases() {
     assert_eq!(owner_after.method_name(0), child_after.method_name(1));
     assert_eq!(owner_after.field_name(0), child_after.field_name(0));
     assert_eq!(
-        set.units[1].dex.code_items,
-        child_after.code_items,
+        set.units[1].dex.code_items, child_after.code_items,
         "executable instruction references retain their original indices"
     );
 }
@@ -526,10 +525,7 @@ fn o13_virtual_method_with_external_superclass_is_kept() {
     let owner = virtual_owner_fixture();
     let parsed = DexParser::parse(&owner).expect("owner");
     assert_eq!(parsed.type_descriptor(1), Some("Ljava/lang/Object;"));
-    let replacement = std::collections::BTreeMap::from([(
-        1_u32,
-        "Lcom/test/Unknown;".to_owned(),
-    )]);
+    let replacement = std::collections::BTreeMap::from([(1_u32, "Lcom/test/Unknown;".to_owned())]);
     let altered = DexWriter::patch_strings(&parsed, &replacement)
         .expect("equal-width external superclass descriptor");
     let consumer = build_linked_member_fixture(false);
@@ -559,7 +555,6 @@ fn o13_virtual_method_with_external_superclass_is_kept() {
     assert_eq!(result.method_name(0), Some("run"));
     assert_eq!(outputs[0].audit.changed_symbol_strings, 0);
 }
-
 
 #[test]
 fn o13_interface_method_and_inherited_implementation_share_one_name() {
@@ -615,14 +610,12 @@ fn o13_interface_override_family_rejects_partial_selection() {
     ])
     .expect("interfaces");
     let policy = RenameConfig {
-        selectors: vec![
-            Selector::new(
-                SelectorKind::Method,
-                "Lcom/test/Owner;",
-                Some("run".to_owned()),
-            )
-            .expect("only owner"),
-        ],
+        selectors: vec![Selector::new(
+            SelectorKind::Method,
+            "Lcom/test/Owner;",
+            Some("run".to_owned()),
+        )
+        .expect("only owner")],
         rename_classes: false,
         rename_fields: false,
         ..RenameConfig::default()
@@ -750,12 +743,15 @@ fn child_implementing_interface_fixture() -> Vec<u8> {
     push_u32(&mut child, 1);
     push_u16(&mut child, 4);
     push_u16(&mut child, 0);
-    let parsed = DexParser::parse(&build_linked_member_fixture(false))
-        .expect("original child");
+    let parsed = DexParser::parse(&build_linked_member_fixture(false)).expect("original child");
     let class_off = parsed.header.class_defs_off as usize;
     put_u32(&mut child, class_off + 12, interfaces_off);
     put_u32(&mut child, 32, len_u32(child.len()));
-    put_u32(&mut child, 104, len_u32(child.len()) - parsed.header.data_off);
+    put_u32(
+        &mut child,
+        104,
+        len_u32(child.len()) - parsed.header.data_off,
+    );
     refresh_integrity(&mut child).expect("interface implementing fixture");
     child
 }
@@ -771,7 +767,17 @@ fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
     } else {
         "Lcom/test/Owner;"
     };
-    let strings = [own, parent, "V", "I", "run", "go", "flag", "A.java", "Lcom/test/Iface;"];
+    let strings = [
+        own,
+        parent,
+        "V",
+        "I",
+        "run",
+        "go",
+        "flag",
+        "A.java",
+        "Lcom/test/Iface;",
+    ];
     let string_ids_off = DEX_HEADER_SIZE;
     let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
     let proto_ids_off = type_ids_off + 5 * 4;
