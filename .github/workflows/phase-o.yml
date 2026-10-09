@@ -206,6 +206,24 @@ jobs:
             --application-id com.nexora.fixture --build-id ci-o13-retrace \
             > build/phase-o1/secure-retrace-stage.txt
           grep -q 'DEX STAGING ONLY' build/phase-o1/secure-retrace-stage.txt
+          cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/secure-stage.apk build/phase-o1/private-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture ci-o13-retrace \
+            > build/phase-o1/retrace-inspection.txt
+          grep -q 'Private retrace map authenticated' build/phase-o1/retrace-inspection.txt
+          grep -q 'Retrace records:' build/phase-o1/retrace-inspection.txt
+          if cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/valid.apk build/phase-o1/private-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture ci-o13-retrace; then
+            echo 'retrace map was accepted for the wrong APK hash' >&2
+            exit 1
+          fi
+          if cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/secure-stage.apk build/phase-o1/private-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture wrong-build; then
+            echo 'retrace map accepted a wrong build identity' >&2
+            exit 1
+          fi
           python - <<'PY'
           from pathlib import Path
           import os, stat, zipfile
@@ -218,7 +236,17 @@ jobs:
           assert stat.S_IMODE(protected.stat().st_mode) == 0o600
           with zipfile.ZipFile(parent / "secure-stage.apk") as apk:
               assert not any("retrace" in name.lower() for name in apk.namelist())
+          corrupted = bytearray(blob)
+          corrupted[-1] ^= 1
+          (parent / "corrupted-retrace.nsr").write_bytes(corrupted)
+          os.chmod(parent / "corrupted-retrace.nsr", 0o600)
           PY
+          if cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/secure-stage.apk build/phase-o1/corrupted-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture ci-o13-retrace; then
+            echo 'tampered retrace container passed authentication' >&2
+            exit 1
+          fi
           if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
             build/phase-o1/valid.apk build/phase-o1/refused-stage.apk \
             --retrace-map build/phase-o1/private-retrace.nsr \
