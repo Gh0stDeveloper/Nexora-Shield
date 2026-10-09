@@ -216,7 +216,6 @@ impl ProductionBuildContext {
     }
 }
 
-
 fn collect_staged_outputs(
     outputs: Vec<DexRewriteOutput>,
     originals: &BTreeMap<String, Vec<u8>>,
@@ -242,14 +241,12 @@ fn collect_staged_outputs(
         if let Some(report) = unit.rename_report {
             result.name_records += report.records.len();
             if wants_retrace {
-                retrace_records.extend(report.records.into_iter().map(|record| {
-                    RetraceRecord {
-                        dex_name: unit.name.clone(),
-                        string_idx: record.string_idx,
-                        original: record.old,
-                        obfuscated: record.new,
-                        symbols: record.symbols,
-                    }
+                retrace_records.extend(report.records.into_iter().map(|record| RetraceRecord {
+                    dex_name: unit.name.clone(),
+                    string_idx: record.string_idx,
+                    original: record.old,
+                    obfuscated: record.new,
+                    symbols: record.symbols,
                 }));
             }
         }
@@ -402,8 +399,7 @@ mod retrace_tests {
     }
 
     #[test]
-    fn protected_sidecar_is_private_and_never_overwritten()
-        -> Result<(), Box<dyn std::error::Error>>
+    fn protected_sidecar_is_private_and_never_overwritten() -> Result<(), Box<dyn std::error::Error>>
     {
         let dir = scratch()?;
         let path = dir.join("build.retrace.enc");
@@ -418,9 +414,8 @@ mod retrace_tests {
     }
 
     #[test]
-    fn protected_sidecar_rejects_symlink_and_preserves_target()
-        -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn protected_sidecar_rejects_symlink_and_preserves_target(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dir = scratch()?;
         let target = dir.join("target");
         let link = dir.join("protected-map");
