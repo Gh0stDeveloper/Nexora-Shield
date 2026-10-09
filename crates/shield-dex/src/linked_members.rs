@@ -12,6 +12,7 @@ use crate::transform::{is_contract_name, RenameConfig};
 use std::collections::{BTreeMap, BTreeSet};
 
 const ACC_PRIVATE: u32 = 0x0002;
+const ACC_INHERITABLE: u32 = 0x0005; // public or protected
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Member {
@@ -78,6 +79,7 @@ pub(crate) fn plan(
 
     let hierarchy = DexHierarchy::build(set)?;
     let mut defined = BTreeMap::<Member, bool>::new();
+    let mut inheritable = BTreeSet::<Member>::new();
     let mut virtual_defs = BTreeSet::<Member>::new();
     let mut protected = BTreeSet::<Member>::new();
     for ((unit, selection), report) in set.units.iter().zip(&selected).zip(compatibility) {
@@ -103,6 +105,9 @@ pub(crate) fn plan(
                     return Err(DexError::UnsafeRename(
                         "duplicate defined method identity".into(),
                     ));
+                }
+                if encoded.access_flags & ACC_INHERITABLE != 0 {
+                    inheritable.insert(key.clone());
                 }
                 if !allowed {
                     protected.insert(key);
@@ -132,6 +137,9 @@ pub(crate) fn plan(
                     ));
                 }
                 virtual_defs.insert(key.clone());
+                if encoded.access_flags & ACC_INHERITABLE != 0 {
+                    inheritable.insert(key.clone());
+                }
                 if !allowed {
                     protected.insert(key);
                 }
@@ -153,6 +161,9 @@ pub(crate) fn plan(
                         "duplicate defined field identity".into(),
                     ));
                 }
+                if encoded.access_flags & ACC_INHERITABLE != 0 {
+                    inheritable.insert(key.clone());
+                }
                 if !allowed {
                     protected.insert(key);
                 }
@@ -164,12 +175,19 @@ pub(crate) fn plan(
     // Renaming one member without every locally linked override is unsafe.
     for left in &virtual_defs {
         for right in &virtual_defs {
-            if left == right || !same_virtual_slot(left, right) {
+            if left == right || !same_dispatch_shape(left, right) {
                 continue;
             }
-            if hierarchy.connected(left.owner(), right.owner())?
-                && defined.get(left) != defined.get(right)
-            {
+            if !hierarchy.connected(left.owner(), right.owner())? {
+                continue;
+            }
+            if !same_virtual_slot(left, right) {
+                if defined.get(left) == Some(&true) || defined.get(right) == Some(&true) {
+                    return Err(DexError::UnsafeRename(
+                        "covariant virtual override requires complete bridge resolution".into(),
+                    ));
+                }
+            } else if defined.get(left) != defined.get(right) {
                 return Err(DexError::UnsafeRename(
                     "virtual/interface override family has inconsistent rename selection".into(),
                 ));
@@ -220,7 +238,7 @@ pub(crate) fn plan(
         let mut usage = BTreeMap::<u32, Vec<(Member, bool, String)>>::new();
         for (index, method) in unit.dex.methods.iter().enumerate() {
             let key = method_key(&unit.dex, index as u32)?;
-            let change = resolve_reference(&key, &defined, &hierarchy)?;
+            let change = resolve_reference(&key, &defined, &inheritable, &hierarchy)?;
             usage.entry(method.name_idx).or_default().push((
                 key,
                 change,
@@ -229,7 +247,7 @@ pub(crate) fn plan(
         }
         for (index, field) in unit.dex.fields.iter().enumerate() {
             let key = field_key(&unit.dex, index as u32)?;
-            let change = resolve_reference(&key, &defined, &hierarchy)?;
+            let change = resolve_reference(&key, &defined, &inheritable, &hierarchy)?;
             usage.entry(field.name_idx).or_default().push((
                 key,
                 change,
@@ -304,6 +322,28 @@ fn is_object_contract_name(name: &str) -> bool {
     )
 }
 
+fn same_dispatch_shape(first: &Member, second: &Member) -> bool {
+    match (first, second) {
+        (
+            Member::Method {
+                name: first_name,
+                signature: first_signature,
+                ..
+            },
+            Member::Method {
+                name: second_name,
+                signature: second_signature,
+                ..
+            },
+        ) => {
+            first_name == second_name
+                && first_signature.split_once(')').map(|(args, _)| args)
+                    == second_signature.split_once(')').map(|(args, _)| args)
+        }
+        _ => false,
+    }
+}
+
 fn same_virtual_slot(first: &Member, second: &Member) -> bool {
     match (first, second) {
         (
@@ -327,6 +367,7 @@ fn same_virtual_slot(first: &Member, second: &Member) -> bool {
 fn resolve_reference(
     member: &Member,
     defined: &BTreeMap<Member, bool>,
+    inheritable: &BTreeSet<Member>,
     hierarchy: &DexHierarchy,
 ) -> Result<bool> {
     if let Some(mapped) = defined.get(member) {
@@ -335,6 +376,11 @@ fn resolve_reference(
     for ancestor in hierarchy.parents(member.owner())? {
         let candidate = member.with_owner(&ancestor);
         if let Some(mapped) = defined.get(&candidate) {
+            if *mapped && !inheritable.contains(&candidate) {
+                return Err(DexError::UnsafeRename(
+                    "inherited reference targets a non-inheritable method or field".into(),
+                ));
+            }
             return Ok(*mapped);
         }
     }
@@ -342,6 +388,11 @@ fn resolve_reference(
     for interface in hierarchy.interfaces(member.owner())? {
         let candidate = member.with_owner(&interface);
         if let Some(mapped) = defined.get(&candidate) {
+            if *mapped && !inheritable.contains(&candidate) {
+                return Err(DexError::UnsafeRename(
+                    "interface reference targets an inaccessible method or field".into(),
+                ));
+            }
             match found {
                 Some(previous) if previous != *mapped => {
                     return Err(DexError::UnsafeRename(
@@ -351,6 +402,11 @@ fn resolve_reference(
                 _ => found = Some(*mapped),
             }
         }
+    }
+    if found == Some(true) && !hierarchy.closed(member.owner())? {
+        return Err(DexError::UnsafeRename(
+            "interface reference crosses an unresolved external contract".into(),
+        ));
     }
     Ok(found.unwrap_or(false))
 }
