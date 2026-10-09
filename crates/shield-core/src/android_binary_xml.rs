@@ -21,13 +21,17 @@ fn reject(reason: &str) -> CoreError {
 }
 
 fn slice(data: &[u8], start: usize, count: usize) -> Result<&[u8]> {
-    let end = start.checked_add(count).ok_or_else(|| reject("offset overflow"))?;
+    let end = start
+        .checked_add(count)
+        .ok_or_else(|| reject("offset overflow"))?;
     data.get(start..end)
         .ok_or_else(|| reject("truncated structure or invalid offset"))
 }
 
 fn u8_at(data: &[u8], at: usize) -> Result<u8> {
-    Ok(*slice(data, at, 1)?.first().ok_or_else(|| reject("truncated byte"))?)
+    Ok(*slice(data, at, 1)?
+        .first()
+        .ok_or_else(|| reject("truncated byte"))?)
 }
 
 fn u16_at(data: &[u8], at: usize) -> Result<u16> {
@@ -94,9 +98,13 @@ fn decode_pool_string(bytes: &[u8], at: usize, utf8: bool) -> Result<String> {
         }
         let text = std::str::from_utf8(slice(bytes, cursor, length)?)
             .map_err(|_| reject("invalid UTF-8 string pool entry"))?;
-        cursor = cursor.checked_add(length).ok_or_else(|| reject("length overflow"))?;
+        cursor = cursor
+            .checked_add(length)
+            .ok_or_else(|| reject("length overflow"))?;
         if u8_at(bytes, cursor)? != 0 || text.encode_utf16().count() != utf16_units {
-            return Err(reject("UTF-8 entry has invalid terminator or UTF-16 length"));
+            return Err(reject(
+                "UTF-8 entry has invalid terminator or UTF-16 length",
+            ));
         }
         return Ok(text.to_owned());
     }
@@ -104,13 +112,17 @@ fn decode_pool_string(bytes: &[u8], at: usize, utf8: bool) -> Result<String> {
     if length > MAX_STRING_UNITS {
         return Err(reject("string exceeds UTF-16 character budget"));
     }
-    let units_bytes = length.checked_mul(2).ok_or_else(|| reject("length overflow"))?;
+    let units_bytes = length
+        .checked_mul(2)
+        .ok_or_else(|| reject("length overflow"))?;
     let raw = slice(bytes, cursor, units_bytes)?;
     let units = raw
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect::<Vec<_>>();
-    cursor = cursor.checked_add(units_bytes).ok_or_else(|| reject("length overflow"))?;
+    cursor = cursor
+        .checked_add(units_bytes)
+        .ok_or_else(|| reject("length overflow"))?;
     if u16_at(bytes, cursor)? != 0 {
         return Err(reject("invalid UTF-16 terminator"));
     }
@@ -133,7 +145,10 @@ fn parse_pool(data: &[u8], at: usize, item: Chunk) -> Result<Vec<String>> {
         .checked_add(styles)
         .and_then(|sum| sum.checked_mul(4))
         .ok_or_else(|| reject("pool index overflow"))?;
-    let slot_end = item.header.checked_add(slots).ok_or_else(|| reject("pool overflow"))?;
+    let slot_end = item
+        .header
+        .checked_add(slots)
+        .ok_or_else(|| reject("pool overflow"))?;
     if slot_end > item.size
         || strings_start < slot_end
         || strings_start >= item.size
@@ -142,7 +157,11 @@ fn parse_pool(data: &[u8], at: usize, item: Chunk) -> Result<Vec<String>> {
     {
         return Err(reject("invalid string/style table offsets"));
     }
-    let end = if styles_start > 0 { styles_start } else { item.size };
+    let end = if styles_start > 0 {
+        styles_start
+    } else {
+        item.size
+    };
     let payload = slice(data, at, item.size)?;
     let strings_data = slice(payload, strings_start, end - strings_start)?;
     let mut result = Vec::with_capacity(count);
@@ -155,7 +174,11 @@ fn parse_pool(data: &[u8], at: usize, item: Chunk) -> Result<Vec<String>> {
         if offset >= strings_data.len() {
             return Err(reject("string offset outside pool payload"));
         }
-        result.push(decode_pool_string(strings_data, offset, flags & UTF8_FLAG != 0)?);
+        result.push(decode_pool_string(
+            strings_data,
+            offset,
+            flags & UTF8_FLAG != 0,
+        )?);
     }
     // Styles are not rewritten here. Validate that every declared style
     // offset remains within the bounds of the chunk.
@@ -226,8 +249,14 @@ fn validate_node(data: &[u8], at: usize, item: Chunk, count: usize) -> Result<()
             let attrs = 16_usize
                 .checked_add(attr_start)
                 .ok_or_else(|| reject("attribute start overflow"))?;
-            let count_bytes = attr_count.checked_mul(attr_size).ok_or_else(|| reject("attribute count overflow"))?;
-            if attrs.checked_add(count_bytes).ok_or_else(|| reject("attribute bounds overflow"))? > item.size {
+            let count_bytes = attr_count
+                .checked_mul(attr_size)
+                .ok_or_else(|| reject("attribute count overflow"))?;
+            if attrs
+                .checked_add(count_bytes)
+                .ok_or_else(|| reject("attribute bounds overflow"))?
+                > item.size
+            {
                 return Err(reject("attribute list outside XML node"));
             }
             for n in 0..attr_count {
@@ -286,7 +315,9 @@ pub(crate) fn inspect_binary_xml(bytes: &[u8]) -> Result<Vec<String>> {
                     if closed {
                         return Err(reject("multiple XML document roots"));
                     }
-                    depth = depth.checked_add(1).ok_or_else(|| reject("node depth overflow"))?;
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| reject("node depth overflow"))?;
                     if depth > 256 {
                         return Err(reject("XML node depth limit exceeded"));
                     }
@@ -305,7 +336,9 @@ pub(crate) fn inspect_binary_xml(bytes: &[u8]) -> Result<Vec<String>> {
                 _ => {}
             }
         }
-        offset = offset.checked_add(item.size).ok_or_else(|| reject("chunk offset overflow"))?;
+        offset = offset
+            .checked_add(item.size)
+            .ok_or_else(|| reject("chunk offset overflow"))?;
     }
     if !saw_start || !closed || depth != 0 {
         return Err(reject("XML document root is missing or unbalanced"));
@@ -317,8 +350,12 @@ pub(crate) fn inspect_binary_xml(bytes: &[u8]) -> Result<Vec<String>> {
 mod tests {
     use super::inspect_binary_xml;
 
-    fn le16(n: u16) -> [u8; 2] { n.to_le_bytes() }
-    fn le32(n: u32) -> [u8; 4] { n.to_le_bytes() }
+    fn le16(n: u16) -> [u8; 2] {
+        n.to_le_bytes()
+    }
+    fn le32(n: u32) -> [u8; 4] {
+        n.to_le_bytes()
+    }
 
     fn chunk(kind: u16, header: u16, payload: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
@@ -343,8 +380,12 @@ mod tests {
             data.extend(string.as_bytes());
             data.push(0);
         } else {
-            data.extend(le16(u16::try_from(string.encode_utf16().count()).unwrap_or(0)));
-            for unit in string.encode_utf16() { data.extend(le16(unit)); }
+            data.extend(le16(
+                u16::try_from(string.encode_utf16().count()).unwrap_or(0),
+            ));
+            for unit in string.encode_utf16() {
+                data.extend(le16(unit));
+            }
             data.extend(le16(0));
         }
         let pool = chunk(1, 28, &data);
@@ -369,7 +410,9 @@ mod tests {
         let mut root = Vec::new();
         root.extend(le16(3));
         root.extend(le16(8));
-        root.extend(le32(u32::try_from(8 + pool.len() + start.len() + end.len()).unwrap_or(u32::MAX)));
+        root.extend(le32(
+            u32::try_from(8 + pool.len() + start.len() + end.len()).unwrap_or(u32::MAX),
+        ));
         root.extend(pool);
         root.extend(start);
         root.extend(end);
@@ -396,7 +439,10 @@ mod tests {
             wrong_root_size[4] = 0;
             assert!(inspect_binary_xml(&wrong_root_size).is_err());
             let mut bad_string_idx = valid.clone();
-            let pool = 8 + usize::try_from(u32::from_le_bytes(valid[12..16].try_into().unwrap_or([0;4]))).unwrap_or(0);
+            let pool = 8 + usize::try_from(u32::from_le_bytes(
+                valid[12..16].try_into().unwrap_or([0; 4]),
+            ))
+            .unwrap_or(0);
             bad_string_idx[pool + 20..pool + 24].copy_from_slice(&1_u32.to_le_bytes());
             assert!(inspect_binary_xml(&bad_string_idx).is_err());
             let mut trailing = valid.clone();
