@@ -14,10 +14,9 @@ pub(crate) fn rewrite_linked_classes(
     set: &MultiDexSet,
     config: &MultiDexRewriteConfig,
 ) -> Result<Vec<DexRewriteOutput>> {
-    let rename = config
-        .rename
-        .as_ref()
-        .ok_or_else(|| DexError::UnsafeRename("linked class rewrite requires rename policy".into()))?;
+    let rename = config.rename.as_ref().ok_or_else(|| {
+        DexError::UnsafeRename("linked class rewrite requires rename policy".into())
+    })?;
     if rename.rename_methods || rename.rename_fields {
         return Err(DexError::UnsafeRename(
             "cross-DEX method/field rename requires signature-bound global remapping".into(),
@@ -30,7 +29,9 @@ pub(crate) fn rewrite_linked_classes(
         .map(|unit| CompatibilityAnalyzer::analyze(&unit.dex))
         .collect::<Result<Vec<_>>>()?;
     if config.conservative_cross_dex_reflection
-        && compatibility.iter().any(|report| report.reflection_detected)
+        && compatibility
+            .iter()
+            .any(|report| report.reflection_detected)
     {
         let mut outputs = set.rewrite(&MultiDexRewriteConfig {
             rename: None,
@@ -61,7 +62,10 @@ pub(crate) fn rewrite_linked_classes(
                 .iter()
                 .find(|record| record.string_idx == type_id.descriptor_idx)
             {
-                if global.insert(record.old.clone(), record.new.clone()).is_some() {
+                if global
+                    .insert(record.old.clone(), record.new.clone())
+                    .is_some()
+                {
                     return Err(DexError::UnsafeRename(
                         "duplicate global class rename owner".into(),
                     ));
@@ -116,17 +120,16 @@ pub(crate) fn rewrite_linked_classes(
     }
 
     let mut outputs = Vec::with_capacity(set.units.len());
-    for ((unit, mut report), compatibility) in
-        set.units.iter().zip(plans).zip(&compatibility)
-    {
+    for ((unit, mut report), compatibility) in set.units.iter().zip(plans).zip(&compatibility) {
         let mut patches = BTreeMap::new();
         for (type_index, type_id) in unit.dex.types.iter().enumerate() {
-            let source = unit.dex.type_descriptor(type_index as u32).ok_or(
-                DexError::InvalidIndex {
-                    kind: "type",
-                    index: type_index as u32,
-                },
-            )?;
+            let source =
+                unit.dex
+                    .type_descriptor(type_index as u32)
+                    .ok_or(DexError::InvalidIndex {
+                        kind: "type",
+                        index: type_index as u32,
+                    })?;
             let component = source.trim_start_matches('[');
             let Some(target) = global.get(component) else {
                 continue;
