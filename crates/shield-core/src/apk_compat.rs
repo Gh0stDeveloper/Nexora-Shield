@@ -117,6 +117,14 @@ pub(crate) fn verify_apk_compatibility(
         }
     }
 
+    verify_non_dex_entries(path, directory, &changed)
+}
+
+fn verify_non_dex_entries(
+    path: &Path,
+    directory: &ZipDirectory,
+    changed: &[ChangedName],
+) -> Result<()> {
     let mut total = 0_usize;
     let mut found_manifest = false;
     for entry in &directory.entries {
