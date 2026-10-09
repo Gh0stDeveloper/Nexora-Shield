@@ -30,7 +30,7 @@ impl fmt::Debug for RetraceRecord {
             .field("dex_name", &self.dex_name)
             .field("string_idx", &self.string_idx)
             .field("names", &"[REDACTED]")
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -48,7 +48,7 @@ impl fmt::Debug for RetraceMap {
             .field("schema", &self.schema)
             .field("record_count", &self.records.len())
             .field("contents", &"[REDACTED]")
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
