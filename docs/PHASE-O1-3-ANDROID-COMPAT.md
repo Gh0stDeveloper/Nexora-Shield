@@ -21,7 +21,7 @@ producing an apparently valid but broken Android package.
 | --- | --- |
 | Text AndroidManifest.xml | Decode bounded UTF-8; reject renamed class descriptors, fully qualified dotted names, relative or quoted simple component names |
 | Text layout/configuration/XML and JSON files | Scan supported bounded text entries for renamed class and member names, including Android `android:onClick` callbacks |
-| Binary AndroidManifest.xml or compiled resource XML | Reject rename: an Android binary XML string-pool/attribute relinker is not yet certified |
+| Binary AndroidManifest.xml or compiled resource XML | Validate bounded chunk headers, UTF-8/UTF-16 string pools, XML nodes, attribute indexes and typed string references. Preserve byte-identical XML only if the renamed DEX symbols have **no** matching string-pool aliases. Otherwise reject pending structural rewrite |
 | `resources.arsc` | Reject rename: compiled resource references are not yet verified |
 | Packaged `lib/**/*.so` or native DEX methods | Reject rename: `JNI_OnLoad`, native registrations and external `FindClass`/`GetMethodID` contracts may depend on original names |
 | Reflective API method IDs | Detect `Class.forName`, `Class.getDeclaredMethod`, `ClassLoader.loadClass`, MethodHandles lookup APIs and Proxy creation even when no literal reflection name exists; reject rename |
@@ -32,6 +32,13 @@ files and refuse unrecognized encoding/formats. Non-DEX ZIP payloads remain
 byte-preserved by the existing staged APK reconstruction verifier.
 
 ## Compatibility limits
+
+The first read-only Android Binary XML string-pool reader is complete for its
+narrow diagnostic purpose. **It does not rewrite XML, resource IDs or compiled
+attribute references.** Valid-but-unreferenced binary XML can now be preserved;
+renamed class or member aliases still require keep rules or a fully verified
+resource relinker. Malformed or unrecognized structures fail closed. The
+compiled `resources.arsc` table remains blocked in the presence of renames.
 
 This diagnostic gate does not claim complete reflection or JNI call-graph
 resolution. Dynamically generated names and references embedded in arbitrary
@@ -44,6 +51,8 @@ contracts must remain blocked.
 
 ## Tests
 
+- Bounded binary XML parser tests cover valid UTF-8 and UTF-16 pools, missing/unbalanced roots, malformed lengths, truncated chunks and invalid string indexes.
+- Synthetic compressed APK tests preserve a structurally valid binary Manifest byte-for-byte when unrelated and reject both fully qualified and relative class name aliases before output creation.
 - Unit-level checks for manifest relative, bare, fully qualified and DEX
   descriptor aliases; XML `onClick`, JSON embedded class names, and an
   unreferenced ordinary manifest.
