@@ -364,41 +364,44 @@ mod retrace_tests {
 
     static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
-    fn scratch() -> std::path::PathBuf {
+    fn scratch() -> std::io::Result<std::path::PathBuf> {
         let unique = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(
             "nexora-o13-retrace-{}-{unique}",
             std::process::id()
         ));
-        fs::create_dir(&dir).expect("unique test directory");
-        dir
+        fs::create_dir(&dir)?;
+        Ok(dir)
     }
 
     #[test]
-    fn protected_sidecar_is_private_and_never_overwritten() {
-        let dir = scratch();
+    fn protected_sidecar_is_private_and_never_overwritten()
+        -> Result<(), Box<dyn std::error::Error>>
+    {
+        let dir = scratch()?;
         let path = dir.join("build.retrace.enc");
-        write_private_retrace(&path, b"authenticated-container").expect("write private file");
-        let permissions = fs::metadata(&path).expect("metadata").permissions().mode();
+        write_private_retrace(&path, b"authenticated-container")?;
+        let permissions = fs::metadata(&path)?.permissions().mode();
         assert_eq!(permissions & 0o077, 0, "no group or world permissions");
-        assert_eq!(fs::read(&path).expect("read"), b"authenticated-container");
+        assert_eq!(fs::read(&path)?, b"authenticated-container");
         assert!(write_private_retrace(&path, b"overwrite-attempt").is_err());
-        assert_eq!(
-            fs::read(&path).expect("preserved"),
-            b"authenticated-container"
-        );
-        fs::remove_dir_all(dir).expect("cleanup");
+        assert_eq!(fs::read(&path)?, b"authenticated-container");
+        fs::remove_dir_all(dir)?;
+        Ok(())
     }
 
     #[test]
-    fn protected_sidecar_rejects_symlink_and_preserves_target() {
-        let dir = scratch();
+    fn protected_sidecar_rejects_symlink_and_preserves_target()
+        -> Result<(), Box<dyn std::error::Error>>
+    {
+        let dir = scratch()?;
         let target = dir.join("target");
         let link = dir.join("protected-map");
-        fs::write(&target, b"unchanged").expect("target");
-        symlink(&target, &link).expect("link");
+        fs::write(&target, b"unchanged")?;
+        symlink(&target, &link)?;
         assert!(write_private_retrace(&link, b"private-data").is_err());
-        assert_eq!(fs::read(&target).expect("original target"), b"unchanged");
-        fs::remove_dir_all(dir).expect("cleanup");
+        assert_eq!(fs::read(&target)?, b"unchanged");
+        fs::remove_dir_all(dir)?;
+        Ok(())
     }
 }
