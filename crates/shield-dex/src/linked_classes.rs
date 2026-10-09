@@ -17,12 +17,6 @@ pub(crate) fn rewrite_linked_classes(
     let rename = config.rename.as_ref().ok_or_else(|| {
         DexError::UnsafeRename("linked class rewrite requires rename policy".into())
     })?;
-    if rename.rename_methods || rename.rename_fields {
-        return Err(DexError::UnsafeRename(
-            "cross-DEX method/field rename requires signature-bound global remapping".into(),
-        ));
-    }
-
     let compatibility = set
         .units
         .iter()
@@ -119,8 +113,14 @@ pub(crate) fn rewrite_linked_classes(
         }
     }
 
+    // Resolve defining owners and descriptor-based signatures before changing
+    // any DEX string bytes. Reference-only method_ids/field_ids inherit that
+    // global plan, while ambiguous or externally-bound aliases fail closed.
+    let member_plan = crate::linked_members::plan(set, rename, &compatibility)?;
     let mut outputs = Vec::with_capacity(set.units.len());
-    for ((unit, mut report), compatibility) in set.units.iter().zip(plans).zip(&compatibility) {
+    for (unit_index, ((unit, mut report), compatibility)) in
+        set.units.iter().zip(plans).zip(&compatibility).enumerate()
+    {
         let mut patches = BTreeMap::new();
         for (type_index, type_id) in unit.dex.types.iter().enumerate() {
             let source =
@@ -170,6 +170,28 @@ pub(crate) fn rewrite_linked_classes(
                 });
             }
         }
+        // Merge member references with class descriptor patches. The fixed-
+        // layout writer cannot fork a single shared string ID.
+        for (index, member) in &member_plan.patches[unit_index] {
+            if patches.insert(*index, member.new.clone()).is_some() {
+                return Err(DexError::UnsafeRename(
+                    "member rewrite shares a string ID with a class descriptor".into(),
+                ));
+            }
+            let old = unit.dex.string(*index).ok_or(DexError::InvalidIndex {
+                kind: "string",
+                index: *index,
+            })?;
+            report.records.push(RenameRecord {
+                string_idx: *index,
+                old: old.to_owned(),
+                new: member.new.clone(),
+                symbols: member.symbols.clone(),
+            });
+        }
+        report.skipped_contract_names.extend(&member_plan.skipped[unit_index]);
+        report.skipped_contract_names.sort_unstable();
+        report.skipped_contract_names.dedup();
         report.records.sort_by_key(|record| record.string_idx);
         let mut current = DexWriter::patch_strings(&unit.dex, &patches)?;
         let mut metadata_report = None;
