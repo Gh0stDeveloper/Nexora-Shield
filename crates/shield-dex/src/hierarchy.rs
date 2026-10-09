@@ -133,16 +133,16 @@ impl DexHierarchy {
     pub(crate) fn parents(&self, owner: &str) -> Result<Vec<String>> {
         let mut chain = Vec::new();
         let mut visited = BTreeSet::new();
-        let mut cursor = owner;
-        while let Some(node) = self.nodes.get(cursor) {
-            if !visited.insert(cursor.to_owned()) || chain.len() >= MAX_DEPTH {
+        let mut cursor = owner.to_owned();
+        while let Some(node) = self.nodes.get(&cursor) {
+            if !visited.insert(cursor.clone()) || chain.len() >= MAX_DEPTH {
                 return Err(DexError::UnsafeRename(
                     "cyclic or oversized superclass chain".into(),
                 ));
             }
             if let Some(parent) = node.parent.as_deref() {
                 chain.push(parent.to_owned());
-                cursor = chain.last().map(String::as_str).unwrap_or(OBJECT);
+                cursor.clone_from(parent);
             } else {
                 break;
             }
