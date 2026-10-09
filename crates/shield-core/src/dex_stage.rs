@@ -94,11 +94,13 @@ impl ProductionBuildContext {
             return Err(CoreError::InvalidRequest(
                 "private retrace file permissions require Unix secure creation".into(),
             ));
+            let normalized_map = crate::production::normalized_destination(map_path)?;
             if fs::symlink_metadata(map_path).is_ok()
-                || [destination, self.input(), self.output()].iter().any(|p| {
-                    crate::production::normalized_destination(map_path).ok()
-                        == crate::production::normalized_destination(p).ok()
-                })
+                || [destination, self.input(), self.output()]
+                    .iter()
+                    .map(|path| crate::production::normalized_destination(path))
+                    .collect::<Result<Vec<_>>>()?
+                    .contains(&normalized_map)
             {
                 return Err(CoreError::InvalidRequest(
                     "private retrace destination must be new and disjoint from APK files".into(),
