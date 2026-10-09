@@ -229,6 +229,64 @@ for filename, values in {
         output.writestr("classes.dex", first)
         output.writestr("classes2.dex", second)
 
+# O.1.3: synthetic ARSC string pools, one package, type spec and type.
+# Structural-only fixtures; these are NOT installable resource APKs.
+def arsc_pool(values: list[str]) -> bytes:
+    raw = bytearray()
+    offsets = []
+    for value in values:
+        encoded = value.encode("utf-8")
+        utf16_units = len(value.encode("utf-16-le")) // 2
+        if utf16_units >= 128 or len(encoded) >= 128:
+            raise ValueError("fixture requires short pool string lengths")
+        offsets.append(len(raw))
+        raw.extend((utf16_units, len(encoded)))
+        raw.extend(encoded)
+        raw.append(0)
+    payload = (
+        struct.pack("<IIIII", len(values), 0, 0x100, 28 + 4 * len(values), 0)
+        + b"".join(struct.pack("<I", offset) for offset in offsets)
+        + raw
+    )
+    result = bytearray(struct.pack("<HHI", 1, 28, len(payload) + 8) + payload)
+    while len(result) % 4:
+        result.append(0)
+    struct.pack_into("<I", result, 4, len(result))
+    return bytes(result)
+
+
+def resource_table(binding: str) -> bytes:
+    values = arsc_pool([binding])
+    type_strings = arsc_pool(["string"])
+    key_strings = arsc_pool(["title"])
+    spec = struct.pack("<HHIBBHI", 0x0202, 16, 20, 1, 0, 0, 1) + struct.pack("<I", 0)
+    type_header = struct.pack("<HHIBBHI", 0x0201, 24, 44, 1, 0, 0, 1)
+    typed = (
+        type_header + struct.pack("<II", 28, 4)
+        + struct.pack("<IHHI", 0, 8, 0, 0)
+        + struct.pack("<HBBI", 8, 0, 3, 0)
+    )
+    package = bytearray(288)
+    struct.pack_into("<HHII", package, 0, 0x0200, 288,
+                     288 + len(type_strings) + len(key_strings) + len(spec) + len(typed), 0x7f)
+    struct.pack_into("<I", package, 268, 288)
+    struct.pack_into("<I", package, 276, 288 + len(type_strings))
+    package.extend(type_strings + key_strings + spec + typed)
+    table = struct.pack("<HHII", 2, 12, 12 + len(values) + len(package), 1)
+    return table + values + package
+
+
+for variant, arsc in {
+    "arsc-unreferenced": resource_table("not.related.Class"),
+    "arsc-class-alias": resource_table("com.test.A"),
+    "arsc-corrupt": resource_table("unrelated")[:-1],
+}.items():
+    with zipfile.ZipFile(directory / f"{variant}.apk", "w", compression=zipfile.ZIP_DEFLATED) as output:
+        output.writestr("AndroidManifest.xml", manifest)
+        output.writestr("classes.dex", first)
+        output.writestr("classes2.dex", second)
+        output.writestr("resources.arsc", arsc)
+
 # Corrupt only the raw compressed stream (not ZIP CRC or length metadata).
 corrupted = bytearray((directory / "compressed-dex.apk").read_bytes())
 with zipfile.ZipFile(directory / "compressed-dex.apk") as compressed_apk:
