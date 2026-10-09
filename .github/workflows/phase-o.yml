@@ -275,6 +275,37 @@ jobs:
           # The ordinary plain-text manifest with no external aliases must
           # remain an allowed diagnostic transform. Previous step covers it.
           test -f build/phase-o1/dex-staged.apk
+      - name: O.1.3 structurally parse Android binary XML and preserve safe input
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core android_binary_xml::tests
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/binary-valid-unreferenced.apk \
+            build/phase-o1/binary-valid-staged.apk \
+            > build/phase-o1/binary-valid-stage.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/binary-valid-stage.txt
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          base = Path("build/phase-o1")
+          with ZipFile(base / "binary-valid-unreferenced.apk") as source:
+              original = source.read("AndroidManifest.xml")
+          with ZipFile(base / "binary-valid-staged.apk") as output:
+              assert output.read("AndroidManifest.xml") == original, "binary XML modified unexpectedly"
+              assert output.read("classes.dex") != (base / "classes.dex").read_bytes()
+          PY
+          for mode in binary-valid-class-alias binary-valid-relative-alias; do
+            denied="build/phase-o1/${mode}-denied.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${mode}.apk" "${denied}" \
+              > "build/phase-o1/${mode}.txt" 2>&1; then
+              echo "O.1.3 accepted a compiled XML class alias: ${mode}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3 external Android binding' "build/phase-o1/${mode}.txt"
+            test ! -e "${denied}"
+          done
       - name: Accept bounded DEFLATE DEX and preserve compression-safe reconstruction
         shell: bash
         run: |
