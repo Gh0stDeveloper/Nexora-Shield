@@ -49,7 +49,6 @@ impl Member {
         }
         key
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
