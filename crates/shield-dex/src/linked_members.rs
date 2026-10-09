@@ -81,7 +81,9 @@ pub(crate) fn plan(
                     && !is_contract_name(key.name())
                     && !report.protected_string_indices.contains(&method.name_idx);
                 if defined.insert(key.clone(), allowed).is_some() {
-                    return Err(DexError::UnsafeRename("duplicate defined method identity".into()));
+                    return Err(DexError::UnsafeRename(
+                        "duplicate defined method identity".into(),
+                    ));
                 }
                 if !allowed {
                     protected.insert(key);
@@ -106,7 +108,9 @@ pub(crate) fn plan(
                     && !is_contract_name(key.name())
                     && !report.protected_string_indices.contains(&field.name_idx);
                 if defined.insert(key.clone(), allowed).is_some() {
-                    return Err(DexError::UnsafeRename("duplicate defined field identity".into()));
+                    return Err(DexError::UnsafeRename(
+                        "duplicate defined field identity".into(),
+                    ));
                 }
                 if !allowed {
                     protected.insert(key);
@@ -197,7 +201,11 @@ pub(crate) fn plan(
             // The same string ID can also be referenced by a type_id; changing
             // it would mutate a class/proto signature outside the member plan.
             if unit.dex.types.iter().any(|ty| ty.descriptor_idx == index)
-                || unit.dex.protos.iter().any(|proto| proto.shorty_idx == index)
+                || unit
+                    .dex
+                    .protos
+                    .iter()
+                    .any(|proto| proto.shorty_idx == index)
             {
                 return Err(DexError::UnsafeRename(
                     "member name string ID aliases a type or prototype descriptor".into(),
@@ -222,14 +230,20 @@ pub(crate) fn plan(
 }
 
 fn method_key(dex: &DexFile, index: u32) -> Result<Member> {
-    let method = dex.methods.get(index as usize).ok_or(DexError::InvalidIndex {
-        kind: "method",
-        index,
-    })?;
-    let proto = dex.protos.get(method.proto_idx as usize).ok_or(DexError::InvalidIndex {
-        kind: "proto",
-        index: u32::from(method.proto_idx),
-    })?;
+    let method = dex
+        .methods
+        .get(index as usize)
+        .ok_or(DexError::InvalidIndex {
+            kind: "method",
+            index,
+        })?;
+    let proto = dex
+        .protos
+        .get(method.proto_idx as usize)
+        .ok_or(DexError::InvalidIndex {
+            kind: "proto",
+            index: u32::from(method.proto_idx),
+        })?;
     let mut signature = String::from("(");
     for parameter in &proto.parameters {
         signature.push_str(type_name(dex, u32::from(*parameter))?);
@@ -238,25 +252,34 @@ fn method_key(dex: &DexFile, index: u32) -> Result<Member> {
     signature.push_str(type_name(dex, proto.return_type_idx)?);
     Ok(Member::Method {
         owner: type_name(dex, u32::from(method.class_idx))?.to_owned(),
-        name: dex.method_name(index).ok_or(DexError::InvalidIndex {
-            kind: "method name",
-            index,
-        })?.to_owned(),
+        name: dex
+            .method_name(index)
+            .ok_or(DexError::InvalidIndex {
+                kind: "method name",
+                index,
+            })?
+            .to_owned(),
         signature,
     })
 }
 
 fn field_key(dex: &DexFile, index: u32) -> Result<Member> {
-    let field = dex.fields.get(index as usize).ok_or(DexError::InvalidIndex {
-        kind: "field",
-        index,
-    })?;
+    let field = dex
+        .fields
+        .get(index as usize)
+        .ok_or(DexError::InvalidIndex {
+            kind: "field",
+            index,
+        })?;
     Ok(Member::Field {
         owner: type_name(dex, u32::from(field.class_idx))?.to_owned(),
-        name: dex.field_name(index).ok_or(DexError::InvalidIndex {
-            kind: "field name",
-            index,
-        })?.to_owned(),
+        name: dex
+            .field_name(index)
+            .ok_or(DexError::InvalidIndex {
+                kind: "field name",
+                index,
+            })?
+            .to_owned(),
         field_type: type_name(dex, u32::from(field.type_idx))?.to_owned(),
     })
 }
@@ -282,8 +305,14 @@ fn obfuscated_name(original: &str, seed: u64, salt: u64) -> String {
         let hash = state.wrapping_mul(0x2545_f491_4f6c_dd1d);
         const FIRST: &[u8; 26] = b"abcdefghijklmnopqrstuvwxyz";
         const REST: &[u8; 37] = b"abcdefghijklmnopqrstuvwxyz0123456789_";
-        let alphabet = if index == 0 { FIRST.as_slice() } else { REST.as_slice() };
-        output.push(char::from(alphabet[(hash % alphabet.len() as u64) as usize]));
+        let alphabet = if index == 0 {
+            FIRST.as_slice()
+        } else {
+            REST.as_slice()
+        };
+        output.push(char::from(
+            alphabet[(hash % alphabet.len() as u64) as usize],
+        ));
     }
     output
 }
