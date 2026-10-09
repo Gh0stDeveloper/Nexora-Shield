@@ -286,25 +286,26 @@ mod tests {
         let mut strings = Vec::new();
         let mut indices = Vec::new();
         for value in values {
-            indices.extend((strings.len() as u32).to_le_bytes());
-            strings.push(value.encode_utf16().count() as u8);
-            strings.push(value.len() as u8);
+            indices.extend((u32::try_from(strings.len()).unwrap_or(u32::MAX)).to_le_bytes());
+            strings.push(u8::try_from(value.encode_utf16().count()).unwrap_or(0));
+            strings.push(u8::try_from(value.len()).unwrap_or(0));
             strings.extend(value.as_bytes());
             strings.push(0);
         }
         let mut out = Vec::new();
         out.extend(1_u16.to_le_bytes());
         out.extend(28_u16.to_le_bytes());
-        out.extend(((28 + indices.len() + strings.len()) as u32).to_le_bytes());
-        out.extend((values.len() as u32).to_le_bytes());
+        out.extend((u32::try_from(28 + indices.len() + strings.len()).unwrap_or(u32::MAX)).to_le_bytes());
+        out.extend((u32::try_from(values.len()).unwrap_or(u32::MAX)).to_le_bytes());
         out.extend(0_u32.to_le_bytes());
         out.extend(0x100_u32.to_le_bytes());
-        out.extend(((28 + indices.len()) as u32).to_le_bytes());
+        out.extend((u32::try_from(28 + indices.len()).unwrap_or(u32::MAX)).to_le_bytes());
         out.extend(0_u32.to_le_bytes());
         out.extend(indices);
         out.extend(strings);
         while out.len() % 4 != 0 { out.push(0); }
-        out[4..8].copy_from_slice(&(out.len() as u32).to_le_bytes());
+        let total = u32::try_from(out.len()).unwrap_or(u32::MAX);
+        out[4..8].copy_from_slice(&total.to_le_bytes());
         out
     }
 
@@ -337,10 +338,10 @@ mod tests {
         let mut package = vec![0_u8; 288];
         package[..2].copy_from_slice(&0x0200_u16.to_le_bytes());
         package[2..4].copy_from_slice(&288_u16.to_le_bytes());
-        package[4..8].copy_from_slice(&(package_size as u32).to_le_bytes());
+        package[4..8].copy_from_slice(&(u32::try_from(package_size).unwrap_or(u32::MAX)).to_le_bytes());
         package[8..12].copy_from_slice(&0x7f_u32.to_le_bytes());
         package[268..272].copy_from_slice(&288_u32.to_le_bytes());
-        package[276..280].copy_from_slice(&((288 + type_pool.len()) as u32).to_le_bytes());
+        package[276..280].copy_from_slice(&(u32::try_from(288 + type_pool.len()).unwrap_or(u32::MAX)).to_le_bytes());
         package.extend(type_pool);
         package.extend(key_pool);
         package.extend(spec);
@@ -348,7 +349,7 @@ mod tests {
         let mut table = Vec::new();
         table.extend(2_u16.to_le_bytes());
         table.extend(12_u16.to_le_bytes());
-        table.extend(((12 + global.len() + package.len()) as u32).to_le_bytes());
+        table.extend((u32::try_from(12 + global.len() + package.len()).unwrap_or(u32::MAX)).to_le_bytes());
         table.extend(1_u32.to_le_bytes());
         table.extend(global);
         table.extend(package);
