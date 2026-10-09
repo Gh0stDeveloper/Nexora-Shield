@@ -25,6 +25,7 @@ mod checksum;
 mod compatibility;
 mod error;
 mod graph;
+mod hierarchy;
 mod ir;
 mod linked_classes;
 mod linked_members;
