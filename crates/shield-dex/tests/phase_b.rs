@@ -473,9 +473,7 @@ fn o13_member_linker_rejects_inherited_import_without_hierarchy_binding() {
             ..MultiDexRewriteConfig::default()
         })
         .expect_err("inherited member alias must not be left unchanged");
-    assert!(error
-        .to_string()
-        .contains("hierarchy-aware linking"));
+    assert!(error.to_string().contains("hierarchy-aware linking"));
 }
 
 #[test]
