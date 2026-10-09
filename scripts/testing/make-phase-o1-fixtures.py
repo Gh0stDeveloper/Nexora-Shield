@@ -188,6 +188,47 @@ for variant, (variant_manifest, extras) in abi_variants.items():
         for extra_name, payload in extras.items():
             output.writestr(extra_name, payload)
 
+# Strict, structurally valid synthetic Android binary XML with a UTF-8
+# string pool, empty start/end manifest nodes and optional resource map.
+# These are parser-contract fixtures, not installable Android manifests.
+def binary_manifest(values: list[str], include_resource_map: bool = True) -> bytes:
+    strings_data = bytearray()
+    offsets = []
+    for value in values:
+        raw = value.encode("utf-8")
+        units = len(value.encode("utf-16-le")) // 2
+        if units > 127 or len(raw) > 127:
+            raise ValueError("synthetic binary XML string exceeds short length encoding")
+        offsets.append(len(strings_data))
+        strings_data.extend((units, len(raw)))
+        strings_data.extend(raw)
+        strings_data.append(0)
+    pool_data = (
+        struct.pack("<IIIII", len(values), 0, 0x100, 28 + len(offsets) * 4, 0)
+        + b"".join(struct.pack("<I", off) for off in offsets)
+        + strings_data
+    )
+    pool = struct.pack("<HHI", 1, 28, len(pool_data) + 8) + pool_data
+    node_start = struct.pack("<II", 1, 0xffffffff) + struct.pack(
+        "<IIHHHHHH", 0xffffffff, 0, 20, 20, 0, 0, 0, 0
+    )
+    node_end = struct.pack("<II", 2, 0xffffffff) + struct.pack("<II", 0xffffffff, 0)
+    start = struct.pack("<HHI", 0x0102, 16, len(node_start) + 8) + node_start
+    end = struct.pack("<HHI", 0x0103, 16, len(node_end) + 8) + node_end
+    resource_map = struct.pack("<HHII", 0x0180, 8, 12, 0x01010003) if include_resource_map else b""
+    children = pool + resource_map + start + end
+    return struct.pack("<HHI", 3, 8, len(children) + 8) + children
+
+for filename, values in {
+    "binary-valid-unreferenced": ["manifest", "other_unrelated"],
+    "binary-valid-class-alias": ["manifest", "com.test.A"],
+    "binary-valid-relative-alias": ["manifest", ".A"],
+}.items():
+    with zipfile.ZipFile(directory / f"{filename}.apk", "w", compression=zipfile.ZIP_DEFLATED) as output:
+        output.writestr("AndroidManifest.xml", binary_manifest(values))
+        output.writestr("classes.dex", first)
+        output.writestr("classes2.dex", second)
+
 # Corrupt only the raw compressed stream (not ZIP CRC or length metadata).
 corrupted = bytearray((directory / "compressed-dex.apk").read_bytes())
 with zipfile.ZipFile(directory / "compressed-dex.apk") as compressed_apk:
