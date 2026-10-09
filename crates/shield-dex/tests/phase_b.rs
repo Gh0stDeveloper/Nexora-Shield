@@ -632,6 +632,73 @@ fn o13_interface_override_family_rejects_partial_selection() {
 }
 
 #[test]
+fn o13_inherited_private_member_does_not_get_public_alias() {
+    let mut owner = build_linked_member_fixture(true);
+    let owner_before = DexParser::parse(&owner).expect("owner");
+    let data_at = owner_before.classes[0].class_data_off as usize;
+    owner[data_at + 5] = 0x0a; // static private field
+    owner[data_at + 7] = 0x0a; // static private method
+    refresh_integrity(&mut owner).expect("private fixture");
+    let mut child = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&child).expect("child");
+    put_u16(&mut child, parsed.header.method_ids_off as usize + 8, 0);
+    put_u16(&mut child, parsed.header.field_ids_off as usize, 0);
+    refresh_integrity(&mut child).expect("ref alias");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child,
+        },
+    ])
+    .expect("synthetic inputs");
+    let err = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect_err("private members are not inherited by subclasses");
+    assert!(err.to_string().contains("non-inheritable"));
+}
+
+#[test]
+fn o13_cyclic_superclass_graph_is_rejected_before_rewrite() {
+    let mut owner = virtual_owner_fixture();
+    let parsed = DexParser::parse(&owner).expect("owner");
+    put_u32(&mut owner, parsed.header.class_defs_off as usize + 8, 0);
+    refresh_integrity(&mut owner).expect("cycle");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_linked_member_fixture(false),
+        },
+    ])
+    .expect("structurally accepted input");
+    let result = set.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig {
+            rename_classes: false,
+            rename_fields: false,
+            ..RenameConfig::default()
+        }),
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(result
+        .expect_err("cycle is unsafe")
+        .to_string()
+        .contains("cyclic DEX class/interface hierarchy"));
+}
+
+#[test]
 fn multidex_parser_rejects_duplicate_class_ownership() {
     let primary = build_test_dex("Lcom/test/A;", "run");
     let err = MultiDexSet::parse(vec![
