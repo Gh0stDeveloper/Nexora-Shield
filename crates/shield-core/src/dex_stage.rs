@@ -3,7 +3,9 @@
 
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
 use nexora_shield_crypto::{seal_retrace_map, KeySchedule, RetraceMap, RetraceRecord};
-use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
+use nexora_shield_dex::{
+    canonical_dex_index, DexInput, DexRewriteOutput, MultiDexRewriteConfig, MultiDexSet,
+};
 use nexora_shield_package::{
     crc32_ieee, is_legacy_signature_entry, read_decoded_entry, read_stored_entry,
     read_zip_directory, rewrite_stored_entries, verify_apk_structure,
@@ -16,6 +18,11 @@ use std::path::Path;
 
 // Bind the validated multidex input set and its exact source bytes.
 type LoadedDexSources = (Vec<DexInput>, BTreeMap<String, Vec<u8>>);
+type StagedRewriteRecords = (
+    StagedDexResult,
+    BTreeMap<String, Vec<u8>>,
+    Vec<RetraceRecord>,
+);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StagedDexResult {
@@ -102,46 +109,8 @@ impl ProductionBuildContext {
         let outputs = set.rewrite(config).map_err(|error| {
             CoreError::InvalidRequest(format!("DEX transform refused: {error}"))
         })?;
-        let mut result = StagedDexResult {
-            dex_units: outputs.len(),
-            changed_dex_units: 0,
-            skipped_cross_dex_rename_units: 0,
-            source_files_removed: 0,
-            debug_info_detached: 0,
-            name_records: 0,
-            verified_code_items: 0,
-            output_sha256: String::new(),
-        };
-        let mut replacements = BTreeMap::new();
-        let mut retrace_records = Vec::new();
-        for unit in outputs {
-            result.verified_code_items += unit.audit.preserved_code_items;
-            if unit.rename_skipped_for_cross_dex_reflection {
-                result.skipped_cross_dex_rename_units += 1;
-            }
-            if let Some(report) = unit.rename_report {
-                result.name_records += report.records.len();
-                if retrace.is_some() {
-                    retrace_records.extend(report.records.into_iter().map(|record| {
-                        RetraceRecord {
-                            dex_name: unit.name.clone(),
-                            string_idx: record.string_idx,
-                            original: record.old,
-                            obfuscated: record.new,
-                            symbols: record.symbols,
-                        }
-                    }));
-                }
-            }
-            if let Some(report) = unit.metadata_report {
-                result.source_files_removed += report.source_files_removed;
-                result.debug_info_detached += report.debug_info_detached;
-            }
-            if originals.get(&unit.name) != Some(&unit.bytes) {
-                result.changed_dex_units += 1;
-            }
-            replacements.insert(unit.name, unit.bytes);
-        }
+        let (mut result, replacements, retrace_records) =
+            collect_staged_outputs(outputs, &originals, retrace.is_some());
         if result.changed_dex_units == 0 {
             return Err(CoreError::InvalidRequest(
                 "requested DEX rewrite changed no bytes; no protection claimed".into(),
@@ -245,6 +214,55 @@ impl ProductionBuildContext {
         self.verify_input_unchanged()?;
         Ok(inspection.sha256)
     }
+}
+
+
+fn collect_staged_outputs(
+    outputs: Vec<DexRewriteOutput>,
+    originals: &BTreeMap<String, Vec<u8>>,
+    wants_retrace: bool,
+) -> StagedRewriteRecords {
+    let mut result = StagedDexResult {
+        dex_units: outputs.len(),
+        changed_dex_units: 0,
+        skipped_cross_dex_rename_units: 0,
+        source_files_removed: 0,
+        debug_info_detached: 0,
+        name_records: 0,
+        verified_code_items: 0,
+        output_sha256: String::new(),
+    };
+    let mut replacements = BTreeMap::new();
+    let mut retrace_records = Vec::new();
+    for unit in outputs {
+        result.verified_code_items += unit.audit.preserved_code_items;
+        if unit.rename_skipped_for_cross_dex_reflection {
+            result.skipped_cross_dex_rename_units += 1;
+        }
+        if let Some(report) = unit.rename_report {
+            result.name_records += report.records.len();
+            if retrace.is_some() {
+                retrace_records.extend(report.records.into_iter().map(|record| {
+                    RetraceRecord {
+                        dex_name: unit.name.clone(),
+                        string_idx: record.string_idx,
+                        original: record.old,
+                        obfuscated: record.new,
+                        symbols: record.symbols,
+                    }
+                }));
+            }
+        }
+        if let Some(report) = unit.metadata_report {
+            result.source_files_removed += report.source_files_removed;
+            result.debug_info_detached += report.debug_info_detached;
+        }
+        if originals.get(&unit.name) != Some(&unit.bytes) {
+            result.changed_dex_units += 1;
+        }
+        replacements.insert(unit.name, unit.bytes);
+    }
+    (result, replacements, retrace_records)
 }
 
 fn validate_retrace_destination(
