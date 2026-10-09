@@ -20,6 +20,7 @@ struct Node {
 #[derive(Debug)]
 pub(crate) struct DexHierarchy {
     nodes: BTreeMap<String, Node>,
+    descendants: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl DexHierarchy {
@@ -73,7 +74,20 @@ impl DexHierarchy {
                 );
             }
         }
-        Ok(Self { nodes })
+        let mut graph = Self {
+            nodes,
+            descendants: BTreeMap::new(),
+        };
+        let mut descendants = BTreeMap::<String, BTreeSet<String>>::new();
+        for owner in graph.nodes.keys() {
+            // Validate the complete local graph once and index ancestors to
+            // descendants to avoid repeated O(classes x methods^2) scans.
+            for ancestor in graph.closure(owner)? {
+                descendants.entry(ancestor).or_default().insert(owner.clone());
+            }
+        }
+        graph.descendants = descendants;
+        Ok(graph)
     }
 
     /// Local parents and interface contracts reachable from this class,
@@ -165,17 +179,14 @@ impl DexHierarchy {
 
     /// Includes a shared local descendant, important when an inherited
     /// implementation satisfies an interface declared by the descendant.
-    pub(crate) fn connected(&self, first: &str, second: &str) -> Result<bool> {
+    pub(crate) fn connected(&self, first: &str, second: &str) -> bool {
         if first == second {
-            return Ok(true);
+            return true;
         }
-        for owner in self.nodes.keys() {
-            let closure = self.closure(owner)?;
-            if closure.contains(first) && closure.contains(second) {
-                return Ok(true);
-            }
+        match (self.descendants.get(first), self.descendants.get(second)) {
+            (Some(left), Some(right)) => left.iter().any(|child| right.contains(child)),
+            _ => false,
         }
-        Ok(false)
     }
 }
 
