@@ -147,9 +147,25 @@ fn verify_non_dex_entries(
             ));
         }
         if name.eq_ignore_ascii_case("resources.arsc") {
-            return Err(CoreError::InvalidRequest(
-                "O.1.3 compiled resource table has no verified reference remapper".into(),
-            ));
+            let size = usize::try_from(entry.uncompressed_size).map_err(|_| {
+                CoreError::InvalidRequest("O.1.3 resource table size overflow".into())
+            })?;
+            total = total.checked_add(size).ok_or_else(|| {
+                CoreError::InvalidRequest("O.1.3 resource table budget overflow".into())
+            })?;
+            if size > MAX_CONTRACT_ENTRY_BYTES || total > MAX_CONTRACT_TOTAL_BYTES {
+                return Err(CoreError::InvalidRequest(
+                    "O.1.3 resource table exceeds bounded inspection budget".into(),
+                ));
+            }
+            let bytes = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
+            for value in crate::android_resources::inspect_resource_table(&bytes)? {
+                // Resource-table values are external DEX ABI contracts.
+                // A matching name requires keep rules until a verified linker
+                // can atomically rewrite DEX + resources + compiled XML.
+                guard_text_reference(&format!("\"{value}\""), changed, name)?;
+            }
+            continue;
         }
         let is_xml = name == "AndroidManifest.xml"
             || extension.is_some_and(|suffix| suffix.eq_ignore_ascii_case("xml"));
