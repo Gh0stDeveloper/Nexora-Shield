@@ -2,6 +2,9 @@
 //! This unsigned staging artifact is never a production protection result.
 
 use crate::{CoreError, ProductionBuildContext, Result, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
+use nexora_shield_crypto::{
+    seal_retrace_map, KeySchedule, RetraceMap, RetraceRecord,
+};
 use nexora_shield_dex::{canonical_dex_index, DexInput, MultiDexRewriteConfig, MultiDexSet};
 use nexora_shield_package::{
     crc32_ieee, is_legacy_signature_entry, read_decoded_entry, read_stored_entry,
@@ -9,7 +12,8 @@ use nexora_shield_package::{
     verify_preserved_entry_payload, ZipDirectory,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::Path;
 
 // Bind the validated multidex input set and its exact source bytes.
@@ -39,6 +43,36 @@ impl ProductionBuildContext {
         destination: &Path,
         config: &MultiDexRewriteConfig,
     ) -> Result<StagedDexResult> {
+        self.stage_dex_rewrite_internal(destination, config, None)
+    }
+
+    /// Produce an unsigned diagnostic APK and a separate, encrypted retrace
+    /// sidecar. A new 0600 Unix file is required; no key/plaintext is written.
+    ///
+    /// # Errors
+    ///
+    /// Rejects conflicting destinations, missing key material, no rename
+    /// records, unsafe output, failed authentication or sidecar I/O.
+    pub fn stage_dex_rewrite_with_protected_retrace(
+        &self,
+        destination: &Path,
+        retrace_destination: &Path,
+        config: &MultiDexRewriteConfig,
+        key_schedule: &KeySchedule,
+    ) -> Result<StagedDexResult> {
+        self.stage_dex_rewrite_internal(
+            destination,
+            config,
+            Some((retrace_destination, key_schedule)),
+        )
+    }
+
+    fn stage_dex_rewrite_internal(
+        &self,
+        destination: &Path,
+        config: &MultiDexRewriteConfig,
+        retrace: Option<(&Path, &KeySchedule)>,
+    ) -> Result<StagedDexResult> {
         if config.rename.is_none() && !config.strip_metadata {
             return Err(CoreError::InvalidRequest(
                 "staging requires a real DEX transform".into(),
@@ -56,6 +90,25 @@ impl ProductionBuildContext {
             return Err(CoreError::InvalidRequest(
                 "DEX staging destination must be new and separate from source/output".into(),
             ));
+        }
+        if let Some((map_path, _)) = retrace {
+            #[cfg(not(unix))]
+            return Err(CoreError::InvalidRequest(
+                "private retrace file permissions require Unix secure creation".into(),
+            ));
+            if fs::symlink_metadata(map_path).is_ok()
+                || [destination, self.input(), self.output()]
+                    .iter()
+                    .any(|p| {
+                        crate::production::normalized_destination(map_path)
+                            .ok()
+                            == crate::production::normalized_destination(p).ok()
+                    })
+            {
+                return Err(CoreError::InvalidRequest(
+                    "private retrace destination must be new and disjoint from APK files".into(),
+                ));
+            }
         }
         // The preflight enforces conservative compatibility and class ownership.
         let _ = self.inspect_dex()?;
@@ -78,6 +131,7 @@ impl ProductionBuildContext {
             output_sha256: String::new(),
         };
         let mut replacements = BTreeMap::new();
+        let mut retrace_records = Vec::new();
         for unit in outputs {
             result.verified_code_items += unit.audit.preserved_code_items;
             if unit.rename_skipped_for_cross_dex_reflection {
@@ -85,6 +139,15 @@ impl ProductionBuildContext {
             }
             if let Some(report) = unit.rename_report {
                 result.name_records += report.records.len();
+                if retrace.is_some() {
+                    retrace_records.extend(report.records.into_iter().map(|record| RetraceRecord {
+                        dex_name: unit.name.clone(),
+                        string_idx: record.string_idx,
+                        original: record.old,
+                        obfuscated: record.new,
+                        symbols: record.symbols,
+                    }));
+                }
             }
             if let Some(report) = unit.metadata_report {
                 result.source_files_removed += report.source_files_removed;
@@ -100,6 +163,11 @@ impl ProductionBuildContext {
                 "requested DEX rewrite changed no bytes; no protection claimed".into(),
             ));
         }
+        if retrace.is_some() && retrace_records.is_empty() {
+            return Err(CoreError::InvalidRequest(
+                "no renamed symbols; an empty protected retrace map is forbidden".into(),
+            ));
+        }
         self.verify_input_unchanged()?;
         // The ZIP writer exclusively owns the new path and cleans its own
         // partial files; never remove a concurrently created path on refusal.
@@ -107,6 +175,19 @@ impl ProductionBuildContext {
         let reconstruction = self.verify_staged_apk(destination, &directory, &replacements);
         match reconstruction {
             Ok(output_hash) => {
+                if let Some((map_path, schedule)) = retrace {
+                    let encrypted = (|| -> Result<Vec<u8>> {
+                        let document = RetraceMap::new(schedule, output_hash.clone(), retrace_records)
+                            .map_err(|_| CoreError::InvalidRequest("invalid private retrace mapping".into()))?;
+                        seal_retrace_map(schedule, &document)
+                            .map_err(|_| CoreError::InvalidRequest("unable to seal private retrace mapping".into()))
+                    })();
+                    let written = encrypted.and_then(|bytes| write_private_retrace(map_path, &bytes));
+                    if let Err(error) = written {
+                        let _ = fs::remove_file(destination);
+                        return Err(error);
+                    }
+                }
                 result.output_sha256 = output_hash;
                 Ok(result)
             }
@@ -185,6 +266,33 @@ impl ProductionBuildContext {
         self.verify_input_unchanged()?;
         Ok(inspection.sha256)
     }
+}
+
+/// Atomic no-overwrite semantics for the private sidecar's leaf. Never emit
+/// plaintext and never overwrite a preexisting file or symlink.
+#[cfg(unix)]
+fn write_private_retrace(destination: &Path, ciphertext: &[u8]) -> Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(destination)?;
+    let outcome = file.write_all(ciphertext).and_then(|()| file.sync_all());
+    if let Err(error) = outcome {
+        drop(file);
+        let _ = fs::remove_file(destination);
+        return Err(CoreError::Io(error));
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn write_private_retrace(_destination: &Path, _ciphertext: &[u8]) -> Result<()> {
+    Err(CoreError::InvalidRequest(
+        "private retrace sidecar requires Unix 0600 file permissions".into(),
+    ))
 }
 
 fn verify_rebuilt_zip(
