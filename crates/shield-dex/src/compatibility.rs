@@ -188,7 +188,10 @@ mod android_reflection_tests {
     fn o13_non_reflective_method_ids_do_not_trigger_global_guard() {
         assert!(!is_dynamic_lookup_api("Lcom/test/A;", "run"));
         assert!(!is_dynamic_lookup_api("Ljava/lang/Class;", "getName"));
-        assert!(!is_dynamic_lookup_api("Ljava/lang/ClassLoader;", "getParent"));
+        assert!(!is_dynamic_lookup_api(
+            "Ljava/lang/ClassLoader;",
+            "getParent"
+        ));
     }
 }
 
