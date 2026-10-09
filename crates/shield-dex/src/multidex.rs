@@ -116,12 +116,10 @@ impl MultiDexSet {
     }
 
     pub fn rewrite(&self, config: &MultiDexRewriteConfig) -> Result<Vec<DexRewriteOutput>> {
-        // Until O.1.3 has a global symbol binding/remapping executor, no
-        // class/method/field rename may invalidate references in another DEX.
+        // Linked class descriptors can be remapped globally. Linked methods
+        // and fields still fail closed until signature-aware binding exists.
         if config.rename.is_some() && self.has_cross_dex_symbol_references()? {
-            return Err(DexError::UnsafeRename(
-                "cross-DEX symbol references require coordinated global remapping; use metadata-only rewrite".into(),
-            ));
+            return crate::linked_classes::rewrite_linked_classes(self, config);
         }
         let cross_dex_reflection = config.conservative_cross_dex_reflection
             && self.units.len() > 1
