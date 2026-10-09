@@ -171,26 +171,40 @@ pub(crate) fn plan(
         }
     }
 
-    // Overrides and interface implementations form dispatch contracts.
-    // Renaming one member without every locally linked override is unsafe.
-    for left in &virtual_defs {
-        for right in &virtual_defs {
-            if left == right || !same_dispatch_shape(left, right) {
-                continue;
-            }
-            if !hierarchy.connected(left.owner(), right.owner())? {
-                continue;
-            }
-            if !same_virtual_slot(left, right) {
-                if defined.get(left) == Some(&true) || defined.get(right) == Some(&true) {
+    // Compare only methods sharing the same dispatch name and parameters.
+    // Comparing every virtual method pair would be quadratic in the whole APK.
+    let mut families = BTreeMap::<(String, String), Vec<&Member>>::new();
+    for member in &virtual_defs {
+        if let Member::Method {
+            name, signature, ..
+        } = member
+        {
+            let args = signature.split_once(')').map_or(signature.as_str(), |(a, _)| a);
+            families
+                .entry((name.clone(), args.to_owned()))
+                .or_default()
+                .push(member);
+        }
+    }
+    for members in families.values() {
+        for (index, left) in members.iter().enumerate() {
+            for right in members.iter().skip(index + 1) {
+                if !same_dispatch_shape(left, right)
+                    || !hierarchy.connected(left.owner(), right.owner())
+                {
+                    continue;
+                }
+                if !same_virtual_slot(left, right) {
+                    if defined.get(*left) == Some(&true) || defined.get(*right) == Some(&true) {
+                        return Err(DexError::UnsafeRename(
+                            "covariant virtual override requires complete bridge resolution".into(),
+                        ));
+                    }
+                } else if defined.get(*left) != defined.get(*right) {
                     return Err(DexError::UnsafeRename(
-                        "covariant virtual override requires complete bridge resolution".into(),
+                        "virtual/interface override family has inconsistent rename selection".into(),
                     ));
                 }
-            } else if defined.get(left) != defined.get(right) {
-                return Err(DexError::UnsafeRename(
-                    "virtual/interface override family has inconsistent rename selection".into(),
-                ));
             }
         }
     }
