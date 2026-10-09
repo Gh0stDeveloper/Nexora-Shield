@@ -746,12 +746,9 @@ fn child_implementing_interface_fixture() -> Vec<u8> {
     let parsed = DexParser::parse(&build_linked_member_fixture(false)).expect("original child");
     let class_off = parsed.header.class_defs_off as usize;
     put_u32(&mut child, class_off + 12, interfaces_off);
-    put_u32(&mut child, 32, len_u32(child.len()));
-    put_u32(
-        &mut child,
-        104,
-        len_u32(child.len()) - parsed.header.data_off,
-    );
+    let file_size = len_u32(child.len());
+    put_u32(&mut child, 32, file_size);
+    put_u32(&mut child, 104, file_size - parsed.header.data_off);
     refresh_integrity(&mut child).expect("interface implementing fixture");
     child
 }
