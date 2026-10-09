@@ -26,6 +26,7 @@ mod compatibility;
 mod error;
 mod graph;
 mod ir;
+mod linked_classes;
 mod model;
 mod multidex;
 mod parser;
