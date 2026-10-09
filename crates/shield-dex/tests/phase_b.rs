@@ -238,7 +238,7 @@ fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
     assert!(rejected
         .expect_err("unsafe remapping must be rejected")
         .to_string()
-        .contains("cross-DEX symbol references"));
+        .contains("signature-bound global remapping"));
     let metadata_only = set
         .rewrite(&MultiDexRewriteConfig {
             rename: None,
@@ -250,6 +250,80 @@ fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
     assert!(metadata_only
         .iter()
         .all(|item| item.audit.source_files_removed == 1));
+}
+
+#[test]
+fn o13_linked_class_only_remapping_updates_cross_dex_type_references() {
+    let primary = build_test_dex("Lcom/test/Owner;", "run");
+    let secondary =
+        build_test_dex_with_superclass("Lcom/test/Child;", "go", "Lcom/test/Owner;");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ])
+    .expect("linked multidex input");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: true,
+                rename_methods: false,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            strip_metadata: true,
+            conservative_cross_dex_reflection: true,
+        })
+        .expect("class-only binding updates both DEX units");
+    assert_eq!(outputs.len(), 2);
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner DEX");
+    let child = DexParser::parse(&outputs[1].bytes).expect("child DEX");
+    let renamed_owner = owner.type_descriptor(0).expect("owner descriptor");
+    assert_ne!(renamed_owner, "Lcom/test/Owner;");
+    assert_eq!(child.type_descriptor(1), Some(renamed_owner));
+    assert_eq!(owner.method_name(0), Some("run"));
+    assert_eq!(child.method_name(0), Some("go"));
+    assert!(outputs.iter().all(|output| output.audit.preserved_code_items == 1));
+    assert!(outputs.iter().all(|output| output.audit.source_files_removed == 1));
+    assert!(outputs[1].audit.changed_symbol_strings >= 2);
+    assert!(!outputs[1].rename_skipped_for_cross_dex_reflection);
+}
+
+#[test]
+fn o13_linked_class_remapping_is_deterministic() {
+    let original = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: build_test_dex("Lcom/test/Owner;", "run"),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_test_dex_with_superclass(
+                "Lcom/test/Child;",
+                "go",
+                "Lcom/test/Owner;",
+            ),
+        },
+    ])
+    .expect("valid linked set");
+    let config = MultiDexRewriteConfig {
+        rename: Some(RenameConfig {
+            rename_classes: true,
+            rename_methods: false,
+            rename_fields: false,
+            ..RenameConfig::default()
+        }),
+        strip_metadata: false,
+        conservative_cross_dex_reflection: true,
+    };
+    let once = original.rewrite(&config).expect("first rewrite");
+    let twice = original.rewrite(&config).expect("second rewrite");
+    assert_eq!(once, twice);
 }
 
 #[test]
