@@ -184,10 +184,7 @@ mod tests {
     use crate::{BuildIdentity, DataProtectionError, KeySchedule};
 
     fn schedule(build: &str, secret: u8) -> Result<KeySchedule, DataProtectionError> {
-        KeySchedule::new(
-            &[secret; 32],
-            BuildIdentity::new("com.nexora.app", build)?,
-        )
+        KeySchedule::new(&[secret; 32], BuildIdentity::new("com.nexora.app", build)?)
     }
 
     fn demo(schedule: &KeySchedule) -> Result<RetraceMap, DataProtectionError> {
@@ -205,9 +202,8 @@ mod tests {
     }
 
     #[test]
-    fn roundtrip_authenticated_and_candidates_preserve_identity()
-        -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn roundtrip_authenticated_and_candidates_preserve_identity(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let key = schedule("test-build", 7)?;
         let doc = demo(&key)?;
         let bytes = seal_retrace_map(&key, &doc)?;
@@ -225,9 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn reject_tampering_wrong_key_wrong_build_and_apk()
-        -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn reject_tampering_wrong_key_wrong_build_and_apk() -> Result<(), Box<dyn std::error::Error>> {
         let key = schedule("test-build", 7)?;
         let mut sealed = seal_retrace_map(&key, &demo(&key)?)?;
         let last = sealed.len() - 1;
@@ -235,7 +229,9 @@ mod tests {
         assert!(open_retrace_map(&key, &"a".repeat(64), &sealed).is_err());
         let original = seal_retrace_map(&key, &demo(&key)?)?;
         assert!(open_retrace_map(&schedule("test-build", 8)?, &"a".repeat(64), &original).is_err());
-        assert!(open_retrace_map(&schedule("other-build", 7)?, &"a".repeat(64), &original).is_err());
+        assert!(
+            open_retrace_map(&schedule("other-build", 7)?, &"a".repeat(64), &original).is_err()
+        );
         assert!(open_retrace_map(&key, &"b".repeat(64), &original).is_err());
         assert!(open_retrace_map(&key, &"a".repeat(63), &original).is_err());
         Ok(())
