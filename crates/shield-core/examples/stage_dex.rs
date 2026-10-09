@@ -55,9 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let summary = if let Some((map_path, key_path, application_id, build_id)) = protected {
         let schedule = read_private_schedule(&key_path, &application_id, &build_id)?;
-        context.stage_dex_rewrite_with_protected_retrace(
-            &staging, &map_path, &config, &schedule,
-        )?
+        context.stage_dex_rewrite_with_protected_retrace(&staging, &map_path, &config, &schedule)?
     } else {
         context.stage_dex_rewrite(&staging, &config)?
     };
@@ -83,9 +81,7 @@ fn read_private_schedule(
     {
         use std::os::unix::fs::PermissionsExt;
         let meta = fs::symlink_metadata(secret_path)?;
-        if !meta.file_type().is_file()
-            || meta.permissions().mode() & 0o077 != 0
-            || meta.len() != 32
+        if !meta.file_type().is_file() || meta.permissions().mode() & 0o077 != 0 || meta.len() != 32
         {
             return Err("retrace key must be a regular, private 0600, 32-byte file".into());
         }
@@ -96,10 +92,7 @@ fn read_private_schedule(
         return Err("private retrace map output requires Unix secure file handling".into());
     }
     let mut root_secret = fs::read(secret_path)?;
-    let schedule = KeySchedule::new(
-        &root_secret,
-        BuildIdentity::new(application_id, build_id)?,
-    );
+    let schedule = KeySchedule::new(&root_secret, BuildIdentity::new(application_id, build_id)?);
     root_secret.fill(0);
     Ok(schedule?)
 }
