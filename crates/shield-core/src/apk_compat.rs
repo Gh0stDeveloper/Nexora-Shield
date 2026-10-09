@@ -18,9 +18,10 @@ enum NameKind {
 }
 
 fn name_kind(symbols: &[String]) -> NameKind {
-    if symbols.iter().any(|name| {
-        name.starts_with("class:") || name.starts_with("global-type-ref:")
-    }) {
+    if symbols
+        .iter()
+        .any(|name| name.starts_with("class:") || name.starts_with("global-type-ref:"))
+    {
         NameKind::Class
     } else {
         NameKind::Member
@@ -60,9 +61,9 @@ fn guard_text_reference(content: &str, changed: &[ChangedName], source: &str) ->
             // Full descriptors/dotted classes can appear as literal values.
             // Simple names must be properly quoted to avoid unrelated text.
             if target.len() < old.len() && name.kind == NameKind::Class {
-                ["\"", "'"].iter().any(|quote| {
-                    content.contains(&format!("{quote}{candidate}{quote}"))
-                })
+                ["\"", "'"]
+                    .iter()
+                    .any(|quote| content.contains(&format!("{quote}{candidate}{quote}")))
             } else {
                 data.windows(target.len()).any(|window| window == target)
             }
@@ -155,9 +156,8 @@ fn verify_non_dex_entries(
             // references cannot be certified by this diagnostic gate.
             continue;
         }
-        let size = usize::try_from(entry.uncompressed_size).map_err(|_| {
-            CoreError::InvalidRequest("O.1.3 external entry size overflow".into())
-        })?;
+        let size = usize::try_from(entry.uncompressed_size)
+            .map_err(|_| CoreError::InvalidRequest("O.1.3 external entry size overflow".into()))?;
         total = total.checked_add(size).ok_or_else(|| {
             CoreError::InvalidRequest("O.1.3 external contract total size overflow".into())
         })?;
@@ -209,17 +209,20 @@ mod tests {
             r#"<manifest package="com.test"><application android:name=".A"/></manifest>"#,
             &class(),
             "AndroidManifest.xml"
-        ).is_err());
+        )
+        .is_err());
         assert!(guard_text_reference(
             r#"<manifest><activity android:name="com.test.A"/></manifest>"#,
             &class(),
             "AndroidManifest.xml"
-        ).is_err());
+        )
+        .is_err());
         assert!(guard_text_reference(
             r#"<manifest><provider android:name="Lcom/test/A;"/></manifest>"#,
             &class(),
             "AndroidManifest.xml"
-        ).is_err());
+        )
+        .is_err());
     }
 
     #[test]
@@ -232,12 +235,12 @@ mod tests {
             r#"<Button android:onClick="submit"/>"#,
             &member,
             "res/layout/login.xml"
-        ).is_err());
-        assert!(guard_text_reference(
-            r#"{"class":"com.test.A"}"#,
-            &class(),
-            "assets/config.json"
-        ).is_err());
+        )
+        .is_err());
+        assert!(
+            guard_text_reference(r#"{"class":"com.test.A"}"#, &class(), "assets/config.json")
+                .is_err()
+        );
     }
 
     #[test]
@@ -246,6 +249,7 @@ mod tests {
             r#"<manifest package="com.example"><application android:label="Title"/></manifest>"#,
             &class(),
             "AndroidManifest.xml"
-        ).is_ok());
+        )
+        .is_ok());
     }
 }
