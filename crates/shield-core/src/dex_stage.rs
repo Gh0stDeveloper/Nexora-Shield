@@ -241,7 +241,7 @@ fn collect_staged_outputs(
         }
         if let Some(report) = unit.rename_report {
             result.name_records += report.records.len();
-            if retrace.is_some() {
+            if wants_retrace {
                 retrace_records.extend(report.records.into_iter().map(|record| {
                     RetraceRecord {
                         dex_name: unit.name.clone(),
