@@ -50,6 +50,21 @@ cargo run --locked -p nexora-shield-core --example stage_dex -- \
   --application-id com.example.app --build-id build-20261008-1
 ```
 
+To authenticate and inspect the encrypted map without disclosing original
+names, run:
+
+```bash
+cargo run --locked -p nexora-shield-core --example retrace_inspect -- \
+  staged-unsigned.apk /secure/staged-unsigned.retrace.nsr \
+  /secure/retrace.key com.example.app build-20261008-1
+```
+
+For a **deliberate local lookup only**, append
+`--lookup classes.dex <obfuscated-name>`. This prints matching original
+names to standard output; do not run that form in shared CI logs or release
+pipelines. The command verifies the SHA-256 of the actual staged APK and
+rejects a mismatched build identity, key, map or modified ciphertext.
+
 The staged APK remains diagnostic and unsigned. The sidecar is a separate
 encrypted local artifact, bound to the verified output hash. Use an external
 encrypted vault with strict ACLs, retention controls and backups for production
