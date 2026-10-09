@@ -255,8 +255,7 @@ fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
 #[test]
 fn o13_linked_class_only_remapping_updates_cross_dex_type_references() {
     let primary = build_test_dex("Lcom/test/Owner;", "run");
-    let secondary =
-        build_test_dex_with_superclass("Lcom/test/Child;", "go", "Lcom/test/Owner;");
+    let secondary = build_test_dex_with_superclass("Lcom/test/Child;", "go", "Lcom/test/Owner;");
     let set = MultiDexSet::parse(vec![
         DexInput {
             name: "classes.dex".into(),
@@ -288,8 +287,12 @@ fn o13_linked_class_only_remapping_updates_cross_dex_type_references() {
     assert_eq!(child.type_descriptor(1), Some(renamed_owner));
     assert_eq!(owner.method_name(0), Some("run"));
     assert_eq!(child.method_name(0), Some("go"));
-    assert!(outputs.iter().all(|output| output.audit.preserved_code_items == 1));
-    assert!(outputs.iter().all(|output| output.audit.source_files_removed == 1));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.preserved_code_items == 1));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.source_files_removed == 1));
     assert!(outputs[1].audit.changed_symbol_strings >= 2);
     assert!(!outputs[1].rename_skipped_for_cross_dex_reflection);
 }
@@ -303,11 +306,7 @@ fn o13_linked_class_remapping_is_deterministic() {
         },
         DexInput {
             name: "classes2.dex".into(),
-            bytes: build_test_dex_with_superclass(
-                "Lcom/test/Child;",
-                "go",
-                "Lcom/test/Owner;",
-            ),
+            bytes: build_test_dex_with_superclass("Lcom/test/Child;", "go", "Lcom/test/Owner;"),
         },
     ])
     .expect("valid linked set");
