@@ -523,39 +523,41 @@ fn o13_virtual_closed_hierarchy_renames_owner_and_inherited_call() {
 
 #[test]
 fn o13_virtual_method_with_external_superclass_is_kept() {
-    let mut owner = virtual_owner_fixture();
+    let owner = virtual_owner_fixture();
     let parsed = DexParser::parse(&owner).expect("owner");
-    let supertype = parsed.classes[0].superclass_idx;
-    assert_eq!(parsed.type_descriptor(supertype), Some("Ljava/lang/Object;"));
-    // A class with an unresolved external parent must not rename its virtual
-    // methods. The parent is now a local string descriptor not owned by any
-    // DEX definition, and may expose an SDK override contract.
-    let dex = DexParser::parse(&owner).expect("DEX");
-    let external = dex.strings.iter().position(|s| s.value == "Lcom/test/Owner;")
-        .expect("known class string");
-    put_u32(
-        &mut owner,
-        dex.header.type_ids_off as usize + 4,
-        external as u32,
-    );
-    refresh_integrity(&mut owner).expect("checksum");
-    // The class cannot extend itself: graph cycle must be rejected.
-    let result = MultiDexSet::parse(vec![DexInput {
-        name: "classes.dex".into(),
-        bytes: owner,
-    }])
-    .expect("structurally valid cyclic fixture")
-    .rewrite(&MultiDexRewriteConfig {
-        rename: Some(RenameConfig {
-            rename_classes: false,
-            rename_fields: false,
-            ..RenameConfig::default()
-        }),
-        ..MultiDexRewriteConfig::default()
-    });
-    // A sole DEX uses the older fast path; hierarchy checks apply only to
-    // linked multidex. This assertion documents that scope explicitly.
-    assert!(result.is_ok());
+    assert_eq!(parsed.type_descriptor(1), Some("Ljava/lang/Object;"));
+    let replacement = std::collections::BTreeMap::from([(
+        1_u32,
+        "Lcom/test/Unknown;".to_owned(),
+    )]);
+    let altered = DexWriter::patch_strings(&parsed, &replacement)
+        .expect("equal-width external superclass descriptor");
+    let consumer = build_linked_member_fixture(false);
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: altered,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: consumer,
+        },
+    ])
+    .expect("local class extends unknown external SDK superclass");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("external override candidates remain unchanged");
+    let result = DexParser::parse(&outputs[0].bytes).expect("output");
+    assert_eq!(result.method_name(0), Some("run"));
+    assert_eq!(outputs[0].audit.changed_symbol_strings, 0);
 }
 
 
