@@ -6,8 +6,8 @@ use crate::container::{open, seal, ContainerKind};
 use crate::error::{DataProtectionError, Result};
 use crate::key::KeySchedule;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::collections::BTreeSet;
+use std::fmt;
 use zeroize::Zeroizing;
 
 pub const RETRACE_SCHEMA: u32 = 1;
@@ -115,20 +115,21 @@ fn canonical_dex_name(value: &str) -> bool {
     if value == "classes.dex" {
         return true;
     }
-    let Some(digits) = value.strip_prefix("classes").and_then(|s| s.strip_suffix(".dex")) else {
+    let Some(digits) = value
+        .strip_prefix("classes")
+        .and_then(|s| s.strip_suffix(".dex"))
+    else {
         return false;
     };
-    !digits.starts_with('0')
-        && digits.parse::<u32>().is_ok_and(|n| n >= 2)
+    !digits.starts_with('0') && digits.parse::<u32>().is_ok_and(|n| n >= 2)
 }
 
 /// Seal one private build map without exposing raw JSON as an artifact.
 pub fn seal_retrace_map(schedule: &KeySchedule, map: &RetraceMap) -> Result<Vec<u8>> {
     map.validate(schedule)?;
     let plaintext = Zeroizing::new(
-        serde_json::to_vec(map).map_err(|_| {
-            DataProtectionError::Metadata("unable to encode retrace map".into())
-        })?,
+        serde_json::to_vec(map)
+            .map_err(|_| DataProtectionError::Metadata("unable to encode retrace map".into()))?,
     );
     if plaintext.len() > MAX_RETRACE_PLAINTEXT {
         return Err(DataProtectionError::Metadata(
@@ -179,9 +180,7 @@ fn logical_id(apk_sha256: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        open_retrace_map, seal_retrace_map, RetraceMap, RetraceRecord, RETRACE_SCHEMA,
-    };
+    use super::{open_retrace_map, seal_retrace_map, RetraceMap, RetraceRecord, RETRACE_SCHEMA};
     use crate::{BuildIdentity, KeySchedule};
 
     fn schedule(build: &str, secret: u8) -> KeySchedule {
@@ -216,7 +215,12 @@ mod tests {
         let opened = open_retrace_map(&key, &"a".repeat(64), &bytes).expect("open");
         assert_eq!(opened, doc);
         assert_eq!(opened.schema, RETRACE_SCHEMA);
-        assert_eq!(opened.candidates("classes2.dex", "Lcom/private/Abcdef;").len(), 1);
+        assert_eq!(
+            opened
+                .candidates("classes2.dex", "Lcom/private/Abcdef;")
+                .len(),
+            1
+        );
     }
 
     #[test]
