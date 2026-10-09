@@ -57,7 +57,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Matching candidates: {}", matches.len());
         for record in matches {
             // Only an explicit --lookup request may disclose old names.
-            println!("{} string[{}]: {}", record.dex_name, record.string_idx, record.original);
+            println!(
+                "{} string[{}]: {}",
+                record.dex_name, record.string_idx, record.original
+            );
         }
     }
     Ok(())
