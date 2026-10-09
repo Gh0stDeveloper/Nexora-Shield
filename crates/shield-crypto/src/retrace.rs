@@ -181,17 +181,16 @@ fn logical_id(apk_sha256: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{open_retrace_map, seal_retrace_map, RetraceMap, RetraceRecord, RETRACE_SCHEMA};
-    use crate::{BuildIdentity, KeySchedule};
+    use crate::{BuildIdentity, DataProtectionError, KeySchedule};
 
-    fn schedule(build: &str, secret: u8) -> KeySchedule {
+    fn schedule(build: &str, secret: u8) -> Result<KeySchedule, DataProtectionError> {
         KeySchedule::new(
             &[secret; 32],
-            BuildIdentity::new("com.nexora.app", build).expect("build identity"),
+            BuildIdentity::new("com.nexora.app", build)?,
         )
-        .expect("key schedule")
     }
 
-    fn demo(schedule: &KeySchedule) -> RetraceMap {
+    fn demo(schedule: &KeySchedule) -> Result<RetraceMap, DataProtectionError> {
         RetraceMap::new(
             schedule,
             "a".repeat(64),
@@ -203,16 +202,17 @@ mod tests {
                 symbols: vec!["class:2".into()],
             }],
         )
-        .expect("private map")
     }
 
     #[test]
-    fn roundtrip_authenticated_and_candidates_preserve_identity() {
-        let key = schedule("test-build", 7);
-        let doc = demo(&key);
-        let bytes = seal_retrace_map(&key, &doc).expect("seal");
+    fn roundtrip_authenticated_and_candidates_preserve_identity()
+        -> Result<(), Box<dyn std::error::Error>>
+    {
+        let key = schedule("test-build", 7)?;
+        let doc = demo(&key)?;
+        let bytes = seal_retrace_map(&key, &doc)?;
         assert!(!bytes.windows("Secret".len()).any(|w| w == b"Secret"));
-        let opened = open_retrace_map(&key, &"a".repeat(64), &bytes).expect("open");
+        let opened = open_retrace_map(&key, &"a".repeat(64), &bytes)?;
         assert_eq!(opened, doc);
         assert_eq!(opened.schema, RETRACE_SCHEMA);
         assert_eq!(
@@ -221,35 +221,41 @@ mod tests {
                 .len(),
             1
         );
+        Ok(())
     }
 
     #[test]
-    fn reject_tampering_wrong_key_wrong_build_and_apk() {
-        let key = schedule("test-build", 7);
-        let mut sealed = seal_retrace_map(&key, &demo(&key)).expect("seal");
+    fn reject_tampering_wrong_key_wrong_build_and_apk()
+        -> Result<(), Box<dyn std::error::Error>>
+    {
+        let key = schedule("test-build", 7)?;
+        let mut sealed = seal_retrace_map(&key, &demo(&key)?)?;
         let last = sealed.len() - 1;
         sealed[last] ^= 1;
         assert!(open_retrace_map(&key, &"a".repeat(64), &sealed).is_err());
-        let original = seal_retrace_map(&key, &demo(&key)).expect("seal");
-        assert!(open_retrace_map(&schedule("test-build", 8), &"a".repeat(64), &original).is_err());
-        assert!(open_retrace_map(&schedule("other-build", 7), &"a".repeat(64), &original).is_err());
+        let original = seal_retrace_map(&key, &demo(&key)?)?;
+        assert!(open_retrace_map(&schedule("test-build", 8)?, &"a".repeat(64), &original).is_err());
+        assert!(open_retrace_map(&schedule("other-build", 7)?, &"a".repeat(64), &original).is_err());
         assert!(open_retrace_map(&key, &"b".repeat(64), &original).is_err());
         assert!(open_retrace_map(&key, &"a".repeat(63), &original).is_err());
+        Ok(())
     }
 
     #[test]
-    fn reject_duplicate_or_empty_records() {
-        let key = schedule("test-build", 7);
-        let entry = demo(&key).records[0].clone();
+    fn reject_duplicate_or_empty_records() -> Result<(), Box<dyn std::error::Error>> {
+        let key = schedule("test-build", 7)?;
+        let entry = demo(&key)?.records[0].clone();
         assert!(RetraceMap::new(&key, "a".repeat(64), vec![entry.clone(), entry]).is_err());
         assert!(RetraceMap::new(&key, "a".repeat(64), vec![]).is_err());
+        Ok(())
     }
 
     #[test]
-    fn debug_does_not_expose_original_names() {
-        let key = schedule("test-build", 7);
-        let map = demo(&key);
+    fn debug_does_not_expose_original_names() -> Result<(), Box<dyn std::error::Error>> {
+        let key = schedule("test-build", 7)?;
+        let map = demo(&key)?;
         assert!(!format!("{map:?}").contains("Secret"));
         assert!(!format!("{:?}", map.records[0]).contains("Secret"));
+        Ok(())
     }
 }
