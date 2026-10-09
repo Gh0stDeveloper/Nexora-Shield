@@ -166,6 +166,14 @@ fn is_reflection_indicator(value: &str) -> bool {
     )
 }
 
+fn descriptor_to_dotted(descriptor: &str) -> String {
+    descriptor
+        .strip_prefix('L')
+        .and_then(|value| value.strip_suffix(';'))
+        .unwrap_or(descriptor)
+        .replace('/', ".")
+}
+
 #[cfg(test)]
 mod android_reflection_tests {
     use super::is_dynamic_lookup_api;
@@ -193,12 +201,4 @@ mod android_reflection_tests {
             "getParent"
         ));
     }
-}
-
-fn descriptor_to_dotted(descriptor: &str) -> String {
-    descriptor
-        .strip_prefix('L')
-        .and_then(|value| value.strip_suffix(';'))
-        .unwrap_or(descriptor)
-        .replace('/', ".")
 }
