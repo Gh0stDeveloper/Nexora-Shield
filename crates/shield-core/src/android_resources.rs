@@ -51,7 +51,7 @@ fn chunk(data: &[u8], at: usize) -> Result<Chunk> {
     let kind = le16(data, at)?;
     let header = usize::from(le16(data, at + 2)?);
     let size = word(data, at + 4)?;
-    if header < 8 || header > size || at.checked_add(size).is_none_or(|end| end > data.len()) {
+    if header < 8 || header > size || at.checked_add(size).map_or(true, |end| end > data.len()) {
         return Err(reject("invalid chunk header or length"));
     }
     Ok(Chunk { kind, header, size })
@@ -76,12 +76,12 @@ fn validate_entry(data: &[u8], at: usize, limit: usize, key_count: usize, global
     let size = usize::from(le16(data, at)?);
     let flags = le16(data, at + 2)?;
     let key = word(data, at + 4)?;
-    if size < 8 || key >= key_count || at.checked_add(size).is_none_or(|end| end > limit) {
+    if size < 8 || key >= key_count || at.checked_add(size).map_or(true, |end| end > limit) {
         return Err(reject("entry header/key index is invalid"));
     }
     let payload = at + size;
     if flags & FLAG_COMPLEX == 0 {
-        if payload.checked_add(8).is_none_or(|end| end > limit) {
+        if payload.checked_add(8).map_or(true, |end| end > limit) {
             return Err(reject("simple entry value is truncated"));
         }
         validate_value(data, payload, global)
@@ -92,7 +92,7 @@ fn validate_entry(data: &[u8], at: usize, limit: usize, key_count: usize, global
         let count = word(data, at + 12)?;
         if count > MAX_ENTRIES || count.checked_mul(12)
             .and_then(|size| payload.checked_add(size))
-            .is_none_or(|end| end > limit)
+            .map_or(true, |end| end > limit)
         {
             return Err(reject("complex resource maps exceed entry bounds"));
         }
@@ -125,13 +125,13 @@ fn validate_type(
     let entries_start = word(data, 16)?;
     let config_size = word(data, 20)?;
     if entry_count > MAX_ENTRIES || (flags & FLAG_SPARSE == 0 && entry_count != spec_count)
-        || config_size < 4 || 20_usize.checked_add(config_size).is_none_or(|end| end > item.header)
+        || config_size < 4 || 20_usize.checked_add(config_size).map_or(true, |end| end > item.header)
         || entries_start > item.size || entries_start % 4 != 0
     {
         return Err(reject("resource type config or entry count invalid"));
     }
     let stride = if flags & FLAG_OFFSET16 != 0 { 2 } else { 4 };
-    if item.header.checked_add(entry_count * stride).is_none_or(|end| end > entries_start) {
+    if item.header.checked_add(entry_count * stride).map_or(true, |end| end > entries_start) {
         return Err(reject("resource entry offset table overlaps payload"));
     }
 
@@ -156,7 +156,7 @@ fn validate_type(
         let _ = entry_idx;
         if let Some(entry_off) = data_off {
             let entry_at = entries_start.checked_add(entry_off).ok_or_else(|| reject("resource entry offset overflow"))?;
-            if entry_at < entries_start || entry_at.checked_add(8).is_none_or(|end| end > item.size) {
+            if entry_at < entries_start || entry_at.checked_add(8).map_or(true, |end| end > item.size) {
                 return Err(reject("resource entry outside payload"));
             }
             validate_entry(data, entry_at, item.size, key_count, global)?;
@@ -200,7 +200,7 @@ fn inspect_package(data: &[u8], item: Chunk, global: usize) -> Result<Vec<String
                 let id = *range(data, offset + 8, 1)?.first().ok_or_else(|| reject("missing type id"))?;
                 let count = word(data, offset + 12)?;
                 if id == 0 || usize::from(id) > types.len() || count > MAX_ENTRIES
-                    || child.header.checked_add(count * 4).is_none_or(|end| end > child.size)
+                    || child.header.checked_add(count * 4).map_or(true, |end| end > child.size)
                     || specs.insert(id, count).is_some()
                 {
                     return Err(reject("type specification index/count invalid"));
@@ -303,6 +303,8 @@ mod tests {
         out.extend(0_u32.to_le_bytes());
         out.extend(indices);
         out.extend(strings);
+        while out.len() % 4 != 0 { out.push(0); }
+        out[4..8].copy_from_slice(&(out.len() as u32).to_le_bytes());
         out
     }
 
