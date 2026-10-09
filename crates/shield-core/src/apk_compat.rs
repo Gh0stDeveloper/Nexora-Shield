@@ -176,9 +176,14 @@ fn verify_non_dex_entries(
         }
         let bytes = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
         if is_xml && bytes.starts_with(&[0x03, 0x00, 0x08, 0x00]) {
-            return Err(CoreError::InvalidRequest(
-                "O.1.3 binary Android XML requires a verified reference remapper".into(),
-            ));
+            let strings = crate::android_binary_xml::inspect_binary_xml(&bytes)?;
+            for value in strings {
+                // Treat every string-pool entry as potentially referenced:
+                // string-ID aliases and XML attribute semantics are external
+                // contracts, so no unknown binding may be silently rewritten.
+                guard_text_reference(&format!("\\\"{value}\\\""), changed, name)?;
+            }
+            continue;
         }
         let text = std::str::from_utf8(&bytes).map_err(|_| {
             CoreError::InvalidRequest(
