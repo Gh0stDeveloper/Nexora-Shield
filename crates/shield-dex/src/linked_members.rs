@@ -4,6 +4,7 @@
 //! the linked transform refuses to emit a partially-linked diagnostic APK.
 use crate::compatibility::CompatibilityReport;
 use crate::error::{DexError, Result};
+use crate::hierarchy::DexHierarchy;
 use crate::model::{DexFile, ACC_NATIVE, ACC_STATIC};
 use crate::multidex::MultiDexSet;
 use crate::selector::SelectorResolver;
@@ -75,7 +76,9 @@ pub(crate) fn plan(
         selected.push(SelectorResolver::resolve(&unit.dex, &config.selectors)?);
     }
 
+    let hierarchy = DexHierarchy::build(set)?;
     let mut defined = BTreeMap::<Member, bool>::new();
+    let mut virtual_defs = BTreeSet::<Member>::new();
     let mut protected = BTreeSet::<Member>::new();
     for ((unit, selection), report) in set.units.iter().zip(&selected).zip(compatibility) {
         for class in &unit.dex.classes {
@@ -105,11 +108,33 @@ pub(crate) fn plan(
                     protected.insert(key);
                 }
             }
-            // Virtual methods can implement an external SDK/interface contract,
-            // even when the declaring class is local. Do not rename them until
-            // interface/override closure is available for the whole hierarchy.
+            // Virtual/interface methods are eligible only in a closed local
+            // superclass/interface graph. Unknown SDK contracts and Android
+            // lifecycle/object overrides must retain their original names.
             for encoded in &data.virtual_methods {
-                protected.insert(method_key(&unit.dex, encoded.method_idx)?);
+                let method = unit.dex.methods.get(encoded.method_idx as usize).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "method",
+                        index: encoded.method_idx,
+                    },
+                )?;
+                let key = method_key(&unit.dex, encoded.method_idx)?;
+                let allowed = config.rename_methods
+                    && selection.methods.contains(&encoded.method_idx)
+                    && hierarchy.closed(key.owner())?
+                    && !is_contract_name(key.name())
+                    && !is_object_contract_name(key.name())
+                    && encoded.access_flags & ACC_NATIVE == 0
+                    && !report.protected_string_indices.contains(&method.name_idx);
+                if defined.insert(key.clone(), allowed).is_some() {
+                    return Err(DexError::UnsafeRename(
+                        "duplicate virtual method identity".into(),
+                    ));
+                }
+                virtual_defs.insert(key.clone());
+                if !allowed {
+                    protected.insert(key);
+                }
             }
             for encoded in data.static_fields.iter().chain(&data.instance_fields) {
                 let field = unit.dex.fields.get(encoded.field_idx as usize).ok_or(
@@ -131,6 +156,23 @@ pub(crate) fn plan(
                 if !allowed {
                     protected.insert(key);
                 }
+            }
+        }
+    }
+
+    // Overrides and interface implementations form dispatch contracts.
+    // Renaming one member without every locally linked override is unsafe.
+    for left in &virtual_defs {
+        for right in &virtual_defs {
+            if left == right || !same_virtual_slot(left, right) {
+                continue;
+            }
+            if hierarchy.connected(left.owner(), right.owner())?
+                && defined.get(left) != defined.get(right)
+            {
+                return Err(DexError::UnsafeRename(
+                    "virtual/interface override family has inconsistent rename selection".into(),
+                ));
             }
         }
     }
@@ -171,29 +213,14 @@ pub(crate) fn plan(
         new_by_name.insert(old, replacement);
     }
 
-    // Method/field IDs may encode a subclass even when runtime resolution
-    // binds an inherited superclass member. Do not leave such a reference
-    // unchanged while renaming its defining member. A complete hierarchy
-    // resolver must handle this before the case can be enabled.
-    let mut superclass = BTreeMap::<String, String>::new();
-    for unit in &set.units {
-        for class in &unit.dex.classes {
-            if class.superclass_idx == crate::model::NO_INDEX {
-                continue;
-            }
-            let owner = type_name(&unit.dex, class.class_idx)?;
-            let parent = type_name(&unit.dex, class.superclass_idx)?;
-            superclass.insert(owner.to_owned(), parent.to_owned());
-        }
-    }
-
+    // Resolve inherited aliases only through validated class/interface
+    // identity; direct bytecode call operands and ID table indices stay fixed.
     let mut result = MemberPlan::default();
     for (unit, report) in set.units.iter().zip(compatibility) {
         let mut usage = BTreeMap::<u32, Vec<(Member, bool, String)>>::new();
         for (index, method) in unit.dex.methods.iter().enumerate() {
             let key = method_key(&unit.dex, index as u32)?;
-            reject_unmapped_inherited(&key, &defined, &superclass)?;
-            let change = defined.get(&key).copied().unwrap_or(false);
+            let change = resolve_reference(&key, &defined, &hierarchy)?;
             usage.entry(method.name_idx).or_default().push((
                 key,
                 change,
@@ -202,8 +229,7 @@ pub(crate) fn plan(
         }
         for (index, field) in unit.dex.fields.iter().enumerate() {
             let key = field_key(&unit.dex, index as u32)?;
-            reject_unmapped_inherited(&key, &defined, &superclass)?;
-            let change = defined.get(&key).copied().unwrap_or(false);
+            let change = resolve_reference(&key, &defined, &hierarchy)?;
             usage.entry(field.name_idx).or_default().push((
                 key,
                 change,
@@ -263,34 +289,70 @@ pub(crate) fn plan(
     Ok(result)
 }
 
-fn reject_unmapped_inherited(
+fn is_object_contract_name(name: &str) -> bool {
+    matches!(
+        name,
+        "toString"
+            | "hashCode"
+            | "equals"
+            | "clone"
+            | "finalize"
+            | "getClass"
+            | "notify"
+            | "notifyAll"
+            | "wait"
+    )
+}
+
+fn same_virtual_slot(first: &Member, second: &Member) -> bool {
+    match (first, second) {
+        (
+            Member::Method {
+                name: left_name,
+                signature: left_signature,
+                ..
+            },
+            Member::Method {
+                name: right_name,
+                signature: right_signature,
+                ..
+            },
+        ) => left_name == right_name && left_signature == right_signature,
+        _ => false,
+    }
+}
+
+/// Exact defining owner wins; then nearest superclass; finally fully known
+/// local interfaces. Ambiguous or conflicting interface bindings fail closed.
+fn resolve_reference(
     member: &Member,
     defined: &BTreeMap<Member, bool>,
-    superclass: &BTreeMap<String, String>,
-) -> Result<()> {
-    if defined.contains_key(member) {
-        return Ok(());
+    hierarchy: &DexHierarchy,
+) -> Result<bool> {
+    if let Some(mapped) = defined.get(member) {
+        return Ok(*mapped);
     }
-    let mut current = member.owner().to_owned();
-    let mut visited = BTreeSet::new();
-    while let Some(parent) = superclass.get(&current) {
-        if !visited.insert(current.clone()) {
-            return Err(DexError::UnsafeRename(
-                "cyclic class hierarchy during linked member resolution".into(),
-            ));
+    for ancestor in hierarchy.parents(member.owner())? {
+        let candidate = member.with_owner(&ancestor);
+        if let Some(mapped) = defined.get(&candidate) {
+            return Ok(*mapped);
         }
-        let ancestor = member.with_owner(parent);
-        if defined.get(&ancestor).copied().unwrap_or(false) {
-            return Err(DexError::UnsafeRename(
-                "inherited method/field reference requires hierarchy-aware linking".into(),
-            ));
-        }
-        if defined.contains_key(&ancestor) {
-            return Ok(());
-        }
-        current.clone_from(parent);
     }
-    Ok(())
+    let mut found = None;
+    for interface in hierarchy.interfaces(member.owner())? {
+        let candidate = member.with_owner(&interface);
+        if let Some(mapped) = defined.get(&candidate) {
+            match found {
+                Some(previous) if previous != *mapped => {
+                    return Err(DexError::UnsafeRename(
+                        "conflicting inherited interface method/field rename contracts".into(),
+                    ));
+                }
+                _ => found = Some(*mapped),
+            }
+        }
+    }
+    Ok(found.unwrap_or(false))
 }
 
 fn method_key(dex: &DexFile, index: u32) -> Result<Member> {
