@@ -133,24 +133,30 @@ fn verify_non_dex_entries(
         if name == "AndroidManifest.xml" {
             found_manifest = true;
         }
-        if name.ends_with(".dex") && nexora_shield_dex::canonical_dex_index(name).is_some() {
+        if nexora_shield_dex::canonical_dex_index(name).is_some() {
             continue;
         }
-        if name.ends_with(".so") && name.starts_with("lib/") {
+        let extension = Path::new(name).extension().and_then(|suffix| suffix.to_str());
+        if extension.is_some_and(|suffix| suffix.eq_ignore_ascii_case("so"))
+            && name.starts_with("lib/")
+        {
             return Err(CoreError::InvalidRequest(
                 "O.1.3 packaged native library requires JNI binding verification".into(),
             ));
         }
-        if name == "resources.arsc" {
+        if name.eq_ignore_ascii_case("resources.arsc") {
             return Err(CoreError::InvalidRequest(
                 "O.1.3 compiled resource table has no verified reference remapper".into(),
             ));
         }
-        let is_xml = name == "AndroidManifest.xml" || name.ends_with(".xml");
+        let is_xml = name == "AndroidManifest.xml"
+            || extension.is_some_and(|suffix| suffix.eq_ignore_ascii_case("xml"));
         let is_text = is_xml
-            || [".json", ".txt", ".properties", ".cfg", ".ini", ".pro"]
-                .iter()
-                .any(|suffix| name.ends_with(suffix));
+            || extension.is_some_and(|suffix| {
+                ["json", "txt", "properties", "cfg", "ini", "pro"]
+                    .iter()
+                    .any(|candidate| suffix.eq_ignore_ascii_case(candidate))
+            });
         if !is_text {
             // All other entries are copied byte-for-byte. Their dynamic code
             // references cannot be certified by this diagnostic gate.
@@ -182,7 +188,7 @@ fn verify_non_dex_entries(
                 "O.1.3 unrecognized Android XML format".into(),
             ));
         }
-        guard_text_reference(text, &changed, name)?;
+        guard_text_reference(text, changed, name)?;
     }
     if !found_manifest {
         return Err(CoreError::InvalidRequest(
