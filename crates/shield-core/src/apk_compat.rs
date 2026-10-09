@@ -136,7 +136,9 @@ fn verify_non_dex_entries(
         if nexora_shield_dex::canonical_dex_index(name).is_some() {
             continue;
         }
-        let extension = Path::new(name).extension().and_then(|suffix| suffix.to_str());
+        let extension = Path::new(name)
+            .extension()
+            .and_then(|suffix| suffix.to_str());
         if extension.is_some_and(|suffix| suffix.eq_ignore_ascii_case("so"))
             && name.starts_with("lib/")
         {
