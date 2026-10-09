@@ -179,7 +179,9 @@ pub(crate) fn plan(
             name, signature, ..
         } = member
         {
-            let args = signature.split_once(')').map_or(signature.as_str(), |(a, _)| a);
+            let args = signature
+                .split_once(')')
+                .map_or(signature.as_str(), |(a, _)| a);
             families
                 .entry((name.clone(), args.to_owned()))
                 .or_default()
@@ -202,7 +204,8 @@ pub(crate) fn plan(
                     }
                 } else if defined.get(*left) != defined.get(*right) {
                     return Err(DexError::UnsafeRename(
-                        "virtual/interface override family has inconsistent rename selection".into(),
+                        "virtual/interface override family has inconsistent rename selection"
+                            .into(),
                     ));
                 }
             }
