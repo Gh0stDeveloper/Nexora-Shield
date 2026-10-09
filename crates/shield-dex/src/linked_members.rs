@@ -292,6 +292,8 @@ fn type_name(dex: &DexFile, index: u32) -> Result<&str> {
 }
 
 fn obfuscated_name(original: &str, seed: u64, salt: u64) -> String {
+    const FIRST: &[u8; 26] = b"abcdefghijklmnopqrstuvwxyz";
+    const REST: &[u8; 37] = b"abcdefghijklmnopqrstuvwxyz0123456789_";
     let mut state = seed ^ salt.wrapping_mul(0x9e37_79b9_7f4a_7c15);
     for byte in original.bytes() {
         state ^= u64::from(byte);
@@ -303,8 +305,6 @@ fn obfuscated_name(original: &str, seed: u64, salt: u64) -> String {
         state ^= state << 25;
         state ^= state >> 27;
         let hash = state.wrapping_mul(0x2545_f491_4f6c_dd1d);
-        const FIRST: &[u8; 26] = b"abcdefghijklmnopqrstuvwxyz";
-        const REST: &[u8; 37] = b"abcdefghijklmnopqrstuvwxyz0123456789_";
         let alphabet = if index == 0 {
             FIRST.as_slice()
         } else {
