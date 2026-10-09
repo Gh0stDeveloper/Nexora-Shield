@@ -198,6 +198,16 @@ fn parse_pool(data: &[u8], at: usize, item: Chunk) -> Result<Vec<String>> {
     Ok(result)
 }
 
+/// Strictly decode a standalone Android ResStringPool chunk. Shared by
+/// compiled XML and resources.arsc, without allowing either parser to mutate it.
+pub(crate) fn inspect_string_pool(bytes: &[u8]) -> Result<Vec<String>> {
+    let item = chunk(bytes, 0)?;
+    if item.kind != STRING_POOL || item.size != bytes.len() {
+        return Err(reject("invalid standalone string pool"));
+    }
+    parse_pool(bytes, 0, item)
+}
+
 fn string_index(data: &[u8], at: usize, count: usize, nullable: bool) -> Result<()> {
     let index = u32_at(data, at)?;
     if nullable && index == u32::MAX {
