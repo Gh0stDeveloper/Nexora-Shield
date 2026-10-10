@@ -433,9 +433,9 @@ fn audit_component_start(
             let idx = usize32(bytes, base + 16)?;
             if raw != u32::MAX
                 && usize::try_from(raw).map_err(|_| reject("raw index overflow"))? != idx
-                && (targets.contains(&idx) || targets.contains(
-                    &usize::try_from(raw).map_err(|_| reject("raw index overflow"))?
-                ))
+                && (targets.contains(&idx)
+                    || targets
+                        .contains(&usize::try_from(raw).map_err(|_| reject("raw index overflow"))?))
             {
                 return Err(reject("raw and typed class attribute references disagree"));
             }
