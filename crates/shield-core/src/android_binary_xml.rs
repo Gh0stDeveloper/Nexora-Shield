@@ -594,6 +594,130 @@ mod tests {
         root
     }
 
+    fn class_manifest(utf8: bool, shared: bool, android_namespace: bool) -> Vec<u8> {
+        let values = [
+            "manifest",
+            "application",
+            "name",
+            "http://schemas.android.com/apk/res/android",
+            "com.test.A",
+        ];
+        let mut payload = Vec::new();
+        payload.extend(le32(u32::try_from(values.len()).unwrap_or(0)));
+        payload.extend(le32(0));
+        payload.extend(le32(if utf8 { 0x100 } else { 0 }));
+        payload.extend(le32(28 + u32::try_from(values.len() * 4).unwrap_or(0)));
+        payload.extend(le32(0));
+        let mut strings = Vec::new();
+        for value in values {
+            payload.extend(le32(u32::try_from(strings.len()).unwrap_or(0)));
+            if utf8 {
+                strings.push(u8::try_from(value.encode_utf16().count()).unwrap_or(0));
+                strings.push(u8::try_from(value.len()).unwrap_or(0));
+                strings.extend(value.as_bytes());
+                strings.push(0);
+            } else {
+                strings.extend(le16(u16::try_from(value.encode_utf16().count()).unwrap_or(0)));
+                for unit in value.encode_utf16() { strings.extend(le16(unit)); }
+                strings.extend(le16(0));
+            }
+        }
+        payload.extend(strings);
+        let pool = chunk(1, 28, &payload);
+        let make_start = |tag: u32, attribute: bool| -> Vec<u8> {
+            let mut node = Vec::new();
+            node.extend(le32(1));
+            node.extend(le32(u32::MAX));
+            node.extend(le32(u32::MAX));
+            node.extend(le32(tag));
+            node.extend(le16(20));
+            node.extend(le16(20));
+            node.extend(le16(u16::from(attribute)));
+            node.extend(le16(0));
+            node.extend(le16(0));
+            node.extend(le16(0));
+            if attribute {
+                node.extend(le32(if android_namespace { 3 } else { u32::MAX }));
+                node.extend(le32(2));
+                node.extend(le32(4));
+                node.extend(le16(8));
+                node.push(0);
+                node.push(3);
+                node.extend(le32(4));
+            }
+            chunk(0x0102, 16, &node)
+        };
+        let make_end = |tag: u32| -> Vec<u8> {
+            let mut node = Vec::new();
+            node.extend(le32(2));
+            node.extend(le32(u32::MAX));
+            node.extend(le32(u32::MAX));
+            node.extend(le32(tag));
+            chunk(0x0103, 16, &node)
+        };
+        let nodes = [
+            make_start(if shared { 4 } else { 0 }, false),
+            make_start(1, true),
+            make_end(1),
+            make_end(if shared { 4 } else { 0 }),
+        ].concat();
+        let mut output = Vec::new();
+        output.extend(le16(3));
+        output.extend(le16(8));
+        output.extend(le32(u32::try_from(8 + pool.len() + nodes.len()).unwrap_or(0)));
+        output.extend(pool);
+        output.extend(nodes);
+        output
+    }
+
+    #[test]
+    fn o13_compiled_manifest_rewrites_only_safe_utf8_utf16_class_values() {
+        let aliases = std::collections::BTreeMap::from([(
+            "com.test.A".to_owned(),
+            "com.test.Z".to_owned(),
+        )]);
+        for utf8 in [true, false] {
+            let original = class_manifest(utf8, false, true);
+            let written = super::rewrite_manifest_class_aliases(&original, &aliases)
+                .unwrap_or_default();
+            assert_eq!(written.len(), original.len());
+            let before = inspect_binary_xml(&original).unwrap_or_default();
+            let after = inspect_binary_xml(&written).unwrap_or_default();
+            assert_eq!(before.get(4).map(String::as_str), Some("com.test.A"));
+            assert_eq!(after.get(4).map(String::as_str), Some("com.test.Z"));
+            assert_eq!(after.get(..4), before.get(..4));
+            assert_eq!(
+                super::rewrite_manifest_class_aliases(&original, &std::collections::BTreeMap::new())
+                    .unwrap_or_default(),
+                original
+            );
+        }
+    }
+
+    #[test]
+    fn o13_manifest_refuses_shared_wrong_namespace_and_length_changes() {
+        let aliases = std::collections::BTreeMap::from([(
+            "com.test.A".to_owned(),
+            "com.test.Z".to_owned(),
+        )]);
+        for utf8 in [true, false] {
+            for (shared, namespace) in [(true, true), (false, false)] {
+                assert!(super::rewrite_manifest_class_aliases(
+                    &class_manifest(utf8, shared, namespace),
+                    &aliases,
+                ).is_err());
+            }
+            let wrong_length = std::collections::BTreeMap::from([(
+                "com.test.A".to_owned(),
+                "com.test.Longer".to_owned(),
+            )]);
+            assert!(super::rewrite_manifest_class_aliases(
+                &class_manifest(utf8, false, true),
+                &wrong_length
+            ).is_err());
+        }
+    }
+
     #[test]
     fn o13_compiled_xml_accepts_valid_utf8_and_utf16_pools() {
         for utf8 in [true, false] {
