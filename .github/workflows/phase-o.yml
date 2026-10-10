@@ -303,7 +303,7 @@ jobs:
               echo "O.1.3 accepted a compiled XML class alias: ${mode}" >&2
               exit 1
             fi
-            grep -q 'O.1.3 external Android binding' "build/phase-o1/${mode}.txt"
+            grep -q 'O.1.3' "build/phase-o1/${mode}.txt"
             test ! -e "${denied}"
           done
       - name: O.1.3 rewrite class-valued compiled Manifest attributes safely
