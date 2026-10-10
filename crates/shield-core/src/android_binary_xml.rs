@@ -422,6 +422,9 @@ fn audit_component_start(
         if raw != u32::MAX {
             let idx = usize::try_from(raw).map_err(|_| reject("raw value overflow"))?;
             if targets.contains(&idx) {
+                if u8_at(bytes, base + 15)? != TYPE_STRING {
+                    return Err(reject("class attribute is not an effective typed string"));
+                }
                 if allowed {
                     permitted.insert(idx);
                 } else {
