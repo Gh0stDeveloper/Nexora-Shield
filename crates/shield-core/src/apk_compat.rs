@@ -6,6 +6,7 @@
 use crate::{CoreError, Result};
 use nexora_shield_dex::{CompatibilityAnalyzer, DexRewriteOutput, MultiDexSet};
 use nexora_shield_package::{read_decoded_entry, ZipDirectory};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 const MAX_CONTRACT_ENTRY_BYTES: usize = 16 * 1024 * 1024;
@@ -31,7 +32,37 @@ fn name_kind(symbols: &[String]) -> NameKind {
 #[derive(Debug, Clone)]
 struct ChangedName {
     old: String,
+    new: String,
     kind: NameKind,
+}
+
+fn checked_aliases(changed: &[ChangedName]) -> Result<BTreeMap<String, String>> {
+    let mut aliases = BTreeMap::new();
+    for record in changed.iter().filter(|record| record.kind == NameKind::Class) {
+        let old = record.old.strip_prefix('L').and_then(|name| name.strip_suffix(';'));
+        let new = record.new.strip_prefix('L').and_then(|name| name.strip_suffix(';'));
+        let (Some(old), Some(new)) = (old, new) else {
+            return Err(CoreError::InvalidRequest(
+                "O.1.3 requires canonical class descriptors for compiled XML relinking".into(),
+            ));
+        };
+        let old_simple = old.rsplit('/').next().unwrap_or(old);
+        let new_simple = new.rsplit('/').next().unwrap_or(new);
+        for (before, after) in [
+            (record.old.clone(), record.new.clone()),
+            (old.replace('/', "."), new.replace('/', ".")),
+            (format!(".{old_simple}"), format!(".{new_simple}")),
+        ] {
+            if aliases.insert(before.clone(), after.clone())
+                .is_some_and(|previous| previous != after)
+            {
+                return Err(CoreError::InvalidRequest(format!(
+                    "O.1.3 conflicting compiled XML alias for '{before}'"
+                )));
+            }
+        }
+    }
+    Ok(aliases)
 }
 
 fn guard_text_reference(content: &str, changed: &[ChangedName], source: &str) -> Result<()> {
@@ -85,20 +116,21 @@ pub(crate) fn verify_apk_compatibility(
     directory: &ZipDirectory,
     set: &MultiDexSet,
     outputs: &[DexRewriteOutput],
-) -> Result<()> {
+) -> Result<BTreeMap<String, Vec<u8>>> {
     let mut changed = Vec::new();
     for output in outputs {
         if let Some(report) = &output.rename_report {
             for record in &report.records {
                 changed.push(ChangedName {
                     old: record.old.clone(),
+                    new: record.new.clone(),
                     kind: name_kind(&record.symbols),
                 });
             }
         }
     }
     if changed.is_empty() {
-        return Ok(());
+        return Ok(BTreeMap::new());
     }
 
     // Reflection API method IDs can exist without literal "forName" strings;
@@ -125,7 +157,9 @@ fn verify_non_dex_entries(
     path: &Path,
     directory: &ZipDirectory,
     changed: &[ChangedName],
-) -> Result<()> {
+) -> Result<BTreeMap<String, Vec<u8>>> {
+    let aliases = checked_aliases(changed)?;
+    let mut xml_replacements = BTreeMap::new();
     let mut total = 0_usize;
     let mut found_manifest = false;
     for entry in &directory.entries {
@@ -192,12 +226,20 @@ fn verify_non_dex_entries(
         }
         let bytes = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
         if is_xml && bytes.starts_with(&[0x03, 0x00, 0x08, 0x00]) {
-            let strings = crate::android_binary_xml::inspect_binary_xml(&bytes)?;
+            // Only AndroidManifest.xml component class-valued attributes have
+            // an eligible linker. All other compiled XML contracts fail closed
+            // if a renamed symbol is still referenced.
+            let rewritten = if name == "AndroidManifest.xml" {
+                crate::android_binary_xml::rewrite_manifest_class_aliases(&bytes, &aliases)?
+            } else {
+                bytes.clone()
+            };
+            let strings = crate::android_binary_xml::inspect_binary_xml(&rewritten)?;
             for value in strings {
-                // Treat every string-pool entry as potentially referenced:
-                // string-ID aliases and XML attribute semantics are external
-                // contracts, so no unknown binding may be silently rewritten.
                 guard_text_reference(&format!("\"{value}\""), changed, name)?;
+            }
+            if rewritten != bytes {
+                xml_replacements.insert(name.to_owned(), rewritten);
             }
             continue;
         }
@@ -218,7 +260,7 @@ fn verify_non_dex_entries(
             "O.1.3 AndroidManifest.xml is missing".into(),
         ));
     }
-    Ok(())
+    Ok(xml_replacements)
 }
 
 #[cfg(test)]
@@ -228,6 +270,7 @@ mod tests {
     fn class() -> Vec<ChangedName> {
         vec![ChangedName {
             old: "Lcom/test/A;".into(),
+            new: "Lcom/test/Z;".into(),
             kind: NameKind::Class,
         }]
     }
@@ -258,6 +301,7 @@ mod tests {
     fn o13_xml_callback_and_config_class_reference_are_rejected() {
         let member = [ChangedName {
             old: "submit".into(),
+            new: "abcdxy".into(),
             kind: NameKind::Member,
         }];
         assert!(guard_text_reference(
