@@ -356,7 +356,6 @@ pub(crate) fn inspect_binary_xml(bytes: &[u8]) -> Result<Vec<String>> {
     strings.ok_or_else(|| reject("missing string pool"))
 }
 
-
 /// Rewrite only unambiguous, Android-namespaced component class attribute
 /// strings in a compiled manifest. String indices, chunk sizes, style spans,
 /// the resource map and every other APK contract remain byte-identical.
@@ -403,7 +402,9 @@ pub(crate) fn rewrite_manifest_class_aliases(
             }
         } else if item.kind == ELEMENT_START {
             let tag_idx = usize32(bytes, at + 20)?;
-            let tag = strings.get(tag_idx).ok_or_else(|| reject("invalid tag index"))?;
+            let tag = strings
+                .get(tag_idx)
+                .ok_or_else(|| reject("invalid tag index"))?;
             let component = [
                 "application",
                 "activity",
@@ -419,46 +420,67 @@ pub(crate) fn rewrite_manifest_class_aliases(
             for n in 0..count {
                 let base = at + first + n * 20;
                 let name_idx = usize32(bytes, base + 4)?;
-                let name = strings.get(name_idx).ok_or_else(|| reject("invalid attribute name"))?;
+                let name = strings
+                    .get(name_idx)
+                    .ok_or_else(|| reject("invalid attribute name"))?;
                 let ns = u32_at(bytes, base)?;
-                let android_ns = ns != u32::MAX && strings.get(usize::try_from(ns)
-                    .map_err(|_| reject("namespace offset overflow"))?)
-                    .is_some_and(|value| value == "http://schemas.android.com/apk/res/android");
-                let allowed = component && android_ns && [
-                    "name",
-                    "targetActivity",
-                    "parentActivityName",
-                    "backupAgent",
-                    "appComponentFactory",
-                    "manageSpaceActivity",
-                ].contains(&name.as_str());
+                let android_ns = ns != u32::MAX
+                    && strings
+                        .get(usize::try_from(ns).map_err(|_| reject("namespace offset overflow"))?)
+                        .is_some_and(|value| value == "http://schemas.android.com/apk/res/android");
+                let allowed = component
+                    && android_ns
+                    && [
+                        "name",
+                        "targetActivity",
+                        "parentActivityName",
+                        "backupAgent",
+                        "appComponentFactory",
+                        "manageSpaceActivity",
+                    ]
+                    .contains(&name.as_str());
                 let raw = u32_at(bytes, base + 8)?;
                 if raw != u32::MAX {
                     let idx = usize::try_from(raw).map_err(|_| reject("raw value overflow"))?;
                     if targets.contains(&idx) {
-                        if allowed { permitted.insert(idx); } else { forbidden.insert(idx); }
+                        if allowed {
+                            permitted.insert(idx);
+                        } else {
+                            forbidden.insert(idx);
+                        }
                     }
                 }
                 if u8_at(bytes, base + 15)? == TYPE_STRING {
                     let idx = usize32(bytes, base + 16)?;
                     if targets.contains(&idx) {
-                        if allowed { permitted.insert(idx); } else { forbidden.insert(idx); }
+                        if allowed {
+                            permitted.insert(idx);
+                        } else {
+                            forbidden.insert(idx);
+                        }
                     }
                 }
                 for field in [base, base + 4] {
                     let idx = u32_at(bytes, field)?;
                     if idx != u32::MAX {
                         if let Ok(idx) = usize::try_from(idx) {
-                            if targets.contains(&idx) { forbidden.insert(idx); }
+                            if targets.contains(&idx) {
+                                forbidden.insert(idx);
+                            }
                         }
                     }
                 }
             }
             for field in [at + 12, at + 16, at + 20] {
                 let idx = u32_at(bytes, field)?;
-                if idx != u32::MAX && targets.contains(&usize::try_from(idx)
-                    .map_err(|_| reject("XML node index overflow"))?) {
-                    forbidden.insert(usize::try_from(idx).map_err(|_| reject("XML node index overflow"))?);
+                if idx != u32::MAX
+                    && targets.contains(
+                        &usize::try_from(idx).map_err(|_| reject("XML node index overflow"))?,
+                    )
+                {
+                    forbidden.insert(
+                        usize::try_from(idx).map_err(|_| reject("XML node index overflow"))?,
+                    );
                 }
             }
         } else if item.kind != RESOURCE_MAP {
@@ -473,14 +495,21 @@ pub(crate) fn rewrite_manifest_class_aliases(
                 let idx = u32_at(bytes, at + slot)?;
                 if idx != u32::MAX {
                     let idx = usize::try_from(idx).map_err(|_| reject("node index overflow"))?;
-                    if targets.contains(&idx) { forbidden.insert(idx); }
+                    if targets.contains(&idx) {
+                        forbidden.insert(idx);
+                    }
                 }
             }
         }
         at += item.size;
     }
-    if targets.iter().any(|idx| !permitted.contains(idx) || forbidden.contains(idx)) {
-        return Err(reject("class alias has ambiguous or unsupported XML string references"));
+    if targets
+        .iter()
+        .any(|idx| !permitted.contains(idx) || forbidden.contains(idx))
+    {
+        return Err(reject(
+            "class alias has ambiguous or unsupported XML string references",
+        ));
     }
     let mut output = bytes.to_vec();
     for idx in targets {
@@ -491,7 +520,8 @@ pub(crate) fn rewrite_manifest_class_aliases(
         }
         let slot = 8 + pool.header + idx * 4;
         let off = usize32(bytes, slot)?;
-        let mut cursor = 8_usize.checked_add(strings_start)
+        let mut cursor = 8_usize
+            .checked_add(strings_start)
             .and_then(|start| start.checked_add(off))
             .ok_or_else(|| reject("string write offset overflow"))?;
         if utf8 {
@@ -617,8 +647,12 @@ mod tests {
                 strings.extend(value.as_bytes());
                 strings.push(0);
             } else {
-                strings.extend(le16(u16::try_from(value.encode_utf16().count()).unwrap_or(0)));
-                for unit in value.encode_utf16() { strings.extend(le16(unit)); }
+                strings.extend(le16(
+                    u16::try_from(value.encode_utf16().count()).unwrap_or(0),
+                ));
+                for unit in value.encode_utf16() {
+                    strings.extend(le16(unit));
+                }
                 strings.extend(le16(0));
             }
         }
@@ -660,11 +694,14 @@ mod tests {
             make_start(1, true),
             make_end(1),
             make_end(if shared { 4 } else { 0 }),
-        ].concat();
+        ]
+        .concat();
         let mut output = Vec::new();
         output.extend(le16(3));
         output.extend(le16(8));
-        output.extend(le32(u32::try_from(8 + pool.len() + nodes.len()).unwrap_or(0)));
+        output.extend(le32(
+            u32::try_from(8 + pool.len() + nodes.len()).unwrap_or(0),
+        ));
         output.extend(pool);
         output.extend(nodes);
         output
@@ -672,14 +709,12 @@ mod tests {
 
     #[test]
     fn o13_compiled_manifest_rewrites_only_safe_utf8_utf16_class_values() {
-        let aliases = std::collections::BTreeMap::from([(
-            "com.test.A".to_owned(),
-            "com.test.Z".to_owned(),
-        )]);
+        let aliases =
+            std::collections::BTreeMap::from([("com.test.A".to_owned(), "com.test.Z".to_owned())]);
         for utf8 in [true, false] {
             let original = class_manifest(utf8, false, true);
-            let written = super::rewrite_manifest_class_aliases(&original, &aliases)
-                .unwrap_or_default();
+            let written =
+                super::rewrite_manifest_class_aliases(&original, &aliases).unwrap_or_default();
             assert_eq!(written.len(), original.len());
             let before = inspect_binary_xml(&original).unwrap_or_default();
             let after = inspect_binary_xml(&written).unwrap_or_default();
@@ -687,8 +722,11 @@ mod tests {
             assert_eq!(after.get(4).map(String::as_str), Some("com.test.Z"));
             assert_eq!(after.get(..4), before.get(..4));
             assert_eq!(
-                super::rewrite_manifest_class_aliases(&original, &std::collections::BTreeMap::new())
-                    .unwrap_or_default(),
+                super::rewrite_manifest_class_aliases(
+                    &original,
+                    &std::collections::BTreeMap::new()
+                )
+                .unwrap_or_default(),
                 original
             );
         }
@@ -696,16 +734,15 @@ mod tests {
 
     #[test]
     fn o13_manifest_refuses_shared_wrong_namespace_and_length_changes() {
-        let aliases = std::collections::BTreeMap::from([(
-            "com.test.A".to_owned(),
-            "com.test.Z".to_owned(),
-        )]);
+        let aliases =
+            std::collections::BTreeMap::from([("com.test.A".to_owned(), "com.test.Z".to_owned())]);
         for utf8 in [true, false] {
             for (shared, namespace) in [(true, true), (false, false)] {
                 assert!(super::rewrite_manifest_class_aliases(
                     &class_manifest(utf8, shared, namespace),
                     &aliases,
-                ).is_err());
+                )
+                .is_err());
             }
             let wrong_length = std::collections::BTreeMap::from([(
                 "com.test.A".to_owned(),
@@ -714,7 +751,8 @@ mod tests {
             assert!(super::rewrite_manifest_class_aliases(
                 &class_manifest(utf8, false, true),
                 &wrong_length
-            ).is_err());
+            )
+            .is_err());
         }
     }
 
