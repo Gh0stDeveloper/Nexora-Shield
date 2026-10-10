@@ -385,6 +385,11 @@ pub(crate) fn rewrite_manifest_class_aliases(
         return Ok(bytes.to_vec());
     }
     let pool = chunk(bytes, 8)?;
+    if usize32(bytes, 8 + 12)? != 0 {
+        return Err(reject(
+            "styled string pools need explicit style-span reference verification",
+        ));
+    }
     let flags = u32_at(bytes, 8 + 16)?;
     let utf8 = flags & UTF8_FLAG != 0;
     let strings_start = usize32(bytes, 8 + 20)?;
@@ -452,6 +457,12 @@ pub(crate) fn rewrite_manifest_class_aliases(
                 }
                 if u8_at(bytes, base + 15)? == TYPE_STRING {
                     let idx = usize32(bytes, base + 16)?;
+                    if raw != u32::MAX && raw != u32::try_from(idx).unwrap_or(u32::MAX)
+                        && (targets.contains(&idx) || targets.contains(&usize::try_from(raw)
+                            .map_err(|_| reject("raw index overflow"))?))
+                    {
+                        return Err(reject("raw and typed class attribute references disagree"));
+                    }
                     if targets.contains(&idx) {
                         if allowed {
                             permitted.insert(idx);
@@ -517,6 +528,13 @@ pub(crate) fn rewrite_manifest_class_aliases(
         let new = aliases.get(old).ok_or_else(|| reject("missing alias"))?;
         if old.len() != new.len() || old.encode_utf16().count() != new.encode_utf16().count() {
             return Err(reject("class alias changes compiled string length"));
+        }
+        if strings
+            .iter()
+            .enumerate()
+            .any(|(other_idx, value)| other_idx != idx && value == new)
+        {
+            return Err(reject("replacement collides with an existing XML string"));
         }
         let slot = 8 + pool.header + idx * 4;
         let off = usize32(bytes, slot)?;
