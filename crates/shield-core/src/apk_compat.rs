@@ -38,9 +38,18 @@ struct ChangedName {
 
 fn checked_aliases(changed: &[ChangedName]) -> Result<BTreeMap<String, String>> {
     let mut aliases = BTreeMap::new();
-    for record in changed.iter().filter(|record| record.kind == NameKind::Class) {
-        let old = record.old.strip_prefix('L').and_then(|name| name.strip_suffix(';'));
-        let new = record.new.strip_prefix('L').and_then(|name| name.strip_suffix(';'));
+    for record in changed
+        .iter()
+        .filter(|record| record.kind == NameKind::Class)
+    {
+        let old = record
+            .old
+            .strip_prefix('L')
+            .and_then(|name| name.strip_suffix(';'));
+        let new = record
+            .new
+            .strip_prefix('L')
+            .and_then(|name| name.strip_suffix(';'));
         let (Some(old), Some(new)) = (old, new) else {
             return Err(CoreError::InvalidRequest(
                 "O.1.3 requires canonical class descriptors for compiled XML relinking".into(),
@@ -53,7 +62,8 @@ fn checked_aliases(changed: &[ChangedName]) -> Result<BTreeMap<String, String>> 
             (old.replace('/', "."), new.replace('/', ".")),
             (format!(".{old_simple}"), format!(".{new_simple}")),
         ] {
-            if aliases.insert(before.clone(), after.clone())
+            if aliases
+                .insert(before.clone(), after.clone())
                 .is_some_and(|previous| previous != after)
             {
                 return Err(CoreError::InvalidRequest(format!(
