@@ -229,6 +229,69 @@ for filename, values in {
         output.writestr("classes.dex", first)
         output.writestr("classes2.dex", second)
 
+# O.1.3: compiled Android Manifest component with real, indexed
+# Android namespace attribute and matching raw/typed string references.
+# Still a structural fixture, not a complete device-installable manifest.
+def compiled_component_manifest(utf8: bool, shared: bool = False, namespace: bool = True) -> bytes:
+    values = ["manifest", "application", "name",
+              "http://schemas.android.com/apk/res/android", "com.test.A"]
+    offsets = []
+    raw = bytearray()
+    for value in values:
+        offsets.append(len(raw))
+        encoded = value.encode("utf-8")
+        units = len(value.encode("utf-16-le")) // 2
+        if utf8:
+            raw.extend((units, len(encoded)))
+            raw.extend(encoded)
+            raw.append(0)
+        else:
+            raw.extend(struct.pack("<H", units))
+            raw.extend(value.encode("utf-16-le"))
+            raw.extend(b"\\x00\\x00")
+    pool_data = (
+        struct.pack("<IIIII", len(values), 0, 0x100 if utf8 else 0, 28 + 4 * len(values), 0)
+        + b"".join(struct.pack("<I", i) for i in offsets) + raw
+    )
+    pool = struct.pack("<HHI", 1, 28, len(pool_data) + 8) + pool_data
+
+    def node_start(tag: int, with_attr: bool) -> bytes:
+        body = (
+            struct.pack("<II", 1, 0xffffffff)
+            + struct.pack("<IIHHHHHH", 0xffffffff, tag, 20, 20,
+                          int(with_attr), 0, 0, 0)
+        )
+        if with_attr:
+            body += (
+                struct.pack("<III", 3 if namespace else 0xffffffff, 2, 4)
+                + struct.pack("<HBBI", 8, 0, 3, 4)
+            )
+        return struct.pack("<HHI", 0x0102, 16, len(body) + 8) + body
+
+    def node_end(tag: int) -> bytes:
+        body = struct.pack("<IIII", 2, 0xffffffff, 0xffffffff, tag)
+        return struct.pack("<HHI", 0x0103, 16, len(body) + 8) + body
+
+    root_name = 4 if shared else 0
+    nodes = (
+        node_start(root_name, False) + node_start(1, True)
+        + node_end(1) + node_end(root_name)
+    )
+    result = pool + nodes
+    return struct.pack("<HHI", 3, 8, 8 + len(result)) + result
+
+
+for mode, binary in {
+    "binary-class-utf8": compiled_component_manifest(True),
+    "binary-class-utf16": compiled_component_manifest(False),
+    "binary-class-shared": compiled_component_manifest(True, shared=True),
+    "binary-class-bad-namespace": compiled_component_manifest(True, namespace=False),
+}.items():
+    with zipfile.ZipFile(directory / f"{mode}.apk", "w", compression=zipfile.ZIP_DEFLATED) as output:
+        output.writestr("AndroidManifest.xml", binary)
+        output.writestr("classes.dex", first)
+        output.writestr("classes2.dex", second)
+
 # O.1.3: synthetic ARSC string pools, one package, type spec and type.
 # Structural-only fixtures; these are NOT installable resource APKs.
 def arsc_pool(values: list[str]) -> bytes:
