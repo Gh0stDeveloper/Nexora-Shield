@@ -354,8 +354,10 @@ fn verify_rebuilt_zip(
             ));
         }
         if let Some(expected) = replacements.get(&entry.name) {
-            let actual = read_stored_entry(destination, entry, MAX_DEX_BYTES)?
-                .ok_or_else(|| CoreError::InvalidRequest("staged replacement entry is not stored".into()))?;
+            let actual =
+                read_stored_entry(destination, entry, MAX_DEX_BYTES)?.ok_or_else(|| {
+                    CoreError::InvalidRequest("staged replacement entry is not stored".into())
+                })?;
             if actual != *expected || crc32_ieee(&actual) != entry.crc32 {
                 return Err(CoreError::InvalidRequest(format!(
                     "staged DEX '{}' differs from validated rewrite",
