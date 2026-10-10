@@ -356,6 +356,171 @@ pub(crate) fn inspect_binary_xml(bytes: &[u8]) -> Result<Vec<String>> {
     strings.ok_or_else(|| reject("missing string pool"))
 }
 
+
+/// Rewrite only unambiguous, Android-namespaced component class attribute
+/// strings in a compiled manifest. String indices, chunk sizes, style spans,
+/// the resource map and every other APK contract remain byte-identical.
+///
+/// The writer deliberately supports equal-length UTF-8/UTF-16 substitutions
+/// only. It cannot perform a general resource or XML name relink.
+///
+/// # Errors
+///
+/// Refuses shared pool entries, unsupported contexts, bad references, or
+/// substitutions changing the encoded string length.
+pub(crate) fn rewrite_manifest_class_aliases(
+    bytes: &[u8],
+    aliases: &std::collections::BTreeMap<String, String>,
+) -> Result<Vec<u8>> {
+    let strings = inspect_binary_xml(bytes)?;
+    if aliases.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    let targets = strings
+        .iter()
+        .enumerate()
+        .filter(|(_, value)| aliases.contains_key(value.as_str()))
+        .map(|(idx, _)| idx)
+        .collect::<std::collections::BTreeSet<_>>();
+    if targets.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    let pool = chunk(bytes, 8)?;
+    let flags = u32_at(bytes, 8 + 16)?;
+    let utf8 = flags & UTF8_FLAG != 0;
+    let strings_start = usize32(bytes, 8 + 20)?;
+    let mut permitted = std::collections::BTreeSet::new();
+    let mut forbidden = std::collections::BTreeSet::new();
+    let mut at = 8 + pool.size;
+    while at < bytes.len() {
+        let item = chunk(bytes, at)?;
+        if item.kind == RESOURCE_MAP {
+            let count = (item.size - item.header) / 4;
+            for idx in &targets {
+                if *idx < count && u32_at(bytes, at + 8 + idx * 4)? != 0 {
+                    forbidden.insert(*idx);
+                }
+            }
+        } else if item.kind == ELEMENT_START {
+            let tag_idx = usize32(bytes, at + 20)?;
+            let tag = strings.get(tag_idx).ok_or_else(|| reject("invalid tag index"))?;
+            let component = [
+                "application",
+                "activity",
+                "activity-alias",
+                "service",
+                "receiver",
+                "provider",
+                "instrumentation",
+            ]
+            .contains(&tag.as_str());
+            let first = 16 + usize::from(u16_at(bytes, at + 24)?);
+            let count = usize::from(u16_at(bytes, at + 28)?);
+            for n in 0..count {
+                let base = at + first + n * 20;
+                let name_idx = usize32(bytes, base + 4)?;
+                let name = strings.get(name_idx).ok_or_else(|| reject("invalid attribute name"))?;
+                let ns = u32_at(bytes, base)?;
+                let android_ns = ns != u32::MAX && strings.get(usize::try_from(ns)
+                    .map_err(|_| reject("namespace offset overflow"))?)
+                    .is_some_and(|value| value == "http://schemas.android.com/apk/res/android");
+                let allowed = component && android_ns && [
+                    "name",
+                    "targetActivity",
+                    "parentActivityName",
+                    "backupAgent",
+                    "appComponentFactory",
+                    "manageSpaceActivity",
+                ].contains(&name.as_str());
+                let raw = u32_at(bytes, base + 8)?;
+                if raw != u32::MAX {
+                    let idx = usize::try_from(raw).map_err(|_| reject("raw value overflow"))?;
+                    if targets.contains(&idx) {
+                        if allowed { permitted.insert(idx); } else { forbidden.insert(idx); }
+                    }
+                }
+                if u8_at(bytes, base + 15)? == TYPE_STRING {
+                    let idx = usize32(bytes, base + 16)?;
+                    if targets.contains(&idx) {
+                        if allowed { permitted.insert(idx); } else { forbidden.insert(idx); }
+                    }
+                }
+                for field in [base, base + 4] {
+                    let idx = u32_at(bytes, field)?;
+                    if idx != u32::MAX {
+                        if let Ok(idx) = usize::try_from(idx) {
+                            if targets.contains(&idx) { forbidden.insert(idx); }
+                        }
+                    }
+                }
+            }
+            for field in [at + 12, at + 16, at + 20] {
+                let idx = u32_at(bytes, field)?;
+                if idx != u32::MAX && targets.contains(&usize::try_from(idx)
+                    .map_err(|_| reject("XML node index overflow"))?) {
+                    forbidden.insert(usize::try_from(idx).map_err(|_| reject("XML node index overflow"))?);
+                }
+            }
+        } else if item.kind != RESOURCE_MAP {
+            // Namespace, element-end and CDATA references are not automatically
+            // class attributes. Shared entries here must never be rewritten.
+            let slots: &[usize] = match item.kind {
+                NS_START | NS_END | ELEMENT_END => &[12, 16, 20],
+                CDATA => &[12, 16, 24],
+                _ => &[],
+            };
+            for slot in slots {
+                let idx = u32_at(bytes, at + slot)?;
+                if idx != u32::MAX {
+                    let idx = usize::try_from(idx).map_err(|_| reject("node index overflow"))?;
+                    if targets.contains(&idx) { forbidden.insert(idx); }
+                }
+            }
+        }
+        at += item.size;
+    }
+    if targets.iter().any(|idx| !permitted.contains(idx) || forbidden.contains(idx)) {
+        return Err(reject("class alias has ambiguous or unsupported XML string references"));
+    }
+    let mut output = bytes.to_vec();
+    for idx in targets {
+        let old = &strings[idx];
+        let new = aliases.get(old).ok_or_else(|| reject("missing alias"))?;
+        if old.len() != new.len() || old.encode_utf16().count() != new.encode_utf16().count() {
+            return Err(reject("class alias changes compiled string length"));
+        }
+        let slot = 8 + pool.header + idx * 4;
+        let off = usize32(bytes, slot)?;
+        let mut cursor = 8_usize.checked_add(strings_start)
+            .and_then(|start| start.checked_add(off))
+            .ok_or_else(|| reject("string write offset overflow"))?;
+        if utf8 {
+            let _ = utf8_length(bytes, &mut cursor)?;
+            let count = utf8_length(bytes, &mut cursor)?;
+            if count != old.len() {
+                return Err(reject("string size differs from decoded value"));
+            }
+            output[cursor..cursor + count].copy_from_slice(new.as_bytes());
+        } else {
+            let count = utf16_length(bytes, &mut cursor)?;
+            if count != old.encode_utf16().count() {
+                return Err(reject("UTF-16 string size differs from decoded value"));
+            }
+            for (i, unit) in new.encode_utf16().enumerate() {
+                output[cursor + i * 2..cursor + i * 2 + 2].copy_from_slice(&unit.to_le_bytes());
+            }
+        }
+    }
+    let verified = inspect_binary_xml(&output)?;
+    for (idx, previous) in strings.iter().enumerate() {
+        let expected = aliases.get(previous).unwrap_or(previous);
+        if verified.get(idx) != Some(expected) {
+            return Err(reject("post-rewrite string pool mismatch"));
+        }
+    }
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::inspect_binary_xml;
