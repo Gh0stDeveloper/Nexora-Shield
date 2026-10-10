@@ -1,10 +1,10 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 use nexora_shield_dex::{
-    refresh_integrity, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter, IrMethod,
-    MetadataReducer, MultiDexRewriteConfig, MultiDexSet, ReferenceGraph, RenameConfig, RenamePass,
-    Selector, SelectorKind, SelectorResolver, TypeAnalyzer, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE,
-    NO_INDEX,
+    refresh_integrity, ControlFlowGraph, DexInput, DexParser, DexRewriteVerifier, DexValidator,
+    DexWriter, IrMethod, MetadataReducer, MultiDexRewriteConfig, MultiDexSet, ReferenceGraph,
+    ReferenceKind, RenameConfig, RenamePass, Selector, SelectorKind, SelectorResolver,
+    TypeAnalyzer, DEX_ENDIAN_CONSTANT, DEX_HEADER_SIZE, NO_INDEX,
 };
 
 #[test]
@@ -114,14 +114,848 @@ fn canonical_multidex_round_trip_rewrites_every_unit() {
     }
 }
 
-fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
-    let strings = [
-        class_descriptor,
-        "Ljava/lang/Object;",
-        "V",
-        method_name,
-        "A.java",
+#[test]
+fn o13_rewrite_audit_proves_only_declared_bytes_changed() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let original = DexParser::parse(&bytes).expect("original DEX");
+    let transformed =
+        RenamePass::apply(&original, &RenameConfig::default()).expect("fixed-layout rename");
+    let renamed = DexParser::parse(&transformed.bytes).expect("renamed DEX");
+    let (final_bytes, metadata) =
+        MetadataReducer::strip_debug_metadata(&renamed).expect("real metadata removal");
+    let audit = DexRewriteVerifier::verify(
+        &original,
+        &final_bytes,
+        Some(&transformed.report),
+        Some(&metadata),
+    )
+    .expect("every changed byte accounted for");
+    assert!(audit.changed_symbol_strings > 0);
+    assert_eq!(audit.source_files_removed, 1);
+    assert_eq!(audit.preserved_code_items, 1);
+}
+
+#[test]
+fn o13_symbol_rename_preserves_const_string_literals() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let mut parsed = DexParser::parse(&bytes).expect("parse DEX");
+    let name_index = parsed.methods[0].name_idx;
+    let code = parsed.code_items.values_mut().next().expect("test code");
+    code.instructions[0].reference = Some((ReferenceKind::String, name_index));
+    let transformed = RenamePass::apply(
+        &parsed,
+        &RenameConfig {
+            rename_classes: false,
+            rename_methods: true,
+            rename_fields: false,
+            ..RenameConfig::default()
+        },
+    )
+    .expect("conservatively retain runtime literal");
+    assert_eq!(transformed.report.records, Vec::new());
+    assert!(transformed.report.skipped_protected.contains(&name_index));
+    assert_eq!(transformed.bytes, bytes);
+}
+
+#[test]
+fn o13_rewrite_audit_rejects_unreported_executable_mutation() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let original = DexParser::parse(&bytes).expect("original DEX");
+    let code_offset = usize::try_from(
+        original
+            .code_items
+            .values()
+            .next()
+            .expect("test method")
+            .offset,
+    )
+    .expect("host offset");
+    let mut corrupted = bytes;
+    corrupted[code_offset + 16] = 0; // Replace return-void with NOP.
+    refresh_integrity(&mut corrupted).expect("refresh tampered DEX checksum");
+    assert!(DexRewriteVerifier::verify(&original, &corrupted, None, None).is_err());
+}
+
+#[test]
+fn o13_multidex_refuses_class_name_collisions_with_foreign_types() {
+    let primary = build_test_dex("Lcom/test/Owner;", "run");
+    let solo = MultiDexSet::parse(vec![DexInput {
+        name: "classes.dex".into(),
+        bytes: primary.clone(),
+    }])
+    .expect("single valid DEX");
+    let renamed = solo
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig::default()),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("derive a deterministic class name");
+    let renamed_dex = DexParser::parse(&renamed[0].bytes).expect("rewritten");
+    let future_name = renamed_dex.type_descriptor(0).expect("class descriptor");
+    assert_ne!(future_name, "Lcom/test/Owner;");
+    let secondary = build_test_dex_with_superclass("Lcom/test/Other;", "go", future_name);
+    let linked = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ])
+    .expect("original DEX inputs valid");
+    let result = linked.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig::default()),
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(result
+        .expect_err("must not capture foreign DEX type")
+        .to_string()
+        .contains("collides with an existing DEX type reference"));
+}
+
+#[test]
+fn o13_multidex_refuses_unsafe_cross_unit_renames_but_allows_metadata() {
+    let primary = build_test_dex("Lcom/test/Owner;", "run");
+    let secondary = build_test_dex_with_superclass("Lcom/test/Other;", "go", "Lcom/test/Owner;");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ])
+    .expect("valid cross-unit link");
+    let linked = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig::default()),
+            strip_metadata: true,
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("cross-DEX direct/static method identities can be mapped safely");
+    assert_eq!(linked.len(), 2);
+    assert!(linked
+        .iter()
+        .all(|output| output.audit.source_files_removed == 1));
+    let metadata_only = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: None,
+            strip_metadata: true,
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("metadata-only transformation preserves link");
+    assert_eq!(metadata_only.len(), 2);
+    assert!(metadata_only
+        .iter()
+        .all(|item| item.audit.source_files_removed == 1));
+}
+
+#[test]
+fn o13_linked_class_only_remapping_updates_cross_dex_type_references() {
+    let primary = build_test_dex("Lcom/test/Owner;", "run");
+    let secondary = build_test_dex_with_superclass("Lcom/test/Child;", "go", "Lcom/test/Owner;");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ])
+    .expect("linked multidex input");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: true,
+                rename_methods: false,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            strip_metadata: true,
+            conservative_cross_dex_reflection: true,
+        })
+        .expect("class-only binding updates both DEX units");
+    assert_eq!(outputs.len(), 2);
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner DEX");
+    let child = DexParser::parse(&outputs[1].bytes).expect("child DEX");
+    let renamed_owner = owner.type_descriptor(0).expect("owner descriptor");
+    assert_ne!(renamed_owner, "Lcom/test/Owner;");
+    assert_eq!(child.type_descriptor(1), Some(renamed_owner));
+    assert_eq!(owner.method_name(0), Some("run"));
+    assert_eq!(child.method_name(0), Some("go"));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.preserved_code_items == 1));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.source_files_removed == 1));
+    assert!(outputs[1].audit.changed_symbol_strings >= 2);
+    assert!(!outputs[1].rename_skipped_for_cross_dex_reflection);
+}
+
+#[test]
+fn o13_linked_class_remapping_is_deterministic() {
+    let original = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: build_test_dex("Lcom/test/Owner;", "run"),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_test_dex_with_superclass("Lcom/test/Child;", "go", "Lcom/test/Owner;"),
+        },
+    ])
+    .expect("valid linked set");
+    let config = MultiDexRewriteConfig {
+        rename: Some(RenameConfig {
+            rename_classes: true,
+            rename_methods: false,
+            rename_fields: false,
+            ..RenameConfig::default()
+        }),
+        strip_metadata: false,
+        conservative_cross_dex_reflection: true,
+    };
+    let once = original.rewrite(&config).expect("first rewrite");
+    let twice = original.rewrite(&config).expect("second rewrite");
+    assert_eq!(once, twice);
+}
+
+#[test]
+fn o13_multidex_rewrites_signature_bound_method_and_field_imports() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: build_linked_member_fixture(true),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_linked_member_fixture(false),
+        },
+    ])
+    .expect("canonical cross-DEX member fixture");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: true,
+                ..RenameConfig::default()
+            }),
+            strip_metadata: true,
+            conservative_cross_dex_reflection: true,
+        })
+        .expect("cross-DEX method and field IDs link by identity and signature");
+    assert_eq!(outputs.len(), 2);
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner parsed");
+    let consumer = DexParser::parse(&outputs[1].bytes).expect("consumer parsed");
+    assert_ne!(owner.method_name(0), Some("run"));
+    assert_ne!(owner.field_name(0), Some("flag"));
+    assert_eq!(owner.method_name(0), consumer.method_name(1));
+    assert_eq!(owner.field_name(0), consumer.field_name(0));
+    assert_ne!(consumer.method_name(0), Some("go"));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.preserved_code_items == 1));
+    assert!(outputs
+        .iter()
+        .all(|output| output.audit.source_files_removed == 1));
+    assert_eq!(
+        consumer
+            .code_items
+            .values()
+            .next()
+            .expect("code")
+            .insns
+            .len(),
+        6
+    );
+    let repeated = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: true,
+                ..RenameConfig::default()
+            }),
+            strip_metadata: true,
+            conservative_cross_dex_reflection: true,
+        })
+        .expect("repeat");
+    assert_eq!(outputs, repeated);
+}
+
+#[test]
+fn o13_member_linking_rejects_alias_to_untouched_import() {
+    let primary = build_linked_member_fixture(true);
+    let mut secondary = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&secondary).expect("consumer");
+    // Give the local method and imported method the *same string ID*
+    // but a different method identity (different declaring class).
+    let own_method_name_offset = parsed.header.method_ids_off as usize + 4;
+    put_u32(&mut secondary, own_method_name_offset, 4);
+    // Also make the foreign method signature impossible to bind by using
+    // the same name but a different prototype with return I.
+    // The actual cross-DEX import is still required by the tests above.
+    refresh_integrity(&mut secondary).expect("recalculate fixture");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: secondary,
+        },
+    ])
+    .expect("input remains structurally valid");
+    // A selector that only picks the local Child.run causes the shared
+    // string to also name the Owner.run import: conflicting definitions
+    // must not be partially rewritten.
+    let reject = set.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig {
+            selectors: vec![Selector::new(
+                SelectorKind::Method,
+                "Lcom/test/Child;",
+                Some("run".to_owned()),
+            )
+            .expect("selector")],
+            rename_classes: false,
+            rename_methods: true,
+            rename_fields: false,
+            ..RenameConfig::default()
+        }),
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(reject
+        .expect_err("shared selected/unselected identity must reject")
+        .to_string()
+        .contains("shared member string ID"));
+}
+
+#[test]
+fn o13_member_linker_updates_inherited_method_and_field_aliases() {
+    let owner = build_linked_member_fixture(true);
+    let mut child = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&child).expect("child fixture");
+    // A method/field reference may name Child even though the member is
+    // defined in Owner. Neither ID index nor executable instruction changes.
+    let method_offset = parsed.header.method_ids_off as usize + 8;
+    put_u16(&mut child, method_offset, 0);
+    let field_offset = parsed.header.field_ids_off as usize;
+    put_u16(&mut child, field_offset, 0);
+    refresh_integrity(&mut child).expect("refresh IDs");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child,
+        },
+    ])
+    .expect("valid inherited references");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: true,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("inherited aliases use their original defining member");
+    let owner_after = DexParser::parse(&outputs[0].bytes).expect("owner");
+    let child_after = DexParser::parse(&outputs[1].bytes).expect("child");
+    assert_ne!(owner_after.method_name(0), Some("run"));
+    assert_ne!(owner_after.field_name(0), Some("flag"));
+    assert_eq!(owner_after.method_name(0), child_after.method_name(1));
+    assert_eq!(owner_after.field_name(0), child_after.field_name(0));
+    assert_eq!(
+        set.units[1].dex.code_items, child_after.code_items,
+        "executable instruction references retain their original indices"
+    );
+}
+
+#[test]
+fn o13_virtual_closed_hierarchy_renames_owner_and_inherited_call() {
+    let owner = virtual_owner_fixture();
+    let mut child = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&child).expect("child fixture");
+    put_u16(&mut child, parsed.header.method_ids_off as usize + 8, 0);
+    refresh_integrity(&mut child).expect("refresh");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child,
+        },
+    ])
+    .expect("valid virtual member fixture");
+    let output = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("virtual definition and inherited reference share new name");
+    let owner_after = DexParser::parse(&output[0].bytes).expect("owner");
+    let child_after = DexParser::parse(&output[1].bytes).expect("child");
+    assert_ne!(owner_after.method_name(0), Some("run"));
+    assert_eq!(owner_after.method_name(0), child_after.method_name(1));
+    assert_eq!(set.units[1].dex.code_items, child_after.code_items);
+}
+
+#[test]
+fn o13_virtual_method_with_external_superclass_is_kept() {
+    let owner = virtual_owner_fixture();
+    let parsed = DexParser::parse(&owner).expect("owner");
+    assert_eq!(parsed.type_descriptor(1), Some("Ljava/lang/Object;"));
+    let replacement = std::collections::BTreeMap::from([(1_u32, "Lcom/test/Unknown;".to_owned())]);
+    let altered = DexWriter::patch_strings(&parsed, &replacement)
+        .expect("equal-width external superclass descriptor");
+    let consumer = build_linked_member_fixture(false);
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: altered,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: consumer,
+        },
+    ])
+    .expect("local class extends unknown external SDK superclass");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_methods: true,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("external override candidates remain unchanged");
+    let result = DexParser::parse(&outputs[0].bytes).expect("output");
+    assert_eq!(result.method_name(0), Some("run"));
+    assert_eq!(outputs[0].audit.changed_symbol_strings, 0);
+}
+
+#[test]
+fn o13_interface_method_and_inherited_implementation_share_one_name() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: virtual_owner_fixture(),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child_implementing_interface_fixture(),
+        },
+        DexInput {
+            name: "classes3.dex".into(),
+            bytes: interface_fixture(),
+        },
+    ])
+    .expect("local parent and interface declarations");
+    let outputs = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                rename_fields: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect("connected virtual/interface family maps atomically");
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner");
+    let implementation = DexParser::parse(&outputs[1].bytes).expect("child");
+    let interface = DexParser::parse(&outputs[2].bytes).expect("interface");
+    assert_ne!(owner.method_name(0), Some("run"));
+    assert_eq!(owner.method_name(0), interface.method_name(0));
+    assert_eq!(owner.method_name(0), implementation.method_name(1));
+    assert_eq!(set.units[1].dex.code_items, implementation.code_items);
+}
+
+#[test]
+fn o13_interface_override_family_rejects_partial_selection() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: virtual_owner_fixture(),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child_implementing_interface_fixture(),
+        },
+        DexInput {
+            name: "classes3.dex".into(),
+            bytes: interface_fixture(),
+        },
+    ])
+    .expect("interfaces");
+    let policy = RenameConfig {
+        selectors: vec![Selector::new(
+            SelectorKind::Method,
+            "Lcom/test/Owner;",
+            Some("run".to_owned()),
+        )
+        .expect("only owner")],
+        rename_classes: false,
+        rename_fields: false,
+        ..RenameConfig::default()
+    };
+    let error = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(policy),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect_err("interface implementer and declaration cannot diverge");
+    assert!(error
+        .to_string()
+        .contains("virtual/interface override family"));
+}
+
+#[test]
+fn o13_inherited_private_member_does_not_get_public_alias() {
+    let mut owner = build_linked_member_fixture(true);
+    let owner_before = DexParser::parse(&owner).expect("owner");
+    let data_at = owner_before.classes[0].class_data_off as usize;
+    owner[data_at + 5] = 0x0a; // static private field
+    owner[data_at + 7] = 0x0a; // static private method
+    refresh_integrity(&mut owner).expect("private fixture");
+    let mut child = build_linked_member_fixture(false);
+    let parsed = DexParser::parse(&child).expect("child");
+    put_u16(&mut child, parsed.header.method_ids_off as usize + 8, 0);
+    put_u16(&mut child, parsed.header.field_ids_off as usize, 0);
+    refresh_integrity(&mut child).expect("ref alias");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: child,
+        },
+    ])
+    .expect("synthetic inputs");
+    let err = set
+        .rewrite(&MultiDexRewriteConfig {
+            rename: Some(RenameConfig {
+                rename_classes: false,
+                ..RenameConfig::default()
+            }),
+            ..MultiDexRewriteConfig::default()
+        })
+        .expect_err("private members are not inherited by subclasses");
+    assert!(err.to_string().contains("non-inheritable"));
+}
+
+#[test]
+fn o13_cyclic_superclass_graph_is_rejected_before_rewrite() {
+    let mut owner = virtual_owner_fixture();
+    let parsed = DexParser::parse(&owner).expect("owner");
+    put_u32(&mut owner, parsed.header.class_defs_off as usize + 8, 0);
+    refresh_integrity(&mut owner).expect("cycle");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: owner,
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_linked_member_fixture(false),
+        },
+    ])
+    .expect("structurally accepted input");
+    let result = set.rewrite(&MultiDexRewriteConfig {
+        rename: Some(RenameConfig {
+            rename_classes: false,
+            rename_fields: false,
+            ..RenameConfig::default()
+        }),
+        ..MultiDexRewriteConfig::default()
+    });
+    assert!(result
+        .expect_err("cycle is unsafe")
+        .to_string()
+        .contains("cyclic DEX class/interface hierarchy"));
+}
+
+#[test]
+fn multidex_parser_rejects_duplicate_class_ownership() {
+    let primary = build_test_dex("Lcom/test/A;", "run");
+    let err = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: primary.clone(),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: primary,
+        },
+    ])
+    .expect_err("two canonical DEX units cannot own the same class");
+    assert!(err.to_string().contains("duplicate class definition"));
+}
+
+#[test]
+fn multidex_parser_rejects_gaps_and_noncanonical_dex_names() {
+    let first = build_test_dex("Lcom/test/A;", "run");
+    let other = build_test_dex("Lcom/test/B;", "go");
+    let missing_second = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: first.clone(),
+        },
+        DexInput {
+            name: "classes3.dex".into(),
+            bytes: other.clone(),
+        },
+    ]);
+    assert!(missing_second.is_err());
+    let leading_zero = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: first,
+        },
+        DexInput {
+            name: "classes02.dex".into(),
+            bytes: other,
+        },
+    ]);
+    assert!(leading_zero.is_err());
+}
+
+#[test]
+fn selector_resolver_revalidates_public_fields_and_rule_limits() {
+    let bytes = build_test_dex("Lcom/test/A;", "run");
+    let dex = DexParser::parse(&bytes).expect("parse synthetic DEX");
+    let malformed = Selector {
+        kind: SelectorKind::Method,
+        class_pattern: "Lcom/test/A;".into(),
+        member_pattern: None,
+    };
+    assert!(SelectorResolver::resolve(&dex, &[malformed]).is_err());
+    let control_chars = Selector {
+        kind: SelectorKind::Class,
+        class_pattern: "Lcom/test/\0;".into(),
+        member_pattern: None,
+    };
+    assert!(SelectorResolver::resolve(&dex, &[control_chars]).is_err());
+    let many = vec![
+        Selector {
+            kind: SelectorKind::Class,
+            class_pattern: "Lcom/test/*;".into(),
+            member_pattern: None,
+        };
+        129
     ];
+    assert!(SelectorResolver::resolve(&dex, &many).is_err());
+}
+
+fn virtual_owner_fixture() -> Vec<u8> {
+    let mut bytes = build_linked_member_fixture(true);
+    let parsed = DexParser::parse(&bytes).expect("owner");
+    let class = parsed.classes[0];
+    let at = class.class_data_off as usize;
+    // The owner has one static field followed by one direct method. Move the
+    // method into the virtual_methods list without changing encoded length.
+    bytes[at + 2] = 0;
+    bytes[at + 3] = 1;
+    bytes[at + 7] = 1;
+    let code = parsed.code_items.values().next().expect("code");
+    put_u16(&mut bytes, code.offset as usize, 1);
+    put_u16(&mut bytes, code.offset as usize + 2, 1);
+    refresh_integrity(&mut bytes).expect("refresh virtual fixture");
+    bytes
+}
+
+fn interface_fixture() -> Vec<u8> {
+    let bytes = virtual_owner_fixture();
+    let parsed = DexParser::parse(&bytes).expect("virtual owner");
+    let mut patches = std::collections::BTreeMap::new();
+    patches.insert(0_u32, "Lcom/test/Iface;".to_owned());
+    let mut renamed = DexWriter::patch_strings(&parsed, &patches)
+        .expect("interface descriptor same width as owner descriptor");
+    let reparsed = DexParser::parse(&renamed).expect("renamed interface");
+    let class_def = reparsed.header.class_defs_off as usize;
+    put_u32(&mut renamed, class_def + 4, 0x0201);
+    refresh_integrity(&mut renamed).expect("interface fixture integrity");
+    renamed
+}
+
+fn child_implementing_interface_fixture() -> Vec<u8> {
+    let mut child = build_linked_member_fixture(false);
+    while child.len() % 4 != 0 {
+        child.push(0);
+    }
+    let interfaces_off = len_u32(child.len());
+    push_u32(&mut child, 1);
+    push_u16(&mut child, 4);
+    push_u16(&mut child, 0);
+    let parsed = DexParser::parse(&build_linked_member_fixture(false)).expect("original child");
+    let class_off = parsed.header.class_defs_off as usize;
+    put_u32(&mut child, class_off + 12, interfaces_off);
+    let file_size = len_u32(child.len());
+    put_u32(&mut child, 32, file_size);
+    put_u32(&mut child, 104, file_size - parsed.header.data_off);
+    refresh_integrity(&mut child).expect("interface implementing fixture");
+    child
+}
+
+fn append_linked_method_data(bytes: &mut Vec<u8>, owner: bool) -> u32 {
+    let code_off = len_u32(bytes.len());
+    push_u16(bytes, u16::from(!owner));
+    push_u16(bytes, 0);
+    push_u16(bytes, 0);
+    push_u16(bytes, 0);
+    push_u32(bytes, 0);
+    push_u32(bytes, if owner { 1 } else { 6 });
+    if owner {
+        push_u16(bytes, 0x000e);
+    } else {
+        push_u16(bytes, 0x0060);
+        push_u16(bytes, 0);
+        push_u16(bytes, 0x0071);
+        push_u16(bytes, 1);
+        push_u16(bytes, 0);
+        push_u16(bytes, 0x000e);
+    }
+    let class_data_off = len_u32(bytes.len());
+    write_uleb128(bytes, u32::from(owner));
+    write_uleb128(bytes, 0);
+    write_uleb128(bytes, 1);
+    write_uleb128(bytes, 0);
+    if owner {
+        write_uleb128(bytes, 0);
+        write_uleb128(bytes, 0x0009);
+    }
+    write_uleb128(bytes, 0);
+    write_uleb128(bytes, 0x0009);
+    write_uleb128(bytes, code_off);
+    class_data_off
+}
+
+fn build_linked_member_fixture(owner: bool) -> Vec<u8> {
+    let own = if owner {
+        "Lcom/test/Owner;"
+    } else {
+        "Lcom/test/Child;"
+    };
+    let parent = if owner {
+        "Ljava/lang/Object;"
+    } else {
+        "Lcom/test/Owner;"
+    };
+    let strings = [
+        own,
+        parent,
+        "V",
+        "I",
+        "run",
+        "go",
+        "flag",
+        "A.java",
+        "Lcom/test/Iface;",
+    ];
+    let string_ids_off = DEX_HEADER_SIZE;
+    let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;
+    let proto_ids_off = type_ids_off + 5 * 4;
+    let field_ids_off = proto_ids_off + 12;
+    let method_ids_off = field_ids_off + 8;
+    let method_count = if owner { 1 } else { 2 };
+    let class_defs_off = method_ids_off + method_count * 8;
+    let data_off = class_defs_off + 32;
+    let mut bytes = vec![0_u8; data_off as usize];
+    let mut offsets = Vec::new();
+    for string in strings {
+        offsets.push(len_u32(bytes.len()));
+        write_uleb128(&mut bytes, len_u32(string.encode_utf16().count()));
+        bytes.extend_from_slice(string.as_bytes());
+        bytes.push(0);
+    }
+    while bytes.len() % 4 != 0 {
+        bytes.push(0);
+    }
+    let class_data_off = append_linked_method_data(&mut bytes, owner);
+    let file_size = len_u32(bytes.len());
+    bytes[0..8].copy_from_slice(b"dex\n035\0");
+    put_u32(&mut bytes, 32, file_size);
+    put_u32(&mut bytes, 36, DEX_HEADER_SIZE);
+    put_u32(&mut bytes, 40, DEX_ENDIAN_CONSTANT);
+    put_u32(&mut bytes, 56, len_u32(strings.len()));
+    put_u32(&mut bytes, 60, string_ids_off);
+    put_u32(&mut bytes, 64, 5);
+    put_u32(&mut bytes, 68, type_ids_off);
+    put_u32(&mut bytes, 72, 1);
+    put_u32(&mut bytes, 76, proto_ids_off);
+    put_u32(&mut bytes, 80, 1);
+    put_u32(&mut bytes, 84, field_ids_off);
+    put_u32(&mut bytes, 88, method_count);
+    put_u32(&mut bytes, 92, method_ids_off);
+    put_u32(&mut bytes, 96, 1);
+    put_u32(&mut bytes, 100, class_defs_off);
+    put_u32(&mut bytes, 104, file_size - data_off);
+    put_u32(&mut bytes, 108, data_off);
+    for (index, offset) in offsets.iter().enumerate() {
+        put_u32(&mut bytes, string_ids_off as usize + index * 4, *offset);
+    }
+    for (i, string_index) in [0, 1, 2, 3, 8].iter().enumerate() {
+        put_u32(&mut bytes, type_ids_off as usize + i * 4, *string_index);
+    }
+    put_u32(&mut bytes, proto_ids_off as usize, 2);
+    put_u32(&mut bytes, proto_ids_off as usize + 4, 2);
+    put_u16(&mut bytes, field_ids_off as usize, u16::from(!owner));
+    put_u16(&mut bytes, field_ids_off as usize + 2, 3);
+    put_u32(&mut bytes, field_ids_off as usize + 4, 6);
+    put_u16(&mut bytes, method_ids_off as usize, 0);
+    put_u16(&mut bytes, method_ids_off as usize + 2, 0);
+    put_u32(
+        &mut bytes,
+        method_ids_off as usize + 4,
+        if owner { 4 } else { 5 },
+    );
+    if !owner {
+        put_u16(&mut bytes, method_ids_off as usize + 8, 1);
+        put_u16(&mut bytes, method_ids_off as usize + 10, 0);
+        put_u32(&mut bytes, method_ids_off as usize + 12, 4);
+    }
+    put_u32(&mut bytes, class_defs_off as usize, 0);
+    put_u32(&mut bytes, class_defs_off as usize + 4, 1);
+    put_u32(&mut bytes, class_defs_off as usize + 8, 1);
+    put_u32(&mut bytes, class_defs_off as usize + 16, 7);
+    put_u32(&mut bytes, class_defs_off as usize + 24, class_data_off);
+    refresh_integrity(&mut bytes).expect("fixture SHA-1 / Adler-32");
+    bytes
+}
+
+fn build_test_dex(class_descriptor: &str, method_name: &str) -> Vec<u8> {
+    build_test_dex_with_superclass(class_descriptor, method_name, "Ljava/lang/Object;")
+}
+
+fn build_test_dex_with_superclass(
+    class_descriptor: &str,
+    method_name: &str,
+    superclass: &str,
+) -> Vec<u8> {
+    let strings = [class_descriptor, superclass, "V", method_name, "A.java"];
 
     let string_ids_off = DEX_HEADER_SIZE;
     let type_ids_off = string_ids_off + len_u32(strings.len()) * 4;

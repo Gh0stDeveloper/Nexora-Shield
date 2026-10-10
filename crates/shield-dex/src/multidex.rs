@@ -1,9 +1,10 @@
 use crate::compatibility::CompatibilityAnalyzer;
 use crate::error::{DexError, Result};
-use crate::model::DexFile;
+use crate::model::{DexFile, ReferenceKind};
 use crate::parser::DexParser;
 use crate::transform::{
-    DexWriter, MetadataReducer, MetadataReductionReport, RenameConfig, RenamePass, RenameReport,
+    DexRewriteAudit, DexRewriteVerifier, DexWriter, MetadataReducer, MetadataReductionReport,
+    RenameConfig, RenamePass, RenameReport,
 };
 use crate::validator::DexValidator;
 
@@ -49,6 +50,7 @@ pub struct DexRewriteOutput {
     pub rename_report: Option<RenameReport>,
     pub metadata_report: Option<MetadataReductionReport>,
     pub rename_skipped_for_cross_dex_reflection: bool,
+    pub audit: DexRewriteAudit,
 }
 
 impl MultiDexSet {
@@ -89,10 +91,36 @@ impl MultiDexSet {
             }
         }
 
+        // An APK cannot resolve competing owners of the same class descriptor.
+        // Validate across *all* units here, not only in CLI preflight, so every
+        // caller (including diagnostic rewrites) receives the same guarantee.
+        let mut owners = std::collections::BTreeMap::new();
+        for unit in &units {
+            for class in &unit.dex.classes {
+                let descriptor = unit.dex.type_descriptor(class.class_idx).ok_or_else(|| {
+                    DexError::InvalidMultiDex(format!(
+                        "{} has a class without a valid descriptor",
+                        unit.name
+                    ))
+                })?;
+                if let Some(previous) = owners.insert(descriptor, unit.name.as_str()) {
+                    return Err(DexError::InvalidMultiDex(format!(
+                        "duplicate class definition {descriptor} in {previous} and {}",
+                        unit.name
+                    )));
+                }
+            }
+        }
+
         Ok(Self { units })
     }
 
     pub fn rewrite(&self, config: &MultiDexRewriteConfig) -> Result<Vec<DexRewriteOutput>> {
+        // Linked class descriptors can be remapped globally. Linked methods
+        // and fields still fail closed until signature-aware binding exists.
+        if config.rename.is_some() && self.has_cross_dex_symbol_references()? {
+            return crate::linked_classes::rewrite_linked_classes(self, config);
+        }
         let cross_dex_reflection = config.conservative_cross_dex_reflection
             && self.units.len() > 1
             && self
@@ -115,7 +143,12 @@ impl MultiDexSet {
                     rename_skipped = true;
                 } else {
                     let parsed = DexParser::parse(&current)?;
-                    let result = RenamePass::apply(&parsed, rename)?;
+                    // Separate the deterministic rename stream per DEX unit.
+                    // Shared seeds formerly generated equal one-letter class
+                    // descriptors across classes.dex/classes2.dex.
+                    let mut unique_rename = rename.clone();
+                    unique_rename.seed ^= u64::from(unit.index).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                    let result = RenamePass::apply(&parsed, &unique_rename)?;
                     current = result.bytes;
                     rename_report = Some(result.report);
                 }
@@ -128,18 +161,117 @@ impl MultiDexSet {
                 metadata_report = Some(report);
             }
 
-            let final_dex = DexParser::parse(&current)?;
-            let _ = DexValidator::validate(&final_dex)?;
+            let audit = DexRewriteVerifier::verify(
+                &unit.dex,
+                &current,
+                rename_report.as_ref(),
+                metadata_report.as_ref(),
+            )?;
             outputs.push(DexRewriteOutput {
                 name: unit.name.clone(),
                 bytes: current,
                 rename_report,
                 metadata_report,
                 rename_skipped_for_cross_dex_reflection: rename_skipped,
+                audit,
             });
         }
 
+        // Reparse the output as a complete set, not independent DEX units.
+        // Never publish diagnostics with duplicated class ownership.
+        let rewritten_inputs = outputs
+            .iter()
+            .map(|output| DexInput {
+                name: output.name.clone(),
+                bytes: output.bytes.clone(),
+            })
+            .collect();
+        let rewritten_set = Self::parse(rewritten_inputs)?;
+        // A generated class name must not capture an existing unresolved type
+        // reference from *any* original DEX. This includes SDK/library types
+        // that are not defined locally, so a class-ownership check alone is
+        // insufficient.
+        let reserved_types = self
+            .units
+            .iter()
+            .flat_map(|unit| {
+                (0..unit.dex.types.len()).filter_map(|index| unit.dex.type_descriptor(index as u32))
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        for (original, rewritten) in self.units.iter().zip(&rewritten_set.units) {
+            for class in &original.dex.classes {
+                let before = original.dex.type_descriptor(class.class_idx).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "type",
+                        index: class.class_idx,
+                    },
+                )?;
+                let after = rewritten.dex.type_descriptor(class.class_idx).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "type",
+                        index: class.class_idx,
+                    },
+                )?;
+                if before != after && reserved_types.contains(after) {
+                    return Err(DexError::UnsafeRename(format!(
+                        "renamed class descriptor {after} collides with an existing DEX type reference"
+                    )));
+                }
+            }
+        }
         Ok(outputs)
+    }
+
+    fn has_cross_dex_symbol_references(&self) -> Result<bool> {
+        if self.units.len() < 2 {
+            return Ok(false);
+        }
+        let mut owners = std::collections::BTreeMap::new();
+        for unit in &self.units {
+            for class in &unit.dex.classes {
+                let descriptor =
+                    unit.dex
+                        .type_descriptor(class.class_idx)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "type",
+                            index: class.class_idx,
+                        })?;
+                owners.insert(descriptor, unit.index);
+            }
+        }
+        for unit in &self.units {
+            for index in 0..unit.dex.types.len() {
+                let descriptor =
+                    unit.dex
+                        .type_descriptor(index as u32)
+                        .ok_or(DexError::InvalidIndex {
+                            kind: "type",
+                            index: index as u32,
+                        })?;
+                // Also recognize array forms referencing another unit's class.
+                let component = descriptor.trim_start_matches('[');
+                if owners
+                    .get(component)
+                    .is_some_and(|owner| *owner != unit.index)
+                {
+                    return Ok(true);
+                }
+            }
+            // Runtime literals can name classes dynamically. Do not assume
+            // that only reflection-indicator invocations reveal these links.
+            for code in unit.dex.code_items.values() {
+                for instruction in &code.instructions {
+                    if let Some((ReferenceKind::String, string_idx)) = instruction.reference {
+                        if let Some(value) = unit.dex.string(string_idx) {
+                            if owners.get(value).is_some_and(|owner| *owner != unit.index) {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
 }
 
@@ -149,7 +281,10 @@ pub fn canonical_dex_index(name: &str) -> Option<u32> {
         return Some(1);
     }
     let number = name.strip_prefix("classes")?.strip_suffix(".dex")?;
-    if number.is_empty() || number.starts_with('0') {
+    if number.is_empty()
+        || number.starts_with('0')
+        || !number.bytes().all(|byte| byte.is_ascii_digit())
+    {
         return None;
     }
     let parsed = number.parse::<u32>().ok()?;
@@ -174,6 +309,8 @@ mod tests {
         assert_eq!(canonical_dex_index("classes.dex"), Some(1));
         assert_eq!(canonical_dex_index("classes2.dex"), Some(2));
         assert_eq!(canonical_dex_index("classes02.dex"), None);
+        assert_eq!(canonical_dex_index("classes+2.dex"), None);
+        assert_eq!(canonical_dex_index("classes-2.dex"), None);
         assert_eq!(canonical_dex_name(1), "classes.dex");
         assert_eq!(canonical_dex_name(3), "classes3.dex");
     }

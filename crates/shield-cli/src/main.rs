@@ -18,7 +18,9 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, ProtectionProfile, ProtectionRequest, CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, protect_production_apk_with_selection, DexSelectorPolicy,
+    ProductionBuildContext, ProductionControl, ProductionOverrides, ProtectionProfile,
+    ProtectionRequest, CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -60,7 +62,8 @@ fn run() -> Result<(), String> {
         }
         "inspect" => run_inspect(&args),
         "verify" => run_verify(&args),
-        "protect" => run_protect(&args),
+        "protect" => run_protect(&args, false),
+        "package-apk" => run_protect(&args, true),
         "aab-inspect" => run_aab_inspect(&args),
         "aab-verify" => run_aab_verify(&args),
         "aar-inspect" => run_aar_inspect(&args),
@@ -422,7 +425,7 @@ fn run_verify(args: &[String]) -> Result<(), String> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn run_protect(args: &[String]) -> Result<(), String> {
+fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     if args.is_empty() || args.iter().any(|value| value == "--help" || value == "-h") {
         print_protect_help();
         return Ok(());
@@ -443,6 +446,9 @@ fn run_protect(args: &[String]) -> Result<(), String> {
     let mut min_sdk = 24_u32;
     let mut public_report = None;
     let mut private_report = None;
+    let mut plan_only = false;
+    let mut overrides = ProductionOverrides::default();
+    let mut dex_selectors = DexSelectorPolicy::default();
     let mut index = 1_usize;
 
     while index < args.len() {
@@ -464,6 +470,49 @@ fn run_protect(args: &[String]) -> Result<(), String> {
             "--unsigned" => {
                 allow_unsigned = true;
                 index += 1;
+            }
+            "--plan-only" => {
+                plan_only = true;
+                index += 1;
+            }
+            "--enable-control" | "--disable-control" => {
+                let enable = args[index] == "--enable-control";
+                let name = require_value(args, index, args[index].as_str())?;
+                let control =
+                    ProductionControl::from_str(name).map_err(|error| error.to_string())?;
+                overrides
+                    .set(control, enable)
+                    .map_err(|error| error.to_string())?;
+                index += 2;
+            }
+            "--class" | "--method" | "--field" | "--exclude-class" | "--exclude-method"
+            | "--exclude-field" => {
+                let option = args[index].as_str();
+                let value = require_value(args, index, option)?;
+                let excluded = option.starts_with("--exclude-");
+                let kind = if option.ends_with("class") {
+                    SelectorKind::Class
+                } else if option.ends_with("method") {
+                    SelectorKind::Method
+                } else {
+                    SelectorKind::Field
+                };
+                let selector = match kind {
+                    SelectorKind::Class => Selector::new(kind, value, None),
+                    SelectorKind::Method | SelectorKind::Field => {
+                        let (class, member) = split_member_selector(value, option)?;
+                        Selector::new(kind, class, Some(member.to_owned()))
+                    }
+                    SelectorKind::Any => unreachable!(),
+                }
+                .map_err(|error| error.to_string())?;
+                if excluded {
+                    dex_selectors.add_exclude(selector)
+                } else {
+                    dex_selectors.add_include(selector)
+                }
+                .map_err(|error| error.to_string())?;
+                index += 2;
             }
             "--force" => {
                 overwrite = true;
@@ -560,8 +609,75 @@ fn run_protect(args: &[String]) -> Result<(), String> {
         private_report,
     };
 
-    let result = protect_apk(&request).map_err(|error| error.to_string())?;
-    println!("Nexora Shield Phase A protection pipeline: OK");
+    if plan_only && phase_a_only {
+        return Err("package-apk does not support --plan-only; use protect --plan-only".into());
+    }
+    if phase_a_only && (overrides != ProductionOverrides::default() || !dex_selectors.is_empty()) {
+        return Err(
+            "package-apk cannot accept production protection or DEX selector options".into(),
+        );
+    }
+
+    if plan_only {
+        let context = ProductionBuildContext::prepare_with_overrides(&request, &overrides)
+            .map_err(|error| error.to_string())?;
+        let dex = context
+            .inspect_dex_with_selectors(&dex_selectors)
+            .map_err(|error| error.to_string())?;
+        println!("Phase O.1 production plan: READ-ONLY, NOT PROTECTED");
+        println!("Input SHA-256: {}", dex.inspected_input_sha256);
+        println!("Profile: {}", context.profile());
+        for control in [
+            ProductionControl::DataProtection,
+            ProductionControl::NativeShield,
+            ProductionControl::VmShield,
+            ProductionControl::Diversity,
+            ProductionControl::IntegrityGraph,
+            ProductionControl::RaspRuntime,
+            ProductionControl::Attestation,
+        ] {
+            println!(
+                "Effective control {}: {}",
+                control.as_str(),
+                context.policy().enabled(control)
+            );
+        }
+        println!("DEX units: {}", dex.units.len());
+        println!("Total decoded DEX bytes: {}", dex.total_decoded_bytes);
+        println!(
+            "Cross-DEX reflection risk: {}",
+            dex.cross_dex_reflection_risk
+        );
+        for unit in &dex.units {
+            println!(
+                "  {}: classes={}, methods={}, fields={}, selected={}/{}/{}, reflection={}, native={}, protected-names={}",
+                unit.name, unit.class_count, unit.method_count, unit.field_count,
+                unit.selected_classes, unit.selected_methods, unit.selected_fields,
+                unit.reflection_detected, unit.native_method_count, unit.protected_string_count
+            );
+        }
+        for stage in context.stages() {
+            println!(
+                "Stage {}: {:?}, {:?}",
+                stage.stage.as_str(),
+                stage.requirement,
+                stage.integration
+            );
+        }
+        let missing = context.required_unintegrated();
+        println!("Production ready: false");
+        println!("Required stages not integrated: {}", missing.len());
+        println!("No APK, signing data or build reports were created.");
+        return Ok(());
+    }
+
+    let result = if phase_a_only {
+        protect_apk(&request)
+    } else {
+        protect_production_apk_with_selection(&request, &overrides, &dex_selectors)
+    }
+    .map_err(|error| error.to_string())?;
+    println!("Nexora Shield Phase A packaging ONLY — NOT FULL PROTECTION");
     println!("Build ID: {}", result.plan.build_id);
     println!("Output: {}", result.plan.output.display());
     println!("SHA-256: {}", result.output_inspection.sha256);
@@ -650,7 +766,8 @@ fn print_help() {
 Android application protection and RASP platform.\n\n\
 USAGE:\n  nexora-shield <COMMAND> [OPTIONS]\n\n\
 COMMANDS:\n\
-  protect      Normalize, align, sign and verify an APK\n\
+  protect      Production protection (fails closed until all required controls exist)\n\
+  package-apk  Legacy Phase A normalization, alignment and signing ONLY\n\
   inspect      Inspect APK structure, manifest and multi-DEX layout\n\
   verify           Verify APK structure and optionally Android signatures\n\
   data-protect     Protect one string/constant/resource/generic data item\n\
@@ -693,7 +810,9 @@ OPTIONS:\n\
 fn print_protect_help() {
     println!(
         "USAGE:\n  nexora-shield protect <input.apk> --output <output.apk> [OPTIONS]\n\n\
-By default Nexora Shield requires signing and alignment. Use --unsigned only when an unsigned artifact is intentional.\n\n\
+Production protection fails closed while O.1 is unfinished. Use --plan-only for\n\
+read-only inspection. package-apk is legacy Phase A packaging ONLY.\n\
+Signing and alignment are required unless disabled explicitly.\n\n\
 OPTIONS:\n\
   -o, --output <apk>          Output APK\n\
   --profile <name>            standard|hardened|maximum (default: hardened)\n\
@@ -707,6 +826,15 @@ OPTIONS:\n\
   --no-align                  Skip zipalign explicitly\n\
   --unsigned                  Explicitly allow an unsigned output\n\
   --force                     Replace an existing output transactionally\n\
+  --plan-only                 Read-only O.1 DEX preflight; does NOT protect or write output\n\
+  --enable-control <name>     Require an optional production control (repeatable)\n\
+  --disable-control <name>    Refuse a control; required controls cannot be disabled\n\
+  --class <dex-glob>          Include matching defined classes (DEX descriptors)\n\
+  --method <class#member>     Include matching defined methods\n\
+  --field <class#member>      Include matching defined fields\n\
+  --exclude-class <glob>     Exclude matching classes\n\
+  --exclude-method <c#m>     Exclude matching methods\n\
+  --exclude-field <c#f>      Exclude matching fields\n\
   --public-report <file>      Write non-sensitive JSON report\n\
   --private-report <file>     Write private build JSON report"
     );

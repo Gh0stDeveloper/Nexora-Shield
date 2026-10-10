@@ -462,6 +462,20 @@ private fun ReportScreen(
             return@ScreenSurface
         }
 
+        Panel(
+            title = "Protection assurance",
+            subtitle = "A successful packaging task or valid signature does not prove the application is protected.",
+        ) {
+            StatusPill(
+                text = if (report.productionProtected) {
+                    "Production protection claimed — verify independent stage evidence"
+                } else {
+                    "NOT production protected — " + report.protectionScope
+                },
+                tone = if (report.productionProtected) ShieldTone.Info else ShieldTone.Warning,
+            )
+        }
+
         MetricGrid(compact) {
             MetricCard(
                 Icons.Outlined.Security,
@@ -492,7 +506,7 @@ private fun ReportScreen(
                 "Pipeline stages",
                 report.stages.size.toString(),
                 report.stages.lastOrNull() ?: "No stages",
-                ShieldTone.Success,
+                if (report.productionProtected) ShieldTone.Info else ShieldTone.Warning,
                 Modifier.weight(1f),
             )
         }
@@ -654,6 +668,20 @@ private fun BuildScreen(state: StudioState) {
                     Spacer(Modifier.width(7.dp))
                     Text("Check CLI")
                 }
+            }
+        }
+
+        Panel(
+            title = "Production readiness (Phase O.1)",
+            subtitle = "Runs protect --plan-only through the authoritative Rust orchestrator. This generates NO APK and grants NO production approval.",
+        ) {
+            OutlinedButton(
+                onClick = { scope.launch { state.runProductionReadinessCheck() } },
+                enabled = !state.busy && state.project != null && state.selectedArtifact != null,
+            ) {
+                Icon(Icons.Outlined.VerifiedUser, contentDescription = null)
+                Spacer(Modifier.width(7.dp))
+                Text("Inspect production readiness")
             }
         }
 

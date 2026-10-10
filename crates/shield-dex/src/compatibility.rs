@@ -27,10 +27,21 @@ impl CompatibilityAnalyzer {
     pub fn analyze(dex: &DexFile) -> Result<CompatibilityReport> {
         let mut report = CompatibilityReport::default();
         let runtime_strings = runtime_string_indices(dex);
+        // A literal referenced by const-string is observable at runtime even
+        // without an obvious reflection indicator. Never rewrite its backing
+        // string table slot while renaming a coincident symbol.
+        for index in &runtime_strings {
+            report.protect(*index, "runtime const-string literal");
+        }
 
         report.reflection_detected = runtime_strings
             .iter()
-            .any(|index| dex.string(*index).is_some_and(is_reflection_indicator));
+            .any(|index| dex.string(*index).is_some_and(is_reflection_indicator))
+            || dex.methods.iter().any(|method| {
+                dex.type_descriptor(u32::from(method.class_idx))
+                    .zip(dex.string(method.name_idx))
+                    .is_some_and(|(owner, name)| is_dynamic_lookup_api(owner, name))
+            });
 
         for data in dex.class_data.values() {
             for encoded in data.methods() {
@@ -96,6 +107,36 @@ impl CompatibilityAnalyzer {
     }
 }
 
+/// A method-id referencing a runtime lookup API is enough to conservatively
+/// identify dynamic name resolution, even without a literal `const-string`.
+fn is_dynamic_lookup_api(owner: &str, name: &str) -> bool {
+    match owner {
+        "Ljava/lang/Class;" => matches!(
+            name,
+            "forName"
+                | "getMethod"
+                | "getDeclaredMethod"
+                | "getField"
+                | "getDeclaredField"
+                | "getConstructor"
+                | "getDeclaredConstructor"
+        ),
+        "Ljava/lang/ClassLoader;" => matches!(name, "loadClass" | "findClass"),
+        "Ljava/lang/invoke/MethodHandles$Lookup;" => matches!(
+            name,
+            "findVirtual"
+                | "findStatic"
+                | "findSpecial"
+                | "findGetter"
+                | "findSetter"
+                | "findStaticGetter"
+                | "findStaticSetter"
+        ),
+        "Ljava/lang/reflect/Proxy;" => name == "newProxyInstance",
+        _ => false,
+    }
+}
+
 fn runtime_string_indices(dex: &DexFile) -> BTreeSet<u32> {
     dex.code_items
         .values()
@@ -131,4 +172,33 @@ fn descriptor_to_dotted(descriptor: &str) -> String {
         .and_then(|value| value.strip_suffix(';'))
         .unwrap_or(descriptor)
         .replace('/', ".")
+}
+
+#[cfg(test)]
+mod android_reflection_tests {
+    use super::is_dynamic_lookup_api;
+
+    #[test]
+    fn o13_reflective_api_id_without_const_string_is_detected() {
+        for (owner, name) in [
+            ("Ljava/lang/Class;", "forName"),
+            ("Ljava/lang/Class;", "getDeclaredMethod"),
+            ("Ljava/lang/Class;", "getDeclaredField"),
+            ("Ljava/lang/ClassLoader;", "loadClass"),
+            ("Ljava/lang/invoke/MethodHandles$Lookup;", "findVirtual"),
+            ("Ljava/lang/reflect/Proxy;", "newProxyInstance"),
+        ] {
+            assert!(is_dynamic_lookup_api(owner, name));
+        }
+    }
+
+    #[test]
+    fn o13_non_reflective_method_ids_do_not_trigger_global_guard() {
+        assert!(!is_dynamic_lookup_api("Lcom/test/A;", "run"));
+        assert!(!is_dynamic_lookup_api("Ljava/lang/Class;", "getName"));
+        assert!(!is_dynamic_lookup_api(
+            "Ljava/lang/ClassLoader;",
+            "getParent"
+        ));
+    }
 }

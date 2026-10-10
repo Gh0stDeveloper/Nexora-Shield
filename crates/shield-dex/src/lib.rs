@@ -25,7 +25,10 @@ mod checksum;
 mod compatibility;
 mod error;
 mod graph;
+mod hierarchy;
 mod ir;
+mod linked_classes;
+mod linked_members;
 mod model;
 mod multidex;
 mod parser;
@@ -52,7 +55,7 @@ pub use multidex::{
 pub use parser::DexParser;
 pub use selector::{glob_match, Selection, Selector, SelectorKind, SelectorResolver};
 pub use transform::{
-    DexWriter, MetadataReducer, MetadataReductionReport, RenameConfig, RenamePass, RenameRecord,
-    RenameReport, RenameResult,
+    DexRewriteAudit, DexRewriteVerifier, DexWriter, MetadataReducer, MetadataReductionReport,
+    RenameConfig, RenamePass, RenameRecord, RenameReport, RenameResult,
 };
 pub use validator::{DexValidator, ValidationReport};

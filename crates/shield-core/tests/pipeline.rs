@@ -67,6 +67,238 @@ fn unsigned_no_align_pipeline_is_transactional_and_reports_are_written() {
     cleanup(&directory);
 }
 
+#[test]
+fn report_destinations_cannot_clobber_source_or_output() {
+    let directory = test_directory("report-alias");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("classes.dex", b"dex-one"),
+            ("AndroidManifest.xml", b"<manifest/>"),
+        ],
+    );
+    let before = fs::read(&input).expect("read source");
+    let base = ProtectionRequest {
+        input: input.clone(),
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let source_collision = ProtectionRequest {
+        public_report: Some(directory.join(".").join("input.apk")),
+        ..base.clone()
+    };
+    assert!(protect_apk(&source_collision).is_err());
+    assert_eq!(fs::read(&input).expect("source unchanged"), before);
+    assert!(!output.exists());
+
+    let output_collision = ProtectionRequest {
+        private_report: Some(directory.join(".").join("output.apk")),
+        ..base
+    };
+    assert!(protect_apk(&output_collision).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
+#[test]
+fn dex_staging_refuses_aliases_of_source_and_planned_output() {
+    let directory = test_directory("dex-stage-alias");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"some bytes"),
+        ],
+    );
+    let request = ProtectionRequest {
+        input: input.clone(),
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let context = nexora_shield_core::ProductionBuildContext::prepare(&request)
+        .expect("read-only production plan");
+    let config = nexora_shield_dex::MultiDexRewriteConfig {
+        strip_metadata: true,
+        ..Default::default()
+    };
+    let source_alias = directory.join(".").join("input.apk");
+    let output_alias = directory.join(".").join("output.apk");
+    assert!(context.stage_dex_rewrite(&source_alias, &config).is_err());
+    assert!(context.stage_dex_rewrite(&output_alias, &config).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
+#[cfg(unix)]
+#[test]
+fn staging_rejects_symlink_parent_then_dotdot_alias_of_planned_output() {
+    let directory = test_directory("symlink-parent-dotdot");
+    let input = directory.join("input.apk");
+    let inner = directory.join("target/deep");
+    fs::create_dir_all(&inner).expect("create symlink target");
+    std::os::unix::fs::symlink(&inner, directory.join("via")).expect("link directory");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"source"),
+        ],
+    );
+    let output = directory.join("target/output.apk");
+    let request = ProtectionRequest {
+        input,
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let context = nexora_shield_core::ProductionBuildContext::prepare(&request)
+        .expect("valid read-only plan");
+    let config = nexora_shield_dex::MultiDexRewriteConfig {
+        strip_metadata: true,
+        ..Default::default()
+    };
+    let alias = directory.join("via/../output.apk");
+    assert!(context.stage_dex_rewrite(&alias, &config).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
+#[test]
+fn o11_policy_resolution_precedes_source_access_and_never_writes() {
+    use nexora_shield_core::{ProductionBuildContext, ProductionControl, ProductionOverrides};
+    let directory = test_directory("o11-no-mutation");
+    let input = directory.join("missing.apk");
+    let output = directory.join("must-not-exist.apk");
+    let request = ProtectionRequest {
+        input,
+        output: output.clone(),
+        profile: ProtectionProfile::Maximum,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let mut overrides = ProductionOverrides::default();
+    assert!(overrides
+        .set(ProductionControl::NativeShield, false)
+        .is_ok());
+    let error = ProductionBuildContext::prepare_with_overrides(&request, &overrides)
+        .expect_err("reject profile downgrade before opening source");
+    assert!(error.to_string().contains("native-shield"));
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
+#[test]
+fn o11_rejects_directory_destinations_before_writes() {
+    use nexora_shield_core::ProductionBuildContext;
+    let directory = test_directory("o11-dir-target");
+    let input = directory.join("input.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"fixture"),
+        ],
+    );
+    let output = directory.join("output.apk");
+    fs::create_dir(&output).expect("directory target fixture");
+    let request = ProtectionRequest {
+        input: input.clone(),
+        output: output.clone(),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: true,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    assert!(ProductionBuildContext::prepare(&request).is_err());
+    assert!(output.is_dir());
+    assert!(input.is_file());
+    cleanup(&directory);
+}
+
+#[cfg(unix)]
+#[test]
+fn o11_refuses_hardlink_aliases_even_when_force_is_enabled() {
+    use nexora_shield_core::ProductionBuildContext;
+    let directory = test_directory("o11-hardlink");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"fixture"),
+        ],
+    );
+    fs::hard_link(&input, &output).expect("create hard-link alias");
+    let before = fs::read(&input).expect("read original");
+    let request = ProtectionRequest {
+        input: input.clone(),
+        output: output.clone(),
+        profile: ProtectionProfile::Hardened,
+        align: false,
+        allow_unsigned: true,
+        overwrite: true,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let failure = ProductionBuildContext::prepare(&request).expect_err("reject alias");
+    assert!(failure.to_string().contains("hard-link collision"));
+    assert_eq!(fs::read(&input).expect("input intact"), before);
+    assert_eq!(fs::read(&output).expect("alias intact"), before);
+
+    let report_alias = directory.join("report.json");
+    fs::hard_link(&input, &report_alias).expect("create report alias");
+    let request = ProtectionRequest {
+        output: directory.join("unused.apk"),
+        public_report: Some(report_alias),
+        ..request
+    };
+    assert!(ProductionBuildContext::prepare(&request).is_err());
+    assert_eq!(fs::read(&input).expect("input intact"), before);
+    cleanup(&directory);
+}
+
 fn test_directory(label: &str) -> PathBuf {
     let counter = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(

@@ -14,6 +14,7 @@ import dev.nexora.shield.studio.service.BudgetEvaluator
 import dev.nexora.shield.studio.service.ConfigCodec
 import dev.nexora.shield.studio.service.GradleBuildService
 import dev.nexora.shield.studio.service.ProjectImporter
+import dev.nexora.shield.studio.service.ProductionReadinessService
 import dev.nexora.shield.studio.service.RetraceService
 import dev.nexora.shield.studio.service.SecretReferenceInspector
 import dev.nexora.shield.studio.service.SecurityReportLoader
@@ -24,6 +25,7 @@ class StudioState(
     private val configCodec: ConfigCodec = ConfigCodec(),
     private val reportLoader: SecurityReportLoader = SecurityReportLoader(),
     val buildService: GradleBuildService = GradleBuildService(),
+    val productionReadinessService: ProductionReadinessService = ProductionReadinessService(),
     val artifactVerifier: ArtifactVerifier = ArtifactVerifier(),
     val retraceService: RetraceService = RetraceService(),
     private val secretInspector: SecretReferenceInspector = SecretReferenceInspector(),
@@ -113,6 +115,27 @@ class StudioState(
             return
         }
         execute("Gradle task") { buildService.runTask(root, gradleTask) }
+    }
+
+    suspend fun runProductionReadinessCheck() {
+        val root = project?.root ?: run {
+            statusMessage = "Import a project before production planning."
+            return
+        }
+        val artifact = selectedArtifact ?: run {
+            statusMessage = "Select an APK for read-only production planning."
+            return
+        }
+        val plannedOutput = root.resolve("build/nexora-shield/o1-diagnostic-placeholder.apk")
+        execute("Read-only production preflight (NOT protected)") {
+            productionReadinessService.inspect(
+                artifact,
+                plannedOutput,
+                config.profile,
+                cliExecutable,
+                root,
+            )
+        }
     }
 
     suspend fun runCliVersion() {

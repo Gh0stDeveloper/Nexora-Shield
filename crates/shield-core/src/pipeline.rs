@@ -161,6 +161,7 @@ pub fn protect_apk(request: &ProtectionRequest) -> Result<PipelineResult> {
 }
 
 fn validate_request(request: &ProtectionRequest) -> Result<()> {
+    crate::production::validate_reserved_paths(request)?;
     if !request.input.is_file() {
         return Err(CoreError::InvalidRequest(format!(
             "input APK '{}' does not exist",

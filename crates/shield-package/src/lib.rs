@@ -33,6 +33,7 @@ pub use error::{PackageError, Result};
 pub use hash::sha256_file;
 pub use tools::{AndroidTools, SigningConfig};
 pub use zip::{
-    is_legacy_signature_entry, normalize_zip, read_zip_directory, verify_normalized_equivalence,
-    NormalizationSummary, ZipDirectory, ZipEntry,
+    crc32_ieee, is_legacy_signature_entry, normalize_zip, read_decoded_entry, read_stored_entry,
+    read_zip_directory, rewrite_stored_entries, verify_normalized_equivalence,
+    verify_preserved_entry_payload, NormalizationSummary, ZipDirectory, ZipEntry,
 };
