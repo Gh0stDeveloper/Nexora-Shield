@@ -109,9 +109,13 @@ impl ProductionBuildContext {
         let outputs = set.rewrite(config).map_err(|error| {
             CoreError::InvalidRequest(format!("DEX transform refused: {error}"))
         })?;
-        crate::apk_compat::verify_apk_compatibility(self.input(), &directory, &set, &outputs)?;
-        let (mut result, replacements, retrace_records) =
+        let linked_xml =
+            crate::apk_compat::verify_apk_compatibility(self.input(), &directory, &set, &outputs)?;
+        let (mut result, mut replacements, retrace_records) =
             collect_staged_outputs(outputs, &originals, retrace.is_some());
+        // Commit verified DEX and compiled Manifest XML changes through one
+        // exclusive staging ZIP transaction, not multiple APK writes.
+        replacements.extend(linked_xml);
         if result.changed_dex_units == 0 {
             return Err(CoreError::InvalidRequest(
                 "requested DEX rewrite changed no bytes; no protection claimed".into(),
@@ -194,7 +198,9 @@ impl ProductionBuildContext {
         let decoded = built
             .entries
             .iter()
-            .filter(|entry| replacements.contains_key(&entry.name))
+            .filter(|entry| {
+                replacements.contains_key(&entry.name) && canonical_dex_index(&entry.name).is_some()
+            })
             .map(|entry| {
                 read_stored_entry(destination, entry, MAX_DEX_BYTES)?
                     .ok_or_else(|| CoreError::InvalidRequest("DEX extraction failed".into()))
@@ -207,7 +213,12 @@ impl ProductionBuildContext {
         let reparsed = MultiDexSet::parse(decoded).map_err(|error| {
             CoreError::InvalidRequest(format!("staged APK DEX verification: {error}"))
         })?;
-        if reparsed.units.len() != replacements.len() {
+        if reparsed.units.len()
+            != replacements
+                .keys()
+                .filter(|name| canonical_dex_index(name).is_some())
+                .count()
+        {
             return Err(CoreError::InvalidRequest(
                 "staged DEX count mismatch".into(),
             ));
@@ -344,7 +355,7 @@ fn verify_rebuilt_zip(
         }
         if let Some(expected) = replacements.get(&entry.name) {
             let actual = read_stored_entry(destination, entry, MAX_DEX_BYTES)?
-                .ok_or_else(|| CoreError::InvalidRequest("staged DEX is not stored".into()))?;
+                .ok_or_else(|| CoreError::InvalidRequest("staged replacement entry is not stored".into()))?;
             if actual != *expected || crc32_ieee(&actual) != entry.crc32 {
                 return Err(CoreError::InvalidRequest(format!(
                     "staged DEX '{}' differs from validated rewrite",
