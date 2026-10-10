@@ -794,6 +794,20 @@ mod tests {
     }
 
     #[test]
+    fn o13_manifest_refuses_non_string_class_attribute_value() {
+        let aliases =
+            std::collections::BTreeMap::from([("com.test.A".to_owned(), "com.test.Z".to_owned())]);
+        let mut manifest = class_manifest(true, false, true);
+        let target = [8, 0, 0, 3, 4, 0, 0, 0];
+        let Some(value_at) = manifest.windows(target.len()).position(|v| v == target) else {
+            assert!(false, "typed class-valued attribute fixture is missing");
+            return;
+        };
+        manifest[value_at + 3] = 1; // TYPE_REFERENCE, not TYPE_STRING
+        assert!(super::rewrite_manifest_class_aliases(&manifest, &aliases).is_err());
+    }
+
+    #[test]
     fn o13_compiled_xml_accepts_valid_utf8_and_utf16_pools() {
         for utf8 in [true, false] {
             let source = sample(utf8, "manifest");
