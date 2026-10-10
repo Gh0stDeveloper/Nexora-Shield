@@ -240,3 +240,38 @@ scan must not be described as a complete Android compatibility contract.
 stability, certified JNI coupling, real-device Android install/launch tests,
 and final integrated production stages. The PR stays open, `main` remains
 unchanged, O.1 stays OPEN, and stable `v1.0.0` stays NO-GO.
+
+## O.1.3 — conservative compiled Manifest XML class relinking (diagnostic)
+
+The O.1.3 unsigned diagnostic APK staging path now supports a **narrow,
+explicitly verified rewrite** of component class-valued attributes in compiled
+`AndroidManifest.xml`. The writer runs the pre-existing bounded binary XML
+structural validator, checks every string-pool reference role, and permits
+rewriting only the Android-namespaced class attributes of recognized component
+elements. Ambiguous shared string-pool indices, styled pools, conflicting
+raw/typed values, alias collisions, noncomponent usages and changes to
+UTF-8/UTF-16 encoded length **fail closed** before any staging output is
+created. Equal-length replacement bytes retain every string-pool index, chunk
+length, resource ID and nonclass payload byte unchanged. The resulting XML is
+reparsed and checked against the expected strings.
+
+The DEX stage atomically provides these specific compiled-Manifest changes
+together with DEX replacements to the existing exclusive ZIP rebuilding path.
+The verification path distinguishes DEX units from modified XML entries and
+independently verifies their exact replacement bytes. Existing no-overwrite,
+rollback, source-hash and encrypted private retrace safeguards still apply.
+
+Synthetic UTF-8 and UTF-16 manifests, shared-reference rejection,
+wrong-namespace denial and compiled-Manifest staging regressions run under the
+Phase O CI job. The sample fixtures are **not installable Android apps**.
+Unrecognized or ambiguous XML references are rejected rather than patched,
+and standalone resource XML, arbitrary attribute values, and text manifests
+are **not** rewritten. A class name embedded in `resources.arsc` is still
+denied until an atomic table linker exists. Native/JNI and dynamic reflection
+remain restricted by the previous safety gate.
+
+This is **not** a full compiled XML serializer, variable-length pool rebuild,
+resource-table rewrite, or native/JNI compatibility proof. Full ARSC/resource
+relinking, real Android installation/launch verification and the integrated
+B–I production executor are still **pending**. O.1.3 and Phase O remain
+**OPEN**; stable `v1.0.0` stays **NO-GO**.
