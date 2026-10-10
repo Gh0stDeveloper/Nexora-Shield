@@ -22,7 +22,9 @@ fn reject(reason: &str) -> CoreError {
 }
 
 fn range(data: &[u8], at: usize, size: usize) -> Result<&[u8]> {
-    let end = at.checked_add(size).ok_or_else(|| reject("offset overflow"))?;
+    let end = at
+        .checked_add(size)
+        .ok_or_else(|| reject("offset overflow"))?;
     data.get(at..end).ok_or_else(|| reject("truncated table"))
 }
 
@@ -72,7 +74,13 @@ fn validate_value(data: &[u8], at: usize, global_strings: usize) -> Result<()> {
     Ok(())
 }
 
-fn validate_entry(data: &[u8], at: usize, limit: usize, key_count: usize, global: usize) -> Result<()> {
+fn validate_entry(
+    data: &[u8],
+    at: usize,
+    limit: usize,
+    key_count: usize,
+    global: usize,
+) -> Result<()> {
     let size = usize::from(le16(data, at)?);
     let flags = le16(data, at + 2)?;
     let key = word(data, at + 4)?;
@@ -90,9 +98,11 @@ fn validate_entry(data: &[u8], at: usize, limit: usize, key_count: usize, global
             return Err(reject("complex resource entry header is incomplete"));
         }
         let count = word(data, at + 12)?;
-        if count > MAX_ENTRIES || count.checked_mul(12)
-            .and_then(|size| payload.checked_add(size))
-            .map_or(true, |end| end > limit)
+        if count > MAX_ENTRIES
+            || count
+                .checked_mul(12)
+                .and_then(|size| payload.checked_add(size))
+                .map_or(true, |end| end > limit)
         {
             return Err(reject("complex resource maps exceed entry bounds"));
         }
@@ -117,21 +127,32 @@ fn validate_type(
     if item.header < 24 || item.size < item.header || id == 0 || usize::from(id) > type_count {
         return Err(reject("resource type header/name is invalid"));
     }
-    let flags = *range(data, 9, 1)?.first().ok_or_else(|| reject("type flags missing"))?;
+    let flags = *range(data, 9, 1)?
+        .first()
+        .ok_or_else(|| reject("type flags missing"))?;
     if flags & !(FLAG_SPARSE | FLAG_OFFSET16) != 0 || flags == (FLAG_SPARSE | FLAG_OFFSET16) {
         return Err(reject("unsupported resource type offset encoding"));
     }
     let entry_count = word(data, 12)?;
     let entries_start = word(data, 16)?;
     let config_size = word(data, 20)?;
-    if entry_count > MAX_ENTRIES || (flags & FLAG_SPARSE == 0 && entry_count != spec_count)
-        || config_size < 4 || 20_usize.checked_add(config_size).map_or(true, |end| end > item.header)
-        || entries_start > item.size || entries_start % 4 != 0
+    if entry_count > MAX_ENTRIES
+        || (flags & FLAG_SPARSE == 0 && entry_count != spec_count)
+        || config_size < 4
+        || 20_usize
+            .checked_add(config_size)
+            .map_or(true, |end| end > item.header)
+        || entries_start > item.size
+        || entries_start % 4 != 0
     {
         return Err(reject("resource type config or entry count invalid"));
     }
     let stride = if flags & FLAG_OFFSET16 != 0 { 2 } else { 4 };
-    if item.header.checked_add(entry_count * stride).map_or(true, |end| end > entries_start) {
+    if item
+        .header
+        .checked_add(entry_count * stride)
+        .map_or(true, |end| end > entries_start)
+    {
         return Err(reject("resource entry offset table overlaps payload"));
     }
 
@@ -151,12 +172,21 @@ fn validate_type(
             (index, (value != u16::MAX).then_some(usize::from(value) * 4))
         } else {
             let value = le32(data, offset)?;
-            (index, (value != NO_ENTRY).then_some(usize::try_from(value).map_err(|_| reject("entry offset overflow"))?))
+            (
+                index,
+                (value != NO_ENTRY).then_some(
+                    usize::try_from(value).map_err(|_| reject("entry offset overflow"))?,
+                ),
+            )
         };
         let _ = entry_idx;
         if let Some(entry_off) = data_off {
-            let entry_at = entries_start.checked_add(entry_off).ok_or_else(|| reject("resource entry offset overflow"))?;
-            if entry_at < entries_start || entry_at.checked_add(8).map_or(true, |end| end > item.size) {
+            let entry_at = entries_start
+                .checked_add(entry_off)
+                .ok_or_else(|| reject("resource entry offset overflow"))?;
+            if entry_at < entries_start
+                || entry_at.checked_add(8).map_or(true, |end| end > item.size)
+            {
                 return Err(reject("resource entry outside payload"));
             }
             validate_entry(data, entry_at, item.size, key_count, global)?;
@@ -172,8 +202,13 @@ fn inspect_package(data: &[u8], item: Chunk, global: usize) -> Result<Vec<String
     }
     let type_at = word(data, 268)?;
     let key_at = word(data, 276)?;
-    if type_at < item.header || key_at < item.header || type_at >= item.size || key_at >= item.size
-        || type_at % 4 != 0 || key_at % 4 != 0 || type_at == key_at
+    if type_at < item.header
+        || key_at < item.header
+        || type_at >= item.size
+        || key_at >= item.size
+        || type_at % 4 != 0
+        || key_at % 4 != 0
+        || type_at == key_at
     {
         return Err(reject("package string pool offsets invalid"));
     }
@@ -197,18 +232,30 @@ fn inspect_package(data: &[u8], item: Chunk, global: usize) -> Result<Vec<String
                 if child.header != 16 {
                     return Err(reject("malformed type specification"));
                 }
-                let id = *range(data, offset + 8, 1)?.first().ok_or_else(|| reject("missing type id"))?;
+                let id = *range(data, offset + 8, 1)?
+                    .first()
+                    .ok_or_else(|| reject("missing type id"))?;
                 let count = word(data, offset + 12)?;
-                if id == 0 || usize::from(id) > types.len() || count > MAX_ENTRIES
-                    || child.header.checked_add(count * 4).map_or(true, |end| end > child.size)
+                if id == 0
+                    || usize::from(id) > types.len()
+                    || count > MAX_ENTRIES
+                    || child
+                        .header
+                        .checked_add(count * 4)
+                        .map_or(true, |end| end > child.size)
                     || specs.insert(id, count).is_some()
                 {
                     return Err(reject("type specification index/count invalid"));
                 }
             }
             TYPE => {
-                let id = *range(data, offset + 8, 1)?.first().ok_or_else(|| reject("missing type id"))?;
-                let spec = specs.get(&id).copied().ok_or_else(|| reject("type has no preceding specification"))?;
+                let id = *range(data, offset + 8, 1)?
+                    .first()
+                    .ok_or_else(|| reject("missing type id"))?;
+                let spec = specs
+                    .get(&id)
+                    .copied()
+                    .ok_or_else(|| reject("type has no preceding specification"))?;
                 validate_type(
                     range(data, offset, child.size)?,
                     child,
@@ -219,9 +266,15 @@ fn inspect_package(data: &[u8], item: Chunk, global: usize) -> Result<Vec<String
                     global,
                 )?;
             }
-            _ => return Err(reject("unsupported package chunk; resource linking requires a verified parser")),
+            _ => {
+                return Err(reject(
+                    "unsupported package chunk; resource linking requires a verified parser",
+                ))
+            }
         }
-        offset = offset.checked_add(child.size).ok_or_else(|| reject("package offset overflow"))?;
+        offset = offset
+            .checked_add(child.size)
+            .ok_or_else(|| reject("package offset overflow"))?;
     }
     if offset != data.len() || !seen_types || !seen_keys {
         return Err(reject("incomplete package or unmatched string pools"));
@@ -264,16 +317,24 @@ pub(crate) fn inspect_resource_table(bytes: &[u8]) -> Result<Vec<String>> {
                 global = Some(strings.len());
             }
             PACKAGE if global.is_some() => {
-                let strings = inspect_package(range(bytes, offset, child.size)?, child, global.unwrap_or(0))?;
+                let strings = inspect_package(
+                    range(bytes, offset, child.size)?,
+                    child,
+                    global.unwrap_or(0),
+                )?;
                 collected.extend(strings);
                 package_count += 1;
             }
             _ => return Err(reject("unsupported resource table chunk/order")),
         }
-        offset = offset.checked_add(child.size).ok_or_else(|| reject("root offset overflow"))?;
+        offset = offset
+            .checked_add(child.size)
+            .ok_or_else(|| reject("root offset overflow"))?;
     }
     if offset != bytes.len() || global.is_none() || packages != package_count {
-        return Err(reject("resource table package count or global pool mismatch"));
+        return Err(reject(
+            "resource table package count or global pool mismatch",
+        ));
     }
     Ok(collected)
 }
@@ -295,7 +356,9 @@ mod tests {
         let mut out = Vec::new();
         out.extend(1_u16.to_le_bytes());
         out.extend(28_u16.to_le_bytes());
-        out.extend((u32::try_from(28 + indices.len() + strings.len()).unwrap_or(u32::MAX)).to_le_bytes());
+        out.extend(
+            (u32::try_from(28 + indices.len() + strings.len()).unwrap_or(u32::MAX)).to_le_bytes(),
+        );
         out.extend((u32::try_from(values.len()).unwrap_or(u32::MAX)).to_le_bytes());
         out.extend(0_u32.to_le_bytes());
         out.extend(0x100_u32.to_le_bytes());
@@ -303,7 +366,9 @@ mod tests {
         out.extend(0_u32.to_le_bytes());
         out.extend(indices);
         out.extend(strings);
-        while out.len() % 4 != 0 { out.push(0); }
+        while out.len() % 4 != 0 {
+            out.push(0);
+        }
         let total = u32::try_from(out.len()).unwrap_or(u32::MAX);
         out[4..8].copy_from_slice(&total.to_le_bytes());
         out
@@ -338,10 +403,13 @@ mod tests {
         let mut package = vec![0_u8; 288];
         package[..2].copy_from_slice(&0x0200_u16.to_le_bytes());
         package[2..4].copy_from_slice(&288_u16.to_le_bytes());
-        package[4..8].copy_from_slice(&(u32::try_from(package_size).unwrap_or(u32::MAX)).to_le_bytes());
+        package[4..8]
+            .copy_from_slice(&(u32::try_from(package_size).unwrap_or(u32::MAX)).to_le_bytes());
         package[8..12].copy_from_slice(&0x7f_u32.to_le_bytes());
         package[268..272].copy_from_slice(&288_u32.to_le_bytes());
-        package[276..280].copy_from_slice(&(u32::try_from(288 + type_pool.len()).unwrap_or(u32::MAX)).to_le_bytes());
+        package[276..280].copy_from_slice(
+            &(u32::try_from(288 + type_pool.len()).unwrap_or(u32::MAX)).to_le_bytes(),
+        );
         package.extend(type_pool);
         package.extend(key_pool);
         package.extend(spec);
@@ -349,7 +417,9 @@ mod tests {
         let mut table = Vec::new();
         table.extend(2_u16.to_le_bytes());
         table.extend(12_u16.to_le_bytes());
-        table.extend((u32::try_from(12 + global.len() + package.len()).unwrap_or(u32::MAX)).to_le_bytes());
+        table.extend(
+            (u32::try_from(12 + global.len() + package.len()).unwrap_or(u32::MAX)).to_le_bytes(),
+        );
         table.extend(1_u32.to_le_bytes());
         table.extend(global);
         table.extend(package);
@@ -374,8 +444,12 @@ mod tests {
         corrupted[8..12].copy_from_slice(&2_u32.to_le_bytes());
         assert!(inspect_resource_table(&corrupted).is_err());
         let mut bad_global_string_index = valid.clone();
-        let start = 12 + pool(&["com.test.A"]).len() + 288
-            + pool(&["string"]).len() + pool(&["title"]).len() + 20;
+        let start = 12
+            + pool(&["com.test.A"]).len()
+            + 288
+            + pool(&["string"]).len()
+            + pool(&["title"]).len()
+            + 20;
         bad_global_string_index[start + 40..start + 44].copy_from_slice(&99_u32.to_le_bytes());
         assert!(inspect_resource_table(&bad_global_string_index).is_err());
         let mut wrong_type_pool_offset = valid.clone();
