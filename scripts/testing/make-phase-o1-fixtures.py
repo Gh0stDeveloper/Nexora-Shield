@@ -248,7 +248,7 @@ def compiled_component_manifest(utf8: bool, shared: bool = False, namespace: boo
         else:
             raw.extend(struct.pack("<H", units))
             raw.extend(value.encode("utf-16-le"))
-            raw.extend(b"\\x00\\x00")
+            raw.extend(bytes([0, 0]))
     pool_data = (
         struct.pack("<IIIII", len(values), 0, 0x100 if utf8 else 0, 28 + 4 * len(values), 0)
         + b"".join(struct.pack("<I", i) for i in offsets) + raw
