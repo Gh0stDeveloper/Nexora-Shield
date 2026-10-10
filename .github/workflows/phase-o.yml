@@ -306,6 +306,41 @@ jobs:
             grep -q 'O.1.3 external Android binding' "build/phase-o1/${mode}.txt"
             test ! -e "${denied}"
           done
+      - name: O.1.3 rewrite class-valued compiled Manifest attributes safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core o13_compiled_manifest_rewrites
+          cargo test --locked -p nexora-shield-core o13_manifest_refuses_shared
+          for mode in binary-class-utf8 binary-class-utf16; do
+            input="build/phase-o1/${mode}.apk"
+            output="build/phase-o1/${mode}-linked.apk"
+            cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "${input}" "${output}" > "build/phase-o1/${mode}.txt"
+            grep -q 'Changed DEX units: 2' "build/phase-o1/${mode}.txt"
+            python - "${input}" "${output}" <<'PY'
+          import sys
+          from zipfile import ZipFile
+          with ZipFile(sys.argv[1]) as source, ZipFile(sys.argv[2]) as staged:
+              original = source.read("AndroidManifest.xml")
+              revised = staged.read("AndroidManifest.xml")
+              assert original != revised, "linked manifest must change"
+              assert len(original) == len(revised), "string-pool index layout must remain fixed"
+              assert source.read("classes.dex") != staged.read("classes.dex")
+              assert b"com.test.A" not in revised
+          PY
+          done
+          for mode in binary-class-shared binary-class-bad-namespace; do
+            denied="build/phase-o1/${mode}-denied.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${mode}.apk" "${denied}" \
+              > "build/phase-o1/${mode}.txt" 2>&1; then
+              echo "O.1.3 accepted ambiguous compiled Manifest class link: ${mode}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3' "build/phase-o1/${mode}.txt"
+            test ! -e "${denied}"
+          done
       - name: O.1.3 inspect resources.arsc and refuse unsafe ABI relinks
         shell: bash
         run: |
