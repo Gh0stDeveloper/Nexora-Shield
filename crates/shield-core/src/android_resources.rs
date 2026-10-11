@@ -632,6 +632,88 @@ mod tests {
         table
     }
 
+    fn pool_utf16(value: &str) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend(1_u16.to_le_bytes());
+        data.extend(28_u16.to_le_bytes());
+        data.extend(0_u32.to_le_bytes());
+        data.extend(1_u32.to_le_bytes());
+        data.extend(0_u32.to_le_bytes());
+        data.extend(0_u32.to_le_bytes());
+        data.extend(32_u32.to_le_bytes());
+        data.extend(0_u32.to_le_bytes());
+        data.extend(0_u32.to_le_bytes());
+        data.extend(u16::try_from(value.encode_utf16().count()).unwrap_or(0).to_le_bytes());
+        for unit in value.encode_utf16() {
+            data.extend(unit.to_le_bytes());
+        }
+        data.extend(0_u16.to_le_bytes());
+        while data.len() % 4 != 0 {
+            data.push(0);
+        }
+        let length = u32::try_from(data.len()).unwrap_or(0);
+        data[4..8].copy_from_slice(&length.to_le_bytes());
+        data
+    }
+
+    fn utf16_sample(value: &str) -> Vec<u8> {
+        let original = sample(value);
+        let old_global_len = pool(&[value]).len();
+        let global = pool_utf16(value);
+        let mut table = original[..12].to_vec();
+        table.extend(global);
+        table.extend_from_slice(&original[12 + old_global_len..]);
+        let length = u32::try_from(table.len()).unwrap_or(0);
+        table[4..8].copy_from_slice(&length.to_le_bytes());
+        table
+    }
+
+    #[test]
+    fn o13_arsc_rewrites_class_value_and_preserves_package_ids_and_offsets() {
+        let aliases = std::collections::BTreeMap::from([(
+            "com.test.A".to_owned(),
+            "com.test.Z".to_owned(),
+        )]);
+        for original in [sample("com.test.A"), utf16_sample("com.test.A")] {
+            let linked = super::rewrite_resource_string_aliases(&original, &aliases)
+                .unwrap_or_default();
+            let inspected = inspect_resource_table(&linked).unwrap_or_default();
+            assert_eq!(inspected, ["com.test.Z", "string", "title"]);
+            assert_eq!(original.len(), linked.len());
+            let before = super::chunk(&original, 12).map(|x| x.size).unwrap_or(0);
+            let after = super::chunk(&linked, 12).map(|x| x.size).unwrap_or(0);
+            assert_eq!(before, after);
+            assert_eq!(&original[12 + before..], &linked[12 + before..]);
+            let unchanged =
+                super::rewrite_resource_string_aliases(&original, &std::collections::BTreeMap::new())
+                    .unwrap_or_default();
+            assert_eq!(unchanged, original);
+        }
+    }
+
+    #[test]
+    fn o13_arsc_rejects_length_changes_and_unreferenced_class_values() {
+        let original = sample("com.test.A");
+        let different_length = std::collections::BTreeMap::from([(
+            "com.test.A".to_owned(),
+            "com.test.Longer".to_owned(),
+        )]);
+        assert!(super::rewrite_resource_string_aliases(&original, &different_length).is_err());
+        let aliases = std::collections::BTreeMap::from([(
+            "com.test.A".to_owned(),
+            "com.test.Z".to_owned(),
+        )]);
+        let mut non_string = original.clone();
+        let at = 12 + pool(&["com.test.A"]).len() + 288
+            + pool(&["string"]).len() + pool(&["title"]).len() + 20 + 36 + 3;
+        non_string[at] = 0x10; // TYPE_INT_DEC replaces TYPE_STRING in entry value
+        assert!(inspect_resource_table(&non_string).is_ok());
+        assert!(super::rewrite_resource_string_aliases(&non_string, &aliases).is_err());
+        let mut truncated = original.clone();
+        truncated.pop();
+        assert!(super::rewrite_resource_string_aliases(&truncated, &aliases).is_err());
+    }
+
     #[test]
     fn o13_resource_table_reads_string_bindings_without_rewriting() {
         let bytes = sample("com.test.A");
