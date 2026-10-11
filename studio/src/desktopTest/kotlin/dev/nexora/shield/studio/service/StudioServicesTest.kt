@@ -2,6 +2,7 @@ package dev.nexora.shield.studio.service
 
 import dev.nexora.shield.studio.model.PerformanceBudgets
 import dev.nexora.shield.studio.model.SecretSettings
+import dev.nexora.shield.studio.model.ShieldProfile
 import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.createTempFile
@@ -46,8 +47,40 @@ class StudioServicesTest {
 
         assertEquals("build-1", report.buildId)
         assertTrue(report.signed)
+        assertFalse(report.productionProtected)
+        assertEquals("unverified-legacy", report.protectionScope)
         assertEquals(10.0, evaluation.measuredApkGrowthPercent)
         assertEquals(true, evaluation.apkGrowthWithinBudget)
+    }
+
+    @Test
+    fun packagingOnlyReportDoesNotCountAsProductionSecurity() {
+        val reportFile = createTempFile("nexora-phase-a", ".json")
+        reportFile.writeText(
+            """
+            {
+              "build_id": "phase-a",
+              "schema_version": 1,
+              "profile": "hardened",
+              "input_sha256": "aa",
+              "output_sha256": "bb",
+              "input_size": 512,
+              "output_size": 512,
+              "entry_count": 2,
+              "dex_count": 1,
+              "manifest_format": "text-xml",
+              "aligned": false,
+              "signed": false,
+              "stripped_signature_entries": 0,
+              "stages": ["normalized", "published"],
+              "protection_scope": "phase-a-packaging-only",
+              "production_protected": false
+            }
+            """.trimIndent(),
+        )
+        val report = SecurityReportLoader().load(reportFile)
+        assertFalse(report.productionProtected)
+        assertEquals("phase-a-packaging-only", report.protectionScope)
     }
 
     @Test
@@ -108,6 +141,29 @@ class StudioServicesTest {
         assertTrue(
             runCatching { service.commandForTask(root, "assembleRelease;rm") }.isFailure,
         )
+    }
+
+    @Test
+    fun productionReadinessUsesFailClosedProtectPlannerWithoutPackaging() {
+        val root = createTempDirectory("nexora-o1-studio-plan")
+        val apk = root.resolve("source.apk")
+        apk.writeText("synthetic-only")
+        val output = root.resolve("build/protected.apk")
+        val service = ProductionReadinessService()
+
+        val args = service.planCommand(apk, output, ShieldProfile.MAXIMUM, "nexora-shield")
+        assertEquals("protect", args[1])
+        assertEquals(apk.toAbsolutePath().normalize().toString(), args[2])
+        assertEquals("maximum", args[args.indexOf("--profile") + 1])
+        assertTrue(args.contains("--plan-only"))
+        assertFalse(args.contains("package-apk"))
+        assertFalse(Files.exists(output))
+        assertTrue(runCatching {
+            service.planCommand(apk, apk, ShieldProfile.STANDARD, "nexora-shield")
+        }.isFailure)
+        assertTrue(runCatching {
+            service.planCommand(root.resolve("missing.apk"), output, ShieldProfile.STANDARD, "nexora-shield")
+        }.isFailure)
     }
 
     @Test

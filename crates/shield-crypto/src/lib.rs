@@ -23,6 +23,7 @@ mod error;
 mod key;
 mod metadata;
 mod resource;
+mod retrace;
 mod runtime;
 mod sensitivity;
 
@@ -46,6 +47,10 @@ pub use metadata::{
 pub use resource::{
     build_resource_bundle, normalize_resource_path, ProtectedResourceRecord, ResourceBundle,
     ResourceBundleBuild, ResourceDecision, ResourceInput, ResourceSelector,
+};
+pub use retrace::{
+    open_retrace_map, seal_retrace_map, RetraceMap, RetraceRecord, MAX_RETRACE_PLAINTEXT,
+    MAX_RETRACE_RECORDS, RETRACE_SCHEMA,
 };
 pub use runtime::{CachePolicy, DecryptRuntime, SensitiveBytes, SensitiveString};
 pub use sensitivity::{

@@ -61,6 +61,7 @@ class NexoraShieldPlugin : Plugin<Project> {
                 profile.set(extension.profile)
                 cliExecutable.set(extension.cliExecutable)
                 allowUnsigned.set(extension.allowUnsigned)
+                legacyPhaseAOnly.set(extension.legacyPhaseAOnly)
                 align.set(extension.align)
                 minSdk.set(extension.minSdk)
                 publicReports.set(extension.publicReports)

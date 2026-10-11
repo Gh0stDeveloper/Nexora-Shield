@@ -29,7 +29,7 @@ Its goal is not to claim that protected software is "unbreakable". Software exec
 
 The component roadmap through **Phase N — Production Hardening** is complete, but a stricter post-N production audit found release-blocking integration and governance gaps. **Phase O — Production Release Audit & Hardening is open and `v1.0.0` is intentionally blocked.**
 
-The most important open item is the production protection path: the current user-facing `nexora-shield protect` command still reaches the Phase A packaging pipeline and does not yet prove end-to-end orchestration of all documented B–I protection engines into the final artifact. See the [Production Readiness Audit](docs/PRODUCTION-READINESS-AUDIT.md).
+The most important open item is the production protection path: the isolated B–I engines do not yet form a verified full production build. During O.1, `nexora-shield protect` now rejects unsupported production requests instead of silently falling back to Phase A packaging. The explicit `package-apk` command remains for historical packaging-only workflows. See the [Production Readiness Audit](docs/PRODUCTION-READINESS-AUDIT.md).
 
 | Area | Current state |
 | --- | --- |
@@ -66,7 +66,7 @@ The packaging layer provides the reproducible foundation used by later protectio
 - transactional protection pipeline;
 - public/private build reports;
 - `zipalign` and `apksigner` integration;
-- inspect, protect, and verify CLI workflows.
+- inspect, legacy `package-apk`, and verify CLI workflows. **This packaging-only mode does not apply the B–I protection stack.**
 
 ### DEX engine
 
@@ -212,10 +212,16 @@ Maximum protection is intentionally not the default for an entire application.
 The CLI is the primary automation surface.
 
 ```bash
+# Read-only production planning; never creates or signs an APK
+nexora-shield protect app.apk --output app-protected.apk --profile hardened --unsigned --no-align --plan-only
+
+# Fail-closed production protection (currently rejects until O.1 is complete)
 nexora-shield protect app.apk --output app-protected.apk --profile hardened
-nexora-shield inspect app-protected.apk
-nexora-shield verify app-protected.apk
-nexora-shield retrace --mapping mapping.nshield crash.txt
+
+# Historical APK normalize/align/sign only; NOT full security protection
+nexora-shield package-apk app.apk --output packaged.apk --unsigned --no-align
+nexora-shield inspect packaged.apk
+nexora-shield verify packaged.apk
 ```
 
 For development and validation:

@@ -14,10 +14,10 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [x] Final O.0 documentation/CI gate
 
 ## O.1 Production Protection Orchestrator
-- [ ] Define authoritative production stage graph
-- [ ] Add typed production build context
-- [ ] Resolve configuration before mutation
-- [ ] Resolve effective protection profile
+- [x] Define authoritative production stage graph
+- [x] Add typed production build context
+- [x] Resolve typed request configuration before mutation (O.1.1; YAML file binding remains O.5)
+- [x] Resolve effective protection profile
 - [ ] Integrate DEX parse/validation
 - [ ] Integrate compatibility analysis
 - [ ] Integrate selectors
@@ -33,7 +33,7 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [ ] Align/sign final output
 - [ ] Verify final output
 - [ ] Emit executed-stage evidence
-- [ ] Fail closed for required unsupported stages
+- [x] Fail closed for required unsupported stages
 - [ ] CLI protect uses orchestrator
 - [ ] Gradle Plugin uses orchestrator
 - [ ] Shield Studio reaches same orchestrator

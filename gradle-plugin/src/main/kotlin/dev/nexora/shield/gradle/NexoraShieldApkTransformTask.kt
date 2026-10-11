@@ -50,6 +50,9 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     abstract val allowUnsigned: Property<Boolean>
 
     @get:Input
+    abstract val legacyPhaseAOnly: Property<Boolean>
+
+    @get:Input
     abstract val align: Property<Boolean>
 
     @get:Input
@@ -118,7 +121,7 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
             val stem = inputApk.name.removeSuffix(".apk")
             val command = mutableListOf(
                 cliExecutable.get(),
-                "protect",
+                if (legacyPhaseAOnly.get()) "package-apk" else "protect",
                 inputApk.absolutePath,
                 "--output",
                 outputApk.absolutePath,
