@@ -318,16 +318,16 @@ def arsc_pool(values: list[str]) -> bytes:
     return bytes(result)
 
 
-def resource_table(binding: str) -> bytes:
+def resource_table(binding: str, *, key: str = "title", typed_string: bool = True) -> bytes:
     values = arsc_pool([binding])
     type_strings = arsc_pool(["string"])
-    key_strings = arsc_pool(["title"])
+    key_strings = arsc_pool([key])
     spec = struct.pack("<HHIBBHI", 0x0202, 16, 20, 1, 0, 0, 1) + struct.pack("<I", 0)
     type_header = struct.pack("<HHIBBHI", 0x0201, 24, 44, 1, 0, 0, 1)
     typed = (
         type_header + struct.pack("<II", 28, 4)
         + struct.pack("<IHHI", 0, 8, 0, 0)
-        + struct.pack("<HBBI", 8, 0, 3, 0)
+        + struct.pack("<HBBI", 8, 0, 3 if typed_string else 0x10, 0)
     )
     package = bytearray(288)
     struct.pack_into("<HHII", package, 0, 0x0200, 288,
@@ -342,6 +342,8 @@ def resource_table(binding: str) -> bytes:
 for variant, arsc in {
     "arsc-unreferenced": resource_table("not.related.Class"),
     "arsc-class-alias": resource_table("com.test.A"),
+    "arsc-class-unbound": resource_table("com.test.A", typed_string=False),
+    "arsc-name-alias": resource_table("unrelated", key="com.test.A"),
     "arsc-corrupt": resource_table("unrelated")[:-1],
 }.items():
     with zipfile.ZipFile(directory / f"{variant}.apk", "w", compression=zipfile.ZIP_DEFLATED) as output:
