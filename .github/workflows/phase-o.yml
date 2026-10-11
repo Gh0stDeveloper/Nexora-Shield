@@ -359,7 +359,28 @@ jobs:
               assert original.read("resources.arsc") == rewritten.read("resources.arsc")
               assert original.read("classes.dex") != rewritten.read("classes.dex")
           PY
-          for mode in arsc-class-alias arsc-corrupt; do
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/arsc-class-alias.apk \
+            build/phase-o1/arsc-linked.apk \
+            > build/phase-o1/arsc-linked.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/arsc-linked.txt
+          python - <<'PY'
+          from zipfile import ZipFile
+          root = "build/phase-o1/"
+          with ZipFile(root + "arsc-class-alias.apk") as original, \
+               ZipFile(root + "arsc-linked.apk") as linked:
+              before = original.read("resources.arsc")
+              after = linked.read("resources.arsc")
+              assert before != after
+              assert len(before) == len(after)
+              assert b"com.test.A" in before
+              assert b"com.test.A" not in after
+              assert before[:12] == after[:12]
+              pool_len = int.from_bytes(before[16:20], "little")
+              assert before[12 + pool_len:] == after[12 + pool_len:], "ARSC packages or IDs changed"
+              assert original.read("classes.dex") != linked.read("classes.dex")
+          PY
+          for mode in arsc-class-unbound arsc-name-alias arsc-corrupt; do
             denied="build/phase-o1/${mode}-denied.apk"
             if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
               "build/phase-o1/${mode}.apk" "${denied}" \
