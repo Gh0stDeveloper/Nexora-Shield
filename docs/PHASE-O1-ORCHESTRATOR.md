@@ -275,3 +275,29 @@ resource-table rewrite, or native/JNI compatibility proof. Full ARSC/resource
 relinking, real Android installation/launch verification and the integrated
 B–I production executor are still **pending**. O.1.3 and Phase O remain
 **OPEN**; stable `v1.0.0` stays **NO-GO**.
+
+## O.1.3 — bounded compiled resource string-value rewriting
+
+The diagnostic APK build now includes a **strictly limited** `resources.arsc`
+relinker for renamed class-name strings that occupy the **global string pool**
+and are referenced by validated `Res_value(TYPE_STRING)` fields in resource
+entries. It supports UTF-8 and UTF-16 pools and only replacements with exactly
+the same byte and UTF-16-unit lengths. It validates the entire compiled resource
+table before and after rewriting. Every public resource ID, package, type/key
+string pool, entry index, offset, chunk length and nonstring payload stays
+unchanged. As with the compiled manifest, the resource table is staged in the
+**same exclusive ZIP transaction** as the transformed DEX and XML entries.
+
+The linker rejects malformed/bounds-violating tables, styled global pools,
+class aliases that are unreferenced by typed resource values, renamed class
+strings used as resource key/type names, replacement collisions and any
+length-changing rewrite. Unknown package layouts continue to fail closed.
+Synthetic unit and E2E fixtures cover positive value-linking, unchanged
+nonbinding resources, corrupt structures and forbidden key/unbound aliases.
+
+**Scope is intentionally not general Android resource rebuilding.** It does
+not add/remove string pool entries, relocate offsets, rename resource entries,
+change resource IDs, update all compiled XML references or solve native/JNI and
+reflection bindings. Real Android install/launch and OEM coverage remain
+required. The diagnostic staging harness is not a signed production artifact;
+Phase O.1.3 and stable v1.0.0 remain OPEN/NO-GO.
