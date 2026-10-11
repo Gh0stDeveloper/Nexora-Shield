@@ -169,7 +169,7 @@ fn verify_non_dex_entries(
     changed: &[ChangedName],
 ) -> Result<BTreeMap<String, Vec<u8>>> {
     let aliases = checked_aliases(changed)?;
-    let mut xml_replacements = BTreeMap::new();
+    let mut linked_entries = BTreeMap::new();
     let mut total = 0_usize;
     let mut found_manifest = false;
     for entry in &directory.entries {
@@ -203,11 +203,15 @@ fn verify_non_dex_entries(
                 ));
             }
             let bytes = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
-            for value in crate::android_resources::inspect_resource_table(&bytes)? {
-                // Resource-table values are external DEX ABI contracts.
-                // A matching name requires keep rules until a verified linker
-                // can atomically rewrite DEX + resources + compiled XML.
+            let rewritten =
+                crate::android_resources::rewrite_resource_string_aliases(&bytes, &aliases)?;
+            for value in crate::android_resources::inspect_resource_table(&rewritten)? {
+                // Unlinked class aliases in a resource key/type or unsupported
+                // value still block the entire diagnostic transaction.
                 guard_text_reference(&format!("\"{value}\""), changed, name)?;
+            }
+            if rewritten != bytes {
+                linked_entries.insert(name.to_owned(), rewritten);
             }
             continue;
         }
@@ -249,7 +253,7 @@ fn verify_non_dex_entries(
                 guard_text_reference(&format!("\"{value}\""), changed, name)?;
             }
             if rewritten != bytes {
-                xml_replacements.insert(name.to_owned(), rewritten);
+                linked_entries.insert(name.to_owned(), rewritten);
             }
             continue;
         }
@@ -270,7 +274,7 @@ fn verify_non_dex_entries(
             "O.1.3 AndroidManifest.xml is missing".into(),
         ));
     }
-    Ok(xml_replacements)
+    Ok(linked_entries)
 }
 
 #[cfg(test)]
