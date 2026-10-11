@@ -729,8 +729,8 @@ mod tests {
             let inspected = inspect_resource_table(&linked).unwrap_or_default();
             assert_eq!(inspected, ["com.test.Z", "string", "title"]);
             assert_eq!(original.len(), linked.len());
-            let before = super::chunk(&original, 12).map(|x| x.size).unwrap_or(0);
-            let after = super::chunk(&linked, 12).map(|x| x.size).unwrap_or(0);
+            let before = super::chunk(&original, 12).map_or(0, |x| x.size);
+            let after = super::chunk(&linked, 12).map_or(0, |x| x.size);
             assert_eq!(before, after);
             assert_eq!(&original[12 + before..], &linked[12 + before..]);
             let unchanged = super::rewrite_resource_string_aliases(
