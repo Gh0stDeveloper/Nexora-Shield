@@ -800,7 +800,10 @@ mod tests {
         let mut manifest = class_manifest(true, false, true);
         let target = [8, 0, 0, 3, 4, 0, 0, 0];
         let value_at = manifest.windows(target.len()).position(|v| v == target);
-        assert!(value_at.is_some(), "typed class-valued attribute fixture is missing");
+        assert!(
+            value_at.is_some(),
+            "typed class-valued attribute fixture is missing"
+        );
         if let Some(value_at) = value_at {
             manifest[value_at + 3] = 1; // TYPE_REFERENCE, not TYPE_STRING
             assert!(super::rewrite_manifest_class_aliases(&manifest, &aliases).is_err());
