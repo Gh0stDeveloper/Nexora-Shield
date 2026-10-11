@@ -341,7 +341,11 @@ pub(crate) fn inspect_resource_table(bytes: &[u8]) -> Result<Vec<String>> {
 
 // Narrow, offset-preserving resource string-value linker. This does not
 // rename resource IDs, resource entry names, file paths or arbitrary chunks.
-fn type_string_value(data: &[u8], at: usize, refs: &mut std::collections::BTreeSet<usize>) -> Result<()> {
+fn type_string_value(
+    data: &[u8],
+    at: usize,
+    refs: &mut std::collections::BTreeSet<usize>,
+) -> Result<()> {
     if data.get(at + 3) == Some(&TYPE_STRING) {
         refs.insert(word(data, at + 4)?);
     }
@@ -358,7 +362,9 @@ fn package_string_value_refs(
         let item = chunk(pkg, at)?;
         if item.kind == TYPE {
             let data = range(pkg, at, item.size)?;
-            let flags = *range(data, 9, 1)?.first().ok_or_else(|| reject("missing type flags"))?;
+            let flags = *range(data, 9, 1)?
+                .first()
+                .ok_or_else(|| reject("missing type flags"))?;
             let count = word(data, 12)?;
             let entries_start = word(data, 16)?;
             let stride = if flags & FLAG_OFFSET16 != 0 { 2 } else { 4 };
@@ -377,10 +383,12 @@ fn package_string_value_refs(
                 };
                 if let Some(offset) = entry_offset {
                     let entry_at = entries_start
-                        .checked_add(offset).ok_or_else(|| reject("resource entry offset overflow"))?;
+                        .checked_add(offset)
+                        .ok_or_else(|| reject("resource entry offset overflow"))?;
                     let entry_size = usize::from(le16(data, entry_at)?);
                     let flags = le16(data, entry_at + 2)?;
-                    let value = entry_at.checked_add(entry_size)
+                    let value = entry_at
+                        .checked_add(entry_size)
                         .ok_or_else(|| reject("resource entry payload overflow"))?;
                     if flags & FLAG_COMPLEX == 0 {
                         type_string_value(data, value, refs)?;
@@ -417,15 +425,22 @@ fn string_payload_offset(pool: &[u8], index: usize) -> Result<(usize, bool)> {
     let strings_start = word(pool, 20)?;
     let off = word(pool, item.header + index * 4)?;
     let pos = strings_start
-        .checked_add(off).ok_or_else(|| reject("string pool offset overflow"))?;
+        .checked_add(off)
+        .ok_or_else(|| reject("string pool offset overflow"))?;
     Ok((pos, flags & 0x100 != 0))
 }
 
 fn encoded_length_8(pool: &[u8], at: &mut usize) -> Result<usize> {
-    let first = *range(pool, *at, 1)?.first().ok_or_else(|| reject("missing length"))?;
+    let first = *range(pool, *at, 1)?
+        .first()
+        .ok_or_else(|| reject("missing length"))?;
     *at += 1;
-    if first & 0x80 == 0 { return Ok(usize::from(first)); }
-    let second = *range(pool, *at, 1)?.first().ok_or_else(|| reject("missing length"))?;
+    if first & 0x80 == 0 {
+        return Ok(usize::from(first));
+    }
+    let second = *range(pool, *at, 1)?
+        .first()
+        .ok_or_else(|| reject("missing length"))?;
     *at += 1;
     Ok((usize::from(first & 0x7f) << 8) | usize::from(second))
 }
@@ -433,7 +448,9 @@ fn encoded_length_8(pool: &[u8], at: &mut usize) -> Result<usize> {
 fn encoded_length_16(pool: &[u8], at: &mut usize) -> Result<usize> {
     let first = le16(pool, *at)?;
     *at += 2;
-    if first & 0x8000 == 0 { return Ok(usize::from(first)); }
+    if first & 0x8000 == 0 {
+        return Ok(usize::from(first));
+    }
     let second = le16(pool, *at)?;
     *at += 2;
     Ok((usize::from(first & 0x7fff) << 16) | usize::from(second))
@@ -457,19 +474,23 @@ fn overwrite_pool_value(
             || count != original.len()
             || count != replacement.len()
         {
-            return Err(reject("UTF-8 resource replacement changes string pool lengths"));
+            return Err(reject(
+                "UTF-8 resource replacement changes string pool lengths",
+            ));
         }
         range(pool_snapshot, at, count)?;
         let write_at = pool_at + at;
         output[write_at..write_at + count].copy_from_slice(replacement.as_bytes());
     } else {
         let count = encoded_length_16(pool_snapshot, &mut at)?;
-        if count != original.encode_utf16().count()
-            || count != replacement.encode_utf16().count()
-        {
-            return Err(reject("UTF-16 resource replacement changes string pool lengths"));
+        if count != original.encode_utf16().count() || count != replacement.encode_utf16().count() {
+            return Err(reject(
+                "UTF-16 resource replacement changes string pool lengths",
+            ));
         }
-        let length = count.checked_mul(2).ok_or_else(|| reject("UTF-16 size overflow"))?;
+        let length = count
+            .checked_mul(2)
+            .ok_or_else(|| reject("UTF-16 size overflow"))?;
         range(pool_snapshot, at, length)?;
         let write_at = pool_at + at;
         for (i, unit) in replacement.encode_utf16().enumerate() {
@@ -496,37 +517,61 @@ pub(crate) fn rewrite_resource_string_aliases(
     aliases: &BTreeMap<String, String>,
 ) -> Result<Vec<u8>> {
     let inspected = inspect_resource_table(bytes)?;
-    if aliases.is_empty() { return Ok(bytes.to_vec()); }
+    if aliases.is_empty() {
+        return Ok(bytes.to_vec());
+    }
     let pool_at = 12;
     let global = pool(bytes, pool_at)?;
     let pool_chunk = chunk(bytes, pool_at)?;
     if word(bytes, pool_at + 12)? != 0 {
-        return Err(reject("styled global string pool cannot be safely relinked"));
+        return Err(reject(
+            "styled global string pool cannot be safely relinked",
+        ));
     }
-    let targets = global.iter().enumerate()
+    let targets = global
+        .iter()
+        .enumerate()
         .filter(|(_, value)| aliases.contains_key(value.as_str()))
-        .map(|(index, _)| index).collect::<std::collections::BTreeSet<_>>();
+        .map(|(index, _)| index)
+        .collect::<std::collections::BTreeSet<_>>();
     if targets.is_empty() {
         for value in &inspected[global.len()..] {
             if aliases.contains_key(value) {
-                return Err(reject("resource key/type pool class name needs a dedicated remapper"));
+                return Err(reject(
+                    "resource key/type pool class name needs a dedicated remapper",
+                ));
             }
         }
         return Ok(bytes.to_vec());
     }
     let used = used_global_string_indices(bytes)?;
     if targets.iter().any(|index| !used.contains(index)) {
-        return Err(reject("unreferenced global pool class alias cannot be safely linked"));
+        return Err(reject(
+            "unreferenced global pool class alias cannot be safely linked",
+        ));
     }
-    if inspected[global.len()..].iter().any(|value| aliases.contains_key(value)) {
-        return Err(reject("resource entry name and value aliases must not share a rewrite"));
+    if inspected[global.len()..]
+        .iter()
+        .any(|value| aliases.contains_key(value))
+    {
+        return Err(reject(
+            "resource entry name and value aliases must not share a rewrite",
+        ));
     }
     let mut out = bytes.to_vec();
     for index in &targets {
         let old = &global[*index];
-        let new = aliases.get(old).ok_or_else(|| reject("missing resource alias"))?;
-        if global.iter().enumerate().any(|(n, value)| n != *index && value == new) {
-            return Err(reject("resource alias collides with another global pool string"));
+        let new = aliases
+            .get(old)
+            .ok_or_else(|| reject("missing resource alias"))?;
+        if global
+            .iter()
+            .enumerate()
+            .any(|(n, value)| n != *index && value == new)
+        {
+            return Err(reject(
+                "resource alias collides with another global pool string",
+            ));
         }
         overwrite_pool_value(&mut out, pool_at, *index, old, new)?;
     }
@@ -537,7 +582,9 @@ pub(crate) fn rewrite_resource_string_aliases(
     for (index, before) in inspected.iter().enumerate() {
         let expected = if targets.contains(&index) {
             aliases.get(before).unwrap_or(before)
-        } else { before };
+        } else {
+            before
+        };
         if verified.get(index) != Some(expected) {
             return Err(reject("resource table read-back failed"));
         }
@@ -643,7 +690,11 @@ mod tests {
         data.extend(32_u32.to_le_bytes());
         data.extend(0_u32.to_le_bytes());
         data.extend(0_u32.to_le_bytes());
-        data.extend(u16::try_from(value.encode_utf16().count()).unwrap_or(0).to_le_bytes());
+        data.extend(
+            u16::try_from(value.encode_utf16().count())
+                .unwrap_or(0)
+                .to_le_bytes(),
+        );
         for unit in value.encode_utf16() {
             data.extend(unit.to_le_bytes());
         }
@@ -670,13 +721,11 @@ mod tests {
 
     #[test]
     fn o13_arsc_rewrites_class_value_and_preserves_package_ids_and_offsets() {
-        let aliases = std::collections::BTreeMap::from([(
-            "com.test.A".to_owned(),
-            "com.test.Z".to_owned(),
-        )]);
+        let aliases =
+            std::collections::BTreeMap::from([("com.test.A".to_owned(), "com.test.Z".to_owned())]);
         for original in [sample("com.test.A"), utf16_sample("com.test.A")] {
-            let linked = super::rewrite_resource_string_aliases(&original, &aliases)
-                .unwrap_or_default();
+            let linked =
+                super::rewrite_resource_string_aliases(&original, &aliases).unwrap_or_default();
             let inspected = inspect_resource_table(&linked).unwrap_or_default();
             assert_eq!(inspected, ["com.test.Z", "string", "title"]);
             assert_eq!(original.len(), linked.len());
@@ -684,9 +733,11 @@ mod tests {
             let after = super::chunk(&linked, 12).map(|x| x.size).unwrap_or(0);
             assert_eq!(before, after);
             assert_eq!(&original[12 + before..], &linked[12 + before..]);
-            let unchanged =
-                super::rewrite_resource_string_aliases(&original, &std::collections::BTreeMap::new())
-                    .unwrap_or_default();
+            let unchanged = super::rewrite_resource_string_aliases(
+                &original,
+                &std::collections::BTreeMap::new(),
+            )
+            .unwrap_or_default();
             assert_eq!(unchanged, original);
         }
     }
@@ -699,13 +750,17 @@ mod tests {
             "com.test.Longer".to_owned(),
         )]);
         assert!(super::rewrite_resource_string_aliases(&original, &different_length).is_err());
-        let aliases = std::collections::BTreeMap::from([(
-            "com.test.A".to_owned(),
-            "com.test.Z".to_owned(),
-        )]);
+        let aliases =
+            std::collections::BTreeMap::from([("com.test.A".to_owned(), "com.test.Z".to_owned())]);
         let mut non_string = original.clone();
-        let at = 12 + pool(&["com.test.A"]).len() + 288
-            + pool(&["string"]).len() + pool(&["title"]).len() + 20 + 36 + 3;
+        let at = 12
+            + pool(&["com.test.A"]).len()
+            + 288
+            + pool(&["string"]).len()
+            + pool(&["title"]).len()
+            + 20
+            + 36
+            + 3;
         non_string[at] = 0x10; // TYPE_INT_DEC replaces TYPE_STRING in entry value
         assert!(inspect_resource_table(&non_string).is_ok());
         assert!(super::rewrite_resource_string_aliases(&non_string, &aliases).is_err());
