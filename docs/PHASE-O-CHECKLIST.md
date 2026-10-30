@@ -16,6 +16,9 @@ The checklist is intentionally strict. A checked implementation item is not enou
 ## O.1 Production Protection Orchestrator
 
 Current implementation/evidence boundaries: [O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md).
+The [eligible Android runtime slice](PHASE-O1-RUNTIME.md) adds actual JNI/VM
+method replacement and signed-fixture qualification. Full production items
+remain unchecked until all required controls run together.
 Frozen selection execution and input snapshots do not complete the unchecked
 production runtime/final-APK items below.
 

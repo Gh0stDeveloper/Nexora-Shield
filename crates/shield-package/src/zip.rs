@@ -181,24 +181,28 @@ pub fn rewrite_stored_entries(
     output: &Path,
     replacements: &BTreeMap<String, Vec<u8>>,
 ) -> Result<NormalizationSummary> {
+    rewrite_with_additions(input, output, replacements, &BTreeMap::new())
+}
+
+/// Rebuild with explicit new STORE entries, rejecting collisions and unsafe paths.
+/// Existing non-replaced compressed payloads remain byte-identical.
+///
+/// # Errors
+/// Rejects invalid names, overwrites, signature additions and ZIP32 overflow.
+pub fn rewrite_with_additions(
+    input: &Path,
+    output: &Path,
+    replacements: &BTreeMap<String, Vec<u8>>,
+    additions: &BTreeMap<String, Vec<u8>>,
+) -> Result<NormalizationSummary> {
     validate_distinct_archive_paths(input, output)?;
 
-    let directory = read_zip_directory(input)?;
-    let input_entries = directory.entries.len();
-    let mut entries = directory.entries;
-    let mut stripped = Vec::new();
-
-    entries.retain(|entry| {
-        if is_legacy_signature_entry(&entry.name) {
-            stripped.push(entry.name.clone());
-            false
-        } else {
-            true
-        }
-    });
-    entries.sort_by(|left, right| left.name.as_bytes().cmp(right.name.as_bytes()));
-
-    validate_replacements(&entries, replacements)?;
+    let RewriteInventory {
+        entries,
+        stripped,
+        input_entries,
+        payloads,
+    } = prepare_inventory(input, replacements, additions)?;
 
     let mut source = File::open(input)?;
     // Exclusive creation ensures an existing artifact or symlink is never
@@ -214,7 +218,7 @@ pub fn rewrite_stored_entries(
     let mut written = Vec::with_capacity(entries.len());
 
     for mut entry in entries {
-        if let Some(bytes) = replacements.get(&entry.name) {
+        if let Some(bytes) = payloads.get(&entry.name) {
             let size = u32::try_from(bytes.len()).map_err(|_| {
                 PackageError::UnsupportedZip(format!(
                     "replacement '{}' exceeds ZIP32 size limits",
@@ -243,7 +247,7 @@ pub fn rewrite_stored_entries(
         destination.write_all(entry.name.as_bytes())?;
         destination.write_all(&local_extra)?;
 
-        if let Some(bytes) = replacements.get(&entry.name) {
+        if let Some(bytes) = payloads.get(&entry.name) {
             destination.write_all(bytes)?;
         } else {
             let data_offset = local_data_offset(&mut source, &entry)?;
@@ -266,13 +270,24 @@ pub fn rewrite_stored_entries(
         written.push(updated);
     }
 
+    finish_archive(&mut destination, &written)?;
+    incomplete.completed = true;
+
+    Ok(NormalizationSummary {
+        input_entries,
+        output_entries: written.len(),
+        stripped_signature_entries: stripped,
+    })
+}
+
+fn finish_archive(destination: &mut File, written: &[ZipEntry]) -> Result<()> {
     let central_offset = destination.stream_position()?;
     let central_offset_u32 = u32::try_from(central_offset).map_err(|_| {
         PackageError::UnsupportedZip("normalized APK central directory exceeds ZIP32".into())
     })?;
 
-    for entry in &written {
-        write_central_header(&mut destination, entry)?;
+    for entry in written {
+        write_central_header(destination, entry)?;
     }
 
     let central_end = destination.stream_position()?;
@@ -286,23 +301,97 @@ pub fn rewrite_stored_entries(
         PackageError::UnsupportedZip("normalized APK has more than 65535 entries".into())
     })?;
 
-    write_u32(&mut destination, EOCD_SIGNATURE)?;
-    write_u16(&mut destination, 0)?;
-    write_u16(&mut destination, 0)?;
-    write_u16(&mut destination, entry_count)?;
-    write_u16(&mut destination, entry_count)?;
-    write_u32(&mut destination, central_size_u32)?;
-    write_u32(&mut destination, central_offset_u32)?;
-    write_u16(&mut destination, 0)?;
+    write_u32(destination, EOCD_SIGNATURE)?;
+    write_u16(destination, 0)?;
+    write_u16(destination, 0)?;
+    write_u16(destination, entry_count)?;
+    write_u16(destination, entry_count)?;
+    write_u32(destination, central_size_u32)?;
+    write_u32(destination, central_offset_u32)?;
+    write_u16(destination, 0)?;
     destination.flush()?;
     destination.sync_all()?;
-    incomplete.completed = true;
+    Ok(())
+}
 
-    Ok(NormalizationSummary {
+#[derive(Debug)]
+struct RewriteInventory {
+    entries: Vec<ZipEntry>,
+    stripped: Vec<String>,
+    input_entries: usize,
+    payloads: BTreeMap<String, Vec<u8>>,
+}
+
+fn prepare_inventory(
+    input: &Path,
+    replacements: &BTreeMap<String, Vec<u8>>,
+    additions: &BTreeMap<String, Vec<u8>>,
+) -> Result<RewriteInventory> {
+    let directory = read_zip_directory(input)?;
+    let input_entries = directory.entries.len();
+    let mut entries = directory.entries;
+    let mut stripped = Vec::new();
+
+    entries.retain(|entry| {
+        if is_legacy_signature_entry(&entry.name) {
+            stripped.push(entry.name.clone());
+            false
+        } else {
+            true
+        }
+    });
+    entries.sort_by(|left, right| left.name.as_bytes().cmp(right.name.as_bytes()));
+
+    validate_replacements(&entries, replacements)?;
+    let mut payloads = replacements.clone();
+    for (name, bytes) in additions {
+        validate_entry_name(name)?;
+        if name.ends_with('/')
+            || is_legacy_signature_entry(name)
+            || directory_name_exists(&entries, name)
+            || payloads.contains_key(name)
+        {
+            return Err(PackageError::InvalidArgument(
+                "new APK entry collides or is forbidden".into(),
+            ));
+        }
+        let size = u32::try_from(bytes.len())
+            .map_err(|_| PackageError::UnsupportedZip("new entry exceeds ZIP32".into()))?;
+        entries.push(ZipEntry {
+            name: name.clone(),
+            flags: 0x800,
+            compression_method: 0,
+            crc32: crc32_ieee(bytes),
+            compressed_size: size,
+            uncompressed_size: size,
+            version_made_by: 20,
+            version_needed: 20,
+            internal_attributes: 0,
+            external_attributes: 0,
+            local_header_offset: 0,
+            local_extra: Vec::new(),
+            central_extra: Vec::new(),
+            comment: Vec::new(),
+        });
+        payloads.insert(name.clone(), bytes.clone());
+    }
+    entries.sort_by(|left, right| left.name.cmp(&right.name));
+
+    if entries.len() > usize::from(u16::MAX) {
+        return Err(PackageError::UnsupportedZip(
+            "too many output ZIP entries".into(),
+        ));
+    }
+    Ok(RewriteInventory {
+        entries,
+        stripped,
         input_entries,
-        output_entries: written.len(),
-        stripped_signature_entries: stripped,
+        payloads,
     })
+}
+
+fn directory_name_exists(entries: &[ZipEntry], name: &str) -> bool {
+    entries.iter().any(|entry| entry.name == name)
 }
 
 fn validate_distinct_archive_paths(input: &Path, output: &Path) -> Result<()> {

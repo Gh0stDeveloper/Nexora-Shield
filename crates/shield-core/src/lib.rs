@@ -8,6 +8,7 @@
 mod android_binary_xml;
 mod android_jni;
 mod android_resources;
+mod android_runtime;
 mod apk_compat;
 mod dex_preflight;
 mod dex_selection;
@@ -19,10 +20,12 @@ mod plan;
 mod policy;
 mod production;
 mod report;
+mod runtime_smali;
 
 use core::fmt;
 use core::str::FromStr;
 
+pub use android_runtime::{AndroidRuntimePlan, RuntimeStageEvidence, SmaliTools};
 pub use dex_preflight::{DexPreflight, DexUnitPreflight, MAX_DEX_BYTES, MAX_TOTAL_DEX_BYTES};
 pub use dex_selection::{DexSelectorPolicy, MAX_DEX_SELECTOR_RULES};
 pub use dex_stage::StagedDexResult;

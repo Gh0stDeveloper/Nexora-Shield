@@ -358,6 +358,87 @@ pub(crate) fn inspect_binary_xml(bytes: &[u8]) -> Result<Vec<String>> {
 
 type XmlStringIndices = std::collections::BTreeSet<usize>;
 
+/// Read the real package/minSdk contract before injecting an API-24 JNI runtime.
+pub(crate) fn runtime_manifest_contract(bytes: &[u8]) -> Result<(String, u32)> {
+    let strings = inspect_binary_xml(bytes)?;
+    let mut offset = 8usize;
+    let mut stack = Vec::new();
+    let mut package = None;
+    let mut min_sdk = None;
+    while offset < bytes.len() {
+        let item = chunk(bytes, offset)?;
+        if item.kind == ELEMENT_START {
+            let tag = &strings[usize32(bytes, offset + 20)?];
+            if stack.is_empty() && tag != "manifest" {
+                return Err(reject("runtime manifest root is invalid"));
+            }
+            let root = stack.is_empty();
+            let sdk = stack.len() == 1 && tag == "uses-sdk";
+            let first = 16 + usize::from(u16_at(bytes, offset + 24)?);
+            for n in 0..usize::from(u16_at(bytes, offset + 28)?) {
+                let at = offset + first + n * 20;
+                let name = &strings[usize32(bytes, at + 4)?];
+                let ns = u32_at(bytes, at)?;
+                let android = ns != u32::MAX
+                    && strings
+                        .get(usize::try_from(ns).map_err(|_| reject("invalid namespace"))?)
+                        .is_some_and(|v| v == "http://schemas.android.com/apk/res/android");
+                let kind = u8_at(bytes, at + 15)?;
+                let value = u32_at(bytes, at + 16)?;
+                if root && name == "package" && ns == u32::MAX {
+                    if kind != TYPE_STRING || package.is_some() {
+                        return Err(reject("ambiguous package identity"));
+                    }
+                    let effective = strings
+                        [usize::try_from(value).map_err(|_| reject("invalid package identity"))?]
+                    .clone();
+                    let raw = u32_at(bytes, at + 8)?;
+                    if raw != u32::MAX
+                        && strings[usize::try_from(raw)
+                            .map_err(|_| reject("invalid raw package identity"))?]
+                            != effective
+                    {
+                        return Err(reject("conflicting package identity"));
+                    }
+                    package = Some(effective);
+                }
+                if sdk && name == "minSdkVersion" && android {
+                    if !matches!(kind, 0x10 | 0x11)
+                        || min_sdk.is_some()
+                        || !(24..=1000).contains(&value)
+                    {
+                        return Err(reject(
+                            "runtime requires an unambiguous numeric minSdk >= 24",
+                        ));
+                    }
+                    let raw = u32_at(bytes, at + 8)?;
+                    if raw != u32::MAX
+                        && strings
+                            [usize::try_from(raw).map_err(|_| reject("invalid raw SDK value"))?]
+                        .parse::<u32>()
+                        .ok()
+                            != Some(value)
+                    {
+                        return Err(reject("conflicting SDK values"));
+                    }
+                    min_sdk = Some(value);
+                }
+            }
+            stack.push(tag);
+        } else if item.kind == ELEMENT_END {
+            let tag = &strings[usize32(bytes, offset + 20)?];
+            if stack.pop() != Some(tag) {
+                return Err(reject("runtime manifest element mismatch"));
+            }
+        }
+        offset += item.size;
+    }
+    Ok((
+        package.ok_or_else(|| reject("missing package identity"))?,
+        min_sdk.ok_or_else(|| reject("missing minSdk contract"))?,
+    ))
+}
+
 fn record_index(
     idx: u32,
     targets: &XmlStringIndices,

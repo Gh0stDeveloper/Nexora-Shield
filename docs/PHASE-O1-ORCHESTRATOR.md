@@ -2,6 +2,12 @@
 
 Status: **IN PROGRESS — NOT PRODUCTION READY**. Stable `v1.0.0` remains **NO-GO**.
 
+The next functional slice replaces eligible APK string/int method bodies with
+real JNI calls to a build-bound encrypted data/VM runtime. Its eligibility,
+local verification and Android qualification gate are described in
+[O.1 Android runtime](PHASE-O1-RUNTIME.md). It does not complete the production
+graph or promote any stage to `ProductionIntegrated`.
+
 Current execution evidence and remaining work are recorded in
 [O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md). Frozen selectors now drive
 actual diagnostic transformations, and multi-read DEX operations use a private

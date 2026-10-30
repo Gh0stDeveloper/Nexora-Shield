@@ -12,6 +12,46 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+fn explicit_additions_preserve_payloads_and_reject_aliases_without_output() {
+    use nexora_shield_package::{read_decoded_entry, rewrite_with_additions};
+    use std::collections::BTreeMap;
+    let directory = test_directory("new-runtime-entries");
+    let input = directory.join("source.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"source dex"),
+            ("res/raw/keep", b"unchanged"),
+        ],
+    );
+    for name in ["classes.dex", "../escape", "META-INF/CERT.SF"] {
+        let output = directory.join("refused.apk");
+        let additions = BTreeMap::from([(name.to_owned(), b"bad".to_vec())]);
+        assert!(rewrite_with_additions(&input, &output, &BTreeMap::new(), &additions).is_err());
+        assert!(!output.exists());
+    }
+    let additions = BTreeMap::from([
+        ("classes2.dex".to_owned(), b"runtime dex".to_vec()),
+        ("lib/x86_64/runtime.so".to_owned(), b"ELF fixture".to_vec()),
+    ]);
+    let output = directory.join("augmented.apk");
+    rewrite_with_additions(&input, &output, &BTreeMap::new(), &additions).unwrap();
+    let built = read_zip_directory(&output).unwrap();
+    assert_eq!(built.entries.len(), 5);
+    for entry in &built.entries {
+        let bytes = read_decoded_entry(&output, entry, 1024).unwrap();
+        if entry.name == "res/raw/keep" {
+            assert_eq!(bytes, b"unchanged");
+        }
+        if let Some(expected) = additions.get(&entry.name) {
+            assert_eq!(&bytes, expected);
+        }
+    }
+    cleanup(&directory);
+}
+
+#[test]
 fn normalizer_preserves_payload_identity_and_discovers_multidex() {
     let directory = test_directory("normalize");
     let input = directory.join("input.apk");

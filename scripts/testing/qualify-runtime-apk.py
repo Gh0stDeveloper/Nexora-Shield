@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Align/sign runtime fixtures and bind evidence to delivered APK bytes."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import subprocess
+import zipfile
+
+p=argparse.ArgumentParser()
+p.add_argument('directory',type=Path)
+p.add_argument('--build-tools',type=Path,required=True)
+p.add_argument('--keytool',default='keytool')
+args=p.parse_args()
+root=args.directory
+tools=args.build_tools
+image=json.loads((root/'runtime.nshield-private').read_text())
+baseline=root/'baseline-unsigned.apk'
+staged=root/'runtime-unsigned.apk'
+probe='Nexora_🔒_runtime_فارسی'
+units=probe.encode('utf-16-be')
+cesu=''.join(chr(int.from_bytes(units[i:i+2],'big')) for i in range(0,len(units),2)).encode('utf-8','surrogatepass')
+with zipfile.ZipFile(baseline) as z:
+    if cesu not in z.read('classes.dex'): raise SystemExit('Baseline exposure probe is missing')
+with zipfile.ZipFile(staged) as z:
+    names=set(z.namelist())
+    if not {'classes.dex','classes2.dex','lib/arm64-v8a/libnexora_shield_native.so','lib/x86_64/libnexora_shield_native.so'}<=names: raise SystemExit('Runtime APK inventory is incomplete')
+    root_key=(root/'root.key').read_bytes()
+    for name in z.namelist():
+        data=z.read(name)
+        if probe.encode() in data or cesu in data or root_key in data: raise SystemExit('Final runtime APK exposes protected fixture material')
+        if name.endswith(('.key','.p12','.nshield-private')): raise SystemExit('Private build file entered APK')
+    binaries={abi:hashlib.sha256(z.read(f'lib/{abi}/libnexora_shield_native.so')).hexdigest() for abi in ['arm64-v8a','x86_64']}
+    payload=bytes(image['entries'][0]['ciphertext'])
+    native=z.read('lib/x86_64/libnexora_shield_native.so')
+    at=native.find(payload)
+    if at<0 or native.find(payload,at+1)>=0: raise SystemExit('Native corruption probe is ambiguous')
+    corrupted=bytearray(native);corrupted[at+len(payload)-1]^=1
+    with zipfile.ZipFile(root/'tampered-unsigned.apk','w') as out:
+        for entry in z.infolist():
+            out.writestr(entry,corrupted if entry.filename=='lib/x86_64/libnexora_shield_native.so' else z.read(entry))
+env=os.environ.copy();env['NEXORA_RUNTIME_TEST_PASSWORD']=secrets.token_hex(24)
+key=root/'ephemeral-test.p12'
+subprocess.run([args.keytool,'-genkeypair','-noprompt','-keystore',str(key),'-storetype','PKCS12','-storepass:env','NEXORA_RUNTIME_TEST_PASSWORD','-keypass:env','NEXORA_RUNTIME_TEST_PASSWORD','-alias','test','-keyalg','RSA','-keysize','2048','-validity','2','-dname','CN=Nexora Runtime Ephemeral Test'],env=env,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+for name,source in [('baseline',baseline),('runtime',staged),('tampered',root/'tampered-unsigned.apk')]:
+    output=root/f'{name}.apk'
+    subprocess.run([str(tools/'zipalign'),'-P','16','-f','4',str(source),str(output)],check=True)
+    subprocess.run([str(tools/'apksigner'),'sign','--min-sdk-version','24','--ks',str(key),'--ks-key-alias','test','--ks-pass','env:NEXORA_RUNTIME_TEST_PASSWORD','--key-pass','env:NEXORA_RUNTIME_TEST_PASSWORD',str(output)],env=env,check=True)
+    subprocess.run([str(tools/'apksigner'),'verify','--min-sdk-version','24',str(output)],check=True,capture_output=True)
+    subprocess.run([str(tools/'zipalign'),'-c','-P','16','4',str(output)],check=True,capture_output=True)
+    with zipfile.ZipFile(source) as before,zipfile.ZipFile(output) as after:
+        if any(before.read(n)!=after.read(n) for n in before.namelist()): raise SystemExit('Signing altered a verified runtime payload')
+evidence={'schema':1,'production_protected':False,'scope':'O.1 eligible static string/int runtime','source_sha256':hashlib.sha256(baseline.read_bytes()).hexdigest(),'protected_strings':1,'virtualized_methods':1,'native_sha256':binaries,'smali_version':'3.0.9','min_sdk':24,'ndk_version':'27.3.13750724','alignment_verified':True,'signature_verified':True,'static_exposure_verified':True,'android_execution':'not-yet-run','artifacts':{name:hashlib.sha256((root/f'{name}.apk').read_bytes()).hexdigest() for name in ['baseline','runtime','tampered']}}
+evidence.update({'effective_profile':'standard; partial runtime qualification',
+    'source_commit':subprocess.run(['git','rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip(),
+    'source_worktree_dirty':bool(subprocess.run(['git','status','--porcelain','--untracked-files=no'],check=True,capture_output=True,text=True).stdout.strip()),
+    'executed_controls':['string-aead-decryption','native-jni-call-sites','integer-vm'],
+    'protected_strings':sum(e['kind']=='String' for e in image['entries']),
+    'virtualized_methods':sum(e['kind']=='IntVm' for e in image['entries']),
+    'runtime_fingerprint':hashlib.sha256(json.dumps([image['schema'],image['application_id'],image['build_id'],image['entries']],sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest(),
+    'apksigner_version':subprocess.run([str(tools/'apksigner'),'version'],check=True,capture_output=True,text=True).stdout.strip()})
+(root/'evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+print('Signed APK hashes, 16 KiB alignment, payload identity and protected-data exposure verified')

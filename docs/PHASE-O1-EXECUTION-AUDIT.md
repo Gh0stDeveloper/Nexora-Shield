@@ -2,6 +2,13 @@
 
 Status: **OPEN — O.1 NOT CLOSED; stable v1.0.0 NO-GO**.
 
+This audit records the previous frozen-selection/input-snapshot increment.
+The subsequent runtime increment verified upstream HEAD
+`f4409a62d7234b785886feaa505048ee5cdcf270` before edits and is recorded in
+[O.1 Android runtime](PHASE-O1-RUNTIME.md). That document supersedes the
+data/native/VM "no injected loader" findings below for its narrow eligible
+method slice only. The production closure boundaries remain open.
+
 ## Baseline and scope
 
 The Ghost Developer connection resolved PR #35 and the branch
