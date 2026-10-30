@@ -22,6 +22,7 @@ results = {}
 guarded = evidence.get('guard_selected', False)
 adb('uninstall', 'dev.nexora.runtime', check=False)
 for name, expected_hash in evidence['artifacts'].items():
+    print(f'Android runtime case: {name}', flush=True)
     positive = name in ('baseline', 'runtime')
     expected = 'NEXORA_RUNTIME_OK' if positive else (
         'NEXORA_GUARD_REJECTED' if guarded and name != 'provider-removed' else 'NEXORA_RUNTIME_REJECTED')
@@ -40,7 +41,9 @@ for name, expected_hash in evidence['artifacts'].items():
     if hashlib.sha256(pulled.read_bytes()).hexdigest() != expected_hash:
         raise SystemExit('Installed APK hash differs from verified final APK')
     adb('logcat', '-c')
-    adb('shell', 'am', 'start', '-W', '-n', 'dev.nexora.runtime/.MainActivity', check=positive)
+    # A deliberately rejected startup never completes ActivityManager's -W wait.
+    # The functional/security marker below remains mandatory for every case.
+    adb('shell', 'am', 'start', '-n', 'dev.nexora.runtime/.MainActivity', check=positive)
     for _ in range(40):
         log = adb('logcat', '-d', '-s', 'NexoraRuntime:I', 'NexoraGuard:I', '*:S')
         if 'UNEXPECTED_FAILURE' in log:
