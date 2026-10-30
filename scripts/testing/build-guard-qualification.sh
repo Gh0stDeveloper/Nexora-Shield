@@ -19,17 +19,19 @@ PY
     prepare "$guard_directory/baseline-unsigned.apk" "$guard_directory/runtime.nshield-private" \
     "$guard_directory/root.key" dev.nexora.runtime o1-functional \
     'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum' \
-    'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' \
+    'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' --asset assets/secret-data.bin \
     --guard-key "$guard_directory/guard-signing.key" --signer-sha "$guard_directory/signer.sha256" --rasp "$guard_mode"
   CARGO_TARGET_DIR=target/o1-android-runtime bash scripts/build-runtime-native.sh "$guard_directory/runtime.nshield-private" "$guard_directory/jniLibs"
   cargo run --locked --quiet -p nexora-shield-core --example stage_android_runtime -- \
     stage "$guard_directory/baseline-unsigned.apk" "$guard_directory/runtime-unsigned.apk" \
     "$guard_directory/root.key" dev.nexora.runtime o1-functional \
     'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum' \
-    'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' \
+    'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' --asset assets/secret-data.bin \
     --guard-key "$guard_directory/guard-signing.key" --signer-sha "$guard_directory/signer.sha256" --rasp "$guard_mode" \
     --tools build/tools/smali --java "$(command -v java)" --native "$guard_directory/jniLibs"
   python scripts/testing/runtime-plan-test.py "$guard_directory" \
+    --example target/debug/examples/stage_android_runtime --tools build/tools/smali --java "$(command -v java)"
+  python scripts/testing/runtime-asset-plan-test.py "$guard_directory" \
     --example target/debug/examples/stage_android_runtime --tools build/tools/smali --java "$(command -v java)"
   cargo build --locked --quiet -p nexora-shield-core --example verify_runtime_guard
   python scripts/testing/qualify-runtime-apk.py "$guard_directory" --build-tools "$guard_tools"

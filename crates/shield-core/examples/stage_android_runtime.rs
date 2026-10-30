@@ -61,7 +61,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let plan = context.prepare_android_runtime(&root, BuildIdentity::new(&args[4], &args[5])?);
     drop(root);
-    let (plan, index) = bind_guard(plan?, &args, index)?;
+    let mut plan = plan?;
+    let mut assets = Vec::new();
+    while args.get(index).map(String::as_str) == Some("--asset") {
+        assets.push(args.get(index + 1).ok_or("asset path required")?.clone());
+        index += 2;
+    }
+    if !assets.is_empty() {
+        plan = plan.with_protected_assets(&assets)?;
+    }
+    let (plan, index) = bind_guard(plan, &args, index)?;
     if args[0] == "prepare" {
         if index != args.len() {
             return Err("prepare does not accept execution options".into());
@@ -88,6 +97,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Protected strings: {}", evidence.protected_strings);
         println!("Protected constants: {}", evidence.protected_constants);
         println!("Virtualized methods: {}", evidence.virtualized_methods);
+        println!("Protected resources: {}", evidence.protected_resources);
+        println!("Rewritten asset calls: {}", evidence.asset_calls);
         println!("Runtime fingerprint: {}", evidence.runtime_fingerprint);
     } else {
         return Err("unknown operation".into());

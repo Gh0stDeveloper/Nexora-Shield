@@ -207,6 +207,24 @@ pub(crate) fn helper(fingerprint: &str) -> String {
     return-void
 .end method
 
+.method public static openAsset(Landroid/content/res/AssetManager;Ljava/lang/String;)Ljava/io/InputStream;
+    .registers 3
+    const/4 v0, 0x2
+    invoke-static {{p0, p1, v0}}, Ldev/nexora/shield/NativeShield;->nOpenAsset(Landroid/content/res/AssetManager;Ljava/lang/String;I)Ljava/io/InputStream;
+    move-result-object v0
+    return-object v0
+.end method
+
+.method public static openAsset(Landroid/content/res/AssetManager;Ljava/lang/String;I)Ljava/io/InputStream;
+    .registers 3
+    invoke-static {{p0, p1, p2}}, Ldev/nexora/shield/NativeShield;->nOpenAsset(Landroid/content/res/AssetManager;Ljava/lang/String;I)Ljava/io/InputStream;
+    move-result-object p0
+    return-object p0
+.end method
+
+.method private static native nOpenAsset(Landroid/content/res/AssetManager;Ljava/lang/String;I)Ljava/io/InputStream;
+.end method
+
 .method private static native nBind(Ljava/lang/String;)V
 .end method
 

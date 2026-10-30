@@ -2,6 +2,9 @@
 
 Status: **partial Android integration; O.1 OPEN; stable v1.0.0 NO-GO**.
 
+The [raw asset runtime increment](PHASE-O1-ASSET-RUNTIME.md) supersedes the
+missing raw-asset loader finding below for its explicitly eligible API-28+ path.
+
 The starting branch HEAD was verified through the Ghost Developer connection as
 `2c30738de23c152cdf7759744a1264d190dfb770` before these edits. The preceding
 [signed guard/RASP increment](PHASE-O1-GUARD-RUNTIME.md) remains in effect.

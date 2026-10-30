@@ -177,9 +177,26 @@ activity=source/'MainActivity.smali'
 body=activity.read_text().replace('    const-string v0, "NEXORA_RUNTIME_OK"', ''.join(checks)+'    const-string v0, "NEXORA_RUNTIME_OK"')
 activity.write_text(body)
 
+asset_payload=b'Nexora private asset v1\x00\xff'+bytes(range(256))*20
+asset_cases=[('secret-data.bin',asset_payload),('guard-probe.bin',b'nexora integrity resource fixture v1')]
+asset_calls=[]
+for name,data in asset_cases:
+    expected=base64.b64encode(hashlib.sha256(data).digest()).decode()
+    for mode in [0,1]:
+        asset_calls.append(f'''    invoke-virtual {{p0}}, Landroid/app/Activity;->getAssets()Landroid/content/res/AssetManager;
+    move-result-object v0
+    const-string v1, "{name}"
+    const-string v2, "{expected}"
+    const/4 v3, 0x{mode:x}
+    invoke-static {{v0, v1, v2, v3}}, Ldev/nexora/runtime/QA;->assertAsset(Landroid/content/res/AssetManager;Ljava/lang/String;Ljava/lang/String;I)V
+''')
+activity.write_text(activity.read_text().replace('    const-string v0, "NEXORA_RUNTIME_OK"',''.join(asset_calls)+'    const-string v0, "NEXORA_RUNTIME_OK"'))
+with (source/'QA.smali').open('a') as out:
+    out.write((Path(__file__).with_name('runtime-asset-qa.smali')).read_text())
+
 manifest = args.output / 'AndroidManifest.xml'
 manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.nexora.runtime">
-<uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35"/>
+<uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35"/>
 <application android:label="Nexora Runtime QA" android:hasCode="true" android:extractNativeLibs="true">
 <activity android:name=".MainActivity" android:exported="true"><intent-filter>
 <action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/>
@@ -190,7 +207,7 @@ subprocess.run([args.java, '-cp', classpath, 'com.android.tools.smali.smali.Main
 with zipfile.ZipFile(args.output/'resources.apk') as original, zipfile.ZipFile(args.output/'baseline-unsigned.apk', 'w') as output:
     for entry in original.infolist(): output.writestr(entry, original.read(entry))
     output.writestr('classes.dex', (args.output/'classes.dex').read_bytes())
-    output.writestr('assets/guard-probe.bin', b'nexora integrity resource fixture v1')
+    for name,data in asset_cases: output.writestr('assets/'+name,data)
 fd = os.open(args.output/'root.key', os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
 with os.fdopen(fd, 'wb') as handle: handle.write(os.urandom(32))
 print('Installable runtime fixture built; private root not printed')

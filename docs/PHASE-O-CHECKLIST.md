@@ -18,7 +18,8 @@ The checklist is intentionally strict. A checked implementation item is not enou
 The [signed startup graph/RASP slice](PHASE-O1-GUARD-RUNTIME.md) remains a
 qualification path; it does not complete the public production integrations.
 The [constant runtime increment](PHASE-O1-CONSTANT-RUNTIME.md) adds eligible
-primitive getters and retains these closure boundaries.
+primitive getters; the [raw asset runtime](PHASE-O1-ASSET-RUNTIME.md) adds
+bounded eligible asset access. These increments retain the closure boundaries.
 
 Current implementation/evidence boundaries: [O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md).
 The [eligible Android runtime slice](PHASE-O1-RUNTIME.md) adds actual JNI/VM

@@ -118,3 +118,47 @@ fn runtime_constant_engine_preserves_integer_and_float_bits_and_rejects_tamper(
     assert!(runtime.constant_bits(0).is_err());
     Ok(())
 }
+
+#[test]
+fn runtime_assets_bind_actual_bundle_path_build_and_slot() -> Result<(), Box<dyn std::error::Error>>
+{
+    let mut image = RuntimeImage::new(
+        &[31; 32],
+        BuildIdentity::new("dev.nexora.assets", "build-a")?,
+    )?;
+    let data = b"asset-private-\0\xff-payload".to_vec();
+    let bundle = image.protect_resource(256, "assets/data.bin", data.clone())?;
+    assert!(!bundle.windows(data.len()).any(|w| w == data));
+    assert_eq!(image.resource_slot("assets/data.bin")?, Some(256));
+    assert_eq!(image.resource_slot("assets/other.bin")?, None);
+    assert_eq!(image.decrypt_resource(256, &bundle)?.as_slice(), data);
+    assert!(image
+        .protect_resource(257, "assets/data.bin", data.clone())
+        .is_err());
+    assert!(image
+        .protect_resource(257, "resources.arsc", data.clone())
+        .is_err());
+    assert!(image
+        .protect_resource(257, "assets/../bad", data.clone())
+        .is_err());
+    let mut corrupt = bundle.clone();
+    let last = corrupt.len() - 1;
+    corrupt[last] ^= 1;
+    assert!(image.decrypt_resource(256, &corrupt).is_err());
+    assert!(image.decrypt_resource(0, &bundle).is_err());
+    let other = image.protect_resource(257, "assets/other.bin", data)?;
+    assert!(image.decrypt_resource(256, &other).is_err());
+    let mut wrong_build = image.clone();
+    wrong_build.build_id = "wrong-build".into();
+    assert!(wrong_build.decrypt_resource(256, &bundle).is_err());
+    let mut wrong_key = image.clone();
+    wrong_key.key_share_b[0] ^= 1;
+    assert!(wrong_key.decrypt_resource(256, &bundle).is_err());
+    let empty = image.protect_resource(258, "assets/empty.bin", Vec::new())?;
+    assert_eq!(image.decrypt_resource(258, &empty)?.as_slice(), b"");
+    assert!(image
+        .protect_resource(259, "assets/oversized.bin", vec![1; 1024 * 1024 + 1])
+        .is_err());
+    image.authenticate()?;
+    Ok(())
+}

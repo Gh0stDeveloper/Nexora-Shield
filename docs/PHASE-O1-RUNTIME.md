@@ -2,6 +2,9 @@
 
 Status: **OPEN — partial integration, production graph incomplete; NO-GO**.
 
+The [raw asset runtime increment](PHASE-O1-ASSET-RUNTIME.md) supersedes the
+missing raw-asset loader finding below for its explicitly eligible API-28+ path.
+
 The [encrypted constant runtime increment](PHASE-O1-CONSTANT-RUNTIME.md) adds
 eligible primitive literal getters; its evidence and limits supersede the
 constant-specific missing-integration findings below.

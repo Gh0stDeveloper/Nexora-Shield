@@ -22,6 +22,7 @@ pub enum RuntimeEntryKind {
     String,
     IntVm,
     Constant,
+    Resource,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +126,71 @@ impl RuntimeImage {
             .map_err(|_| RuntimeError("invalid runtime identity"))?;
         KeySchedule::new(root.as_ref(), identity)
             .map_err(|_| RuntimeError("runtime key derivation failed"))
+    }
+
+    pub fn protect_resource(&mut self, slot: u32, path: &str, bytes: Vec<u8>) -> Result<Vec<u8>> {
+        use nexora_shield_crypto::{build_resource_bundle, ResourceInput, ResourceSelector};
+        let input = ResourceInput::new(path, bytes);
+        if !path.starts_with("assets/") || input.bytes.len() > 1024 * 1024 {
+            return Err(RuntimeError(
+                "resource is outside the bounded asset contract",
+            ));
+        }
+        let bundle =
+            build_resource_bundle(&self.schedule()?, &ResourceSelector::default(), &[input])
+                .map_err(|_| RuntimeError("resource encryption failed"))?;
+        if bundle.records.len() != 1 || bundle.records[0].path != path {
+            return Err(RuntimeError("resource selection was not applied"));
+        }
+        if self.resource_slot(path)?.is_some() {
+            return Err(RuntimeError("duplicate protected resource"));
+        }
+        let metadata = ResourceMetadata {
+            path: path.into(),
+            digest: sha256(&bundle.bytes),
+        };
+        let encoded = Zeroizing::new(
+            serde_json::to_vec(&metadata)
+                .map_err(|_| RuntimeError("resource binding encoding failed"))?,
+        );
+        self.insert(slot, RuntimeEntryKind::Resource, &encoded)?;
+        Ok(bundle.bytes)
+    }
+
+    fn resource_metadata(&self, slot: u32) -> Result<ResourceMetadata> {
+        let bytes = self.decrypt(slot, RuntimeEntryKind::Resource)?;
+        serde_json::from_slice(bytes.as_slice())
+            .map_err(|_| RuntimeError("invalid resource binding"))
+    }
+
+    pub fn resource_slot(&self, path: &str) -> Result<Option<u32>> {
+        // An empty image is allowed only while the first resource is being planned.
+        let mut found = None;
+        for entry in self
+            .entries
+            .iter()
+            .filter(|e| e.kind == RuntimeEntryKind::Resource)
+        {
+            if self.resource_metadata(entry.slot)?.path == path
+                && found.replace(entry.slot).is_some()
+            {
+                return Err(RuntimeError("ambiguous resource binding"));
+            }
+        }
+        Ok(found)
+    }
+
+    pub fn decrypt_resource(&self, slot: u32, bytes: &[u8]) -> Result<SensitiveBytes> {
+        let metadata = self.resource_metadata(slot)?;
+        if bytes.len() > 1024 * 1024 + 4096 || sha256(bytes) != metadata.digest {
+            return Err(RuntimeError("resource artifact binding failed"));
+        }
+        let bundle = nexora_shield_crypto::ResourceBundle::parse(bytes)
+            .map_err(|_| RuntimeError("invalid resource bundle"))?;
+        bundle
+            .decrypt(&self.schedule()?, &metadata.path)
+            .map(SensitiveBytes::new)
+            .map_err(|_| RuntimeError("resource authentication failed"))
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -356,7 +422,14 @@ fn container_kind(kind: RuntimeEntryKind) -> ContainerKind {
         RuntimeEntryKind::String => ContainerKind::String,
         RuntimeEntryKind::IntVm => ContainerKind::Generic,
         RuntimeEntryKind::Constant => ContainerKind::Constant,
+        RuntimeEntryKind::Resource => ContainerKind::Resource,
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct ResourceMetadata {
+    path: String,
+    digest: [u8; 32],
 }
 fn logical_id(kind: RuntimeEntryKind, slot: u32) -> String {
     format!("runtime/{kind:?}/{slot}")

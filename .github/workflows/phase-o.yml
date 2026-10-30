@@ -60,7 +60,7 @@ jobs:
             prepare build/o1-runtime/baseline-unsigned.apk build/o1-runtime/host-runtime.nshield-private \
             build/o1-runtime/root.key dev.nexora.runtime o1-functional \
             'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum' \
-            'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant'
+            'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' --asset assets/secret-data.bin
       - name: Execute real JNI entry points and authenticated tamper rejection on JVM
         run: |
           NEXORA_RUNTIME_IMAGE="$(realpath build/o1-runtime/host-runtime.nshield-private)" \

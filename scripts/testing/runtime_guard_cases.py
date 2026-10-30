@@ -31,6 +31,10 @@ def build_cases(root, staged, image):
         resource = bytearray(source.read('assets/guard-probe.bin'))
         resource[0] ^= 1
         variant('resource-tampered', {'assets/guard-probe.bin': resource})
+        if any(entry['kind']=='Resource' for entry in image['entries']):
+            encrypted=bytearray(source.read('assets/secret-data.bin'))
+            encrypted[-1]^=1
+            variant('encrypted-asset-tampered', {'assets/secret-data.bin':encrypted})
         dex = bytearray(source.read('classes.dex'))
         before, after = b'preserved public constant', b'preserved public constanU'
         if dex.count(before) != 1:

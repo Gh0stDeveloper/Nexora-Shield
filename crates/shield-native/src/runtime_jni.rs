@@ -1,5 +1,7 @@
 //! JNI owns Android references; all cryptography and VM execution stay in safe Rust.
 use crate::{RuntimeError, RuntimeImage};
+#[path = "runtime_assets_jni.rs"]
+mod assets;
 #[path = "runtime_guard_jni.rs"]
 mod guard;
 use jni::{

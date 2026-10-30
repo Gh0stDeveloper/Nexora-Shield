@@ -2,6 +2,8 @@
 //! The complete protection graph remains fail-closed; this is not a production release.
 
 pub use crate::runtime_smali::SmaliTools;
+#[path = "runtime_assets.rs"]
+mod assets;
 #[path = "runtime_constants.rs"]
 mod constants;
 #[path = "android_guard.rs"]
@@ -45,6 +47,8 @@ pub struct AndroidRuntimePlan {
     bindings: Vec<MethodBinding>,
     image: RuntimeImage,
     guard: Option<guard::GuardBuild>,
+    assets: BTreeMap<String, Vec<u8>>,
+    asset_calls: usize,
 }
 impl fmt::Debug for AndroidRuntimePlan {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -62,6 +66,8 @@ pub struct RuntimeStageEvidence {
     pub runtime_fingerprint: String,
     pub protected_strings: usize,
     pub protected_constants: usize,
+    pub protected_resources: usize,
+    pub asset_calls: usize,
     pub virtualized_methods: usize,
     pub dex_units: usize,
     pub native_sha256: BTreeMap<String, String>,
@@ -170,6 +176,8 @@ impl ProductionBuildContext {
             bindings,
             image,
             guard: None,
+            assets: BTreeMap::new(),
+            asset_calls: 0,
         })
     }
 }
@@ -267,6 +275,12 @@ impl AndroidRuntimePlan {
                 runtime_smali::ordered_methods(&runtime_smali::provider()),
             )?;
         }
+        if !self.assets.is_empty() {
+            fs::write(
+                helper.join("dev/nexora/shield/ResourceInputStream.smali"),
+                runtime_smali::ordered_methods(include_str!("runtime_resource_stream.smali")),
+            )?;
+        }
         let helper_bytes = assemble_verified(
             tools,
             &helper,
@@ -279,6 +293,7 @@ impl AndroidRuntimePlan {
             ),
             helper_bytes,
         );
+        replacements.extend(self.assets.clone());
         self.add_guard(&mut replacements, &mut additions)?;
         self.context.verify_input_unchanged()?;
         rewrite_with_additions(&source, destination, &replacements, &additions)?;
@@ -304,6 +319,8 @@ impl AndroidRuntimePlan {
                     .iter()
                     .filter(|b| b.kind == RuntimeEntryKind::IntVm)
                     .count(),
+                protected_resources: self.assets.len(),
+                asset_calls: self.asset_calls,
                 dex_units: self.units.len() + 1,
                 native_sha256: native_hashes,
             })
@@ -318,14 +335,26 @@ impl AndroidRuntimePlan {
 impl AndroidRuntimePlan {
     fn rewrite_units(&self, tools: &SmaliTools, root: &Path) -> Result<RuntimePayloads> {
         let mut replacements = BTreeMap::new();
+        let mut asset_calls = 0;
         for (index, unit) in self.units.iter().enumerate() {
-            if !self.bindings.iter().any(|b| b.dex == index) {
+            if self.assets.is_empty() && !self.bindings.iter().any(|b| b.dex == index) {
                 continue;
             }
             let input = root.join(format!("unit-{index}.dex"));
             fs::write(&input, &unit.bytes)?;
             let smali = root.join(format!("smali-{index}"));
             tools.disassemble(&input, &smali)?;
+            if !self.assets.is_empty() {
+                for (relative, _) in runtime_smali::source_inventory(&smali)? {
+                    let path = smali.join(relative);
+                    let source =
+                        String::from_utf8(runtime_smali::read_bounded(&path, 64 * 1024 * 1024)?)
+                            .map_err(|_| refuse("invalid asset Smali text"))?;
+                    let (rewritten, count) = assets::rewrite(&source)?;
+                    asset_calls += count;
+                    fs::write(path, rewritten)?;
+                }
+            }
             for binding in self.bindings.iter().filter(|b| b.dex == index) {
                 let path = smali.join(format!(
                     "{}.smali",
@@ -347,6 +376,9 @@ impl AndroidRuntimePlan {
                     RuntimeEntryKind::IntVm => {
                         runtime_smali::int_stub(binding.slot, binding.arguments)
                     }
+                    RuntimeEntryKind::Resource => {
+                        return Err(refuse("resource metadata is not a method binding"))
+                    }
                 };
                 fs::write(
                     path,
@@ -360,6 +392,9 @@ impl AndroidRuntimePlan {
                 &root.join(format!("verify-{index}")),
             )?;
             replacements.insert(unit.name.clone(), built);
+        }
+        if asset_calls != self.asset_calls {
+            return Err(refuse("asset call rewrite differs from frozen DEX plan"));
         }
         Ok(replacements)
     }
