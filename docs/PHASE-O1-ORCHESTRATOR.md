@@ -2,6 +2,11 @@
 
 Status: **IN PROGRESS — NOT PRODUCTION READY**. Stable `v1.0.0` remains **NO-GO**.
 
+The [delivered diversity/private reproduction increment](PHASE-O1-DIVERSITY-RUNTIME.md)
+adds executing DEX/data/VM/native/graph variation to the eligible runtime path.
+Its scope supersedes historical missing-diversity findings below; full production
+closure remains outstanding.
+
 The next functional slice replaces eligible APK string/int method bodies with
 real JNI calls to a build-bound encrypted data/VM runtime. Its eligibility,
 local verification and Android qualification gate are described in

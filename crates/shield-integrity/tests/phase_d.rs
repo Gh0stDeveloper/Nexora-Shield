@@ -471,3 +471,138 @@ fn certificate_digest_parser_rejects_non_ascii_without_panicking() {
     use std::str::FromStr;
     assert!(Sha256Digest::from_str(&format!("a{}b", "é".repeat(31))).is_err());
 }
+
+#[test]
+fn diversified_certificate_tree_preserves_every_binding_and_executes_all_checks() {
+    use nexora_shield_integrity::{
+        IntegrityEdge, IntegrityGraph, IntegrityNodeKind, ManifestTopology,
+    };
+    let (manifest, evidence) = manifest_and_evidence();
+    let certificate = manifest
+        .graph
+        .nodes
+        .iter()
+        .find(|n| n.kind == IntegrityNodeKind::Certificate)
+        .expect("certificate")
+        .id;
+    let package = manifest
+        .graph
+        .nodes
+        .iter()
+        .find(|n| n.kind == IntegrityNodeKind::Package)
+        .expect("package")
+        .id;
+    let mut parent = package;
+    let mut edges = vec![IntegrityEdge {
+        from: certificate,
+        to: package,
+    }];
+    for node in manifest
+        .graph
+        .nodes
+        .iter()
+        .filter(|n| n.id != certificate && n.id != package)
+    {
+        edges.push(IntegrityEdge {
+            from: parent,
+            to: node.id,
+        });
+        parent = node.id;
+    }
+    let graph =
+        IntegrityGraph::from_parts(manifest.graph.nodes.clone(), edges).expect("tree graph");
+    let tree = manifest
+        .clone()
+        .with_certificate_tree(
+            graph,
+            &DistributionConfig::new(b"private tree distribution", 5, 2),
+        )
+        .expect("tree manifest");
+    assert_eq!(tree.topology, ManifestTopology::CertificateTree);
+    assert_ne!(tree.graph, manifest.graph);
+    assert_eq!(tree.graph.nodes, manifest.graph.nodes);
+    assert!(
+        IntegrityVerifier::verify_all(&tree, &evidence)
+            .expect("all checks")
+            .clean
+    );
+    let encoded = tree.to_json_pretty().expect("serialize tree");
+    assert_eq!(
+        IntegrityManifest::from_json(&encoded).expect("parse tree"),
+        tree
+    );
+    let mut canonical_label = tree.clone();
+    canonical_label.topology = ManifestTopology::Canonical;
+    assert!(canonical_label.validate().is_err());
+    let legacy = manifest.to_json_pretty().expect("canonical JSON");
+    assert!(!legacy.contains("\"topology\""));
+    assert_eq!(
+        IntegrityManifest::from_json(&legacy).expect("legacy parse"),
+        manifest
+    );
+    let mut forged_binding = tree.clone();
+    forged_binding.graph.nodes[0].expected = Sha256Digest::of(b"forged binding");
+    forged_binding.graph = IntegrityGraph::from_parts(
+        forged_binding.graph.nodes.clone(),
+        forged_binding.graph.edges.clone(),
+    )
+    .expect("well formed forged graph");
+    assert!(forged_binding.validate().is_err());
+    let mut corrupted = evidence;
+    corrupted
+        .artifacts
+        .values_mut()
+        .next()
+        .expect("artifact")
+        .push(1);
+    assert!(
+        !IntegrityVerifier::verify_all(&tree, &corrupted)
+            .expect("actual tamper")
+            .clean
+    );
+}
+
+#[test]
+fn integrity_graph_rejects_disconnected_cycles_and_tree_rejects_certificate_branching() {
+    use nexora_shield_integrity::{IntegrityEdge, IntegrityGraph, IntegrityNodeKind};
+    let (manifest, _) = manifest_and_evidence();
+    let nodes = &manifest.graph.nodes;
+    let cert = nodes
+        .iter()
+        .find(|n| n.kind == IntegrityNodeKind::Certificate)
+        .expect("certificate")
+        .id;
+    let package = nodes
+        .iter()
+        .find(|n| n.kind == IntegrityNodeKind::Package)
+        .expect("package")
+        .id;
+    let others = nodes
+        .iter()
+        .filter(|n| n.id != cert && n.id != package)
+        .map(|n| n.id)
+        .collect::<Vec<_>>();
+    let (a, b) = (others[0], others[1]);
+    let mut edges = manifest.graph.edges.clone();
+    edges.retain(|e| e.to != a && e.to != b);
+    edges.extend([
+        IntegrityEdge { from: a, to: b },
+        IntegrityEdge { from: b, to: a },
+    ]);
+    assert!(IntegrityGraph::from_parts(nodes.clone(), edges).is_err());
+    let mut edges = manifest.graph.edges.clone();
+    edges.retain(|e| e.to != a);
+    edges.push(IntegrityEdge { from: cert, to: a });
+    let branching = IntegrityGraph::from_parts(nodes.clone(), edges).expect("valid rooted DAG");
+    assert!(manifest
+        .clone()
+        .with_certificate_tree(branching, &DistributionConfig::new(b"seed", 5, 2))
+        .is_err());
+    let mut edges = manifest.graph.edges.clone();
+    edges.push(IntegrityEdge { from: cert, to: a });
+    let dag = IntegrityGraph::from_parts(nodes.clone(), edges)
+        .expect("multiple parent DAG remains supported");
+    assert!(manifest
+        .with_certificate_tree(dag, &DistributionConfig::new(b"seed", 5, 2))
+        .is_err());
+}

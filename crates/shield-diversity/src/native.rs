@@ -3,6 +3,7 @@ use crate::seed::{DiversityDomain, SeedDeriver};
 use nexora_shield_native::GeneratedNativeData;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NativeConstantVariant {
@@ -15,8 +16,8 @@ impl NativeConstantVariant {
         if build_id.trim().is_empty() {
             return Err(DiversityError::EmptyBuildId);
         }
-        let key = seed.domain_key(DiversityDomain::NativeConstants)?;
-        let generated = GeneratedNativeData::derive(build_id, &key)
+        let key = Zeroizing::new(seed.domain_key(DiversityDomain::NativeConstants)?);
+        let generated = GeneratedNativeData::derive(build_id, key.as_ref())
             .map_err(|error| DiversityError::Native(error.to_string()))?;
 
         let mut hasher = Sha256::new();

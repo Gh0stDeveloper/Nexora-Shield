@@ -304,8 +304,28 @@ impl RuntimeImage {
             .map_err(|_| RuntimeError("VM opcode derivation failed"))?;
         let allocation = OpcodeAllocation::derive(&self.build_id, &seed)
             .map_err(|_| RuntimeError("VM opcode allocation failed"))?;
+        self.protect_int_vm_with_allocation(slot, method, allocation)
+    }
+
+    pub fn protect_int_vm_with_allocation(
+        &mut self,
+        slot: u32,
+        method: &VmMethod,
+        allocation: OpcodeAllocation,
+    ) -> Result<()> {
+        validate_int_method(method)?;
+        if allocation.build_id() != self.build_id {
+            return Err(RuntimeError("VM allocation belongs to another build"));
+        }
         let stream = OpcodeStream::encode(&method.instructions, &allocation)
             .map_err(|_| RuntimeError("VM encoding failed"))?;
+        if stream
+            .decode(&allocation)
+            .map_err(|_| RuntimeError("VM map failed round-trip verification"))?
+            != method.instructions
+        {
+            return Err(RuntimeError("VM map changed instruction semantics"));
+        }
         let program = IntProgram {
             method_idx: method.method_idx,
             register_count: method.register_count,
@@ -470,3 +490,7 @@ fn validate_int_method(method: &VmMethod) -> Result<()> {
     }
     Ok(())
 }
+
+#[path = "runtime_vm_evidence.rs"]
+mod vm_evidence;
+pub use vm_evidence::RuntimeVmEvidence;

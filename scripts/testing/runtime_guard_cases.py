@@ -49,5 +49,7 @@ def build_cases(root, staged, image):
         variant('native-tampered', {name: native})
         variant('provider-removed', {'AndroidManifest.xml': original_manifest})
         variant('extra-entry', additions={'assets/unplanned.bin': b'unplanned'})
+        foreign=(root/'unique/jniLibs/x86_64/libnexora_shield_native.so').read_bytes()
+        variant('foreign-native', {'lib/x86_64/libnexora_shield_native.so':foreign})
         cases['resigned'] = staged
     return cases

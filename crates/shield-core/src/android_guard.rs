@@ -34,9 +34,14 @@ impl AndroidRuntimePlan {
         for (index, byte) in client_root.iter_mut().enumerate() {
             *byte = self.image.key_share_a[index] ^ self.image.key_share_b[index];
         }
-        if signing_key == client_root.as_ref() {
+        if signing_key == client_root.as_ref()
+            || self
+                .diversity
+                .as_ref()
+                .is_some_and(|d| d.matches_private_material(signing_key))
+        {
             return Err(refuse(
-                "APK graph signing key must be independent of client key material",
+                "APK graph signing key must be independent of client and private diversity key material",
             ));
         }
         let key = SigningKey::from_bytes(signing_key);
@@ -123,7 +128,7 @@ impl AndroidRuntimePlan {
                 .map(|(name, bytes)| (name.clone(), bytes.clone())),
         );
         let (dex_files, artifacts) = guard_artifacts(payloads)?;
-        let manifest = IntegrityManifest::build(IntegrityManifestInput {
+        let mut manifest = IntegrityManifest::build(IntegrityManifestInput {
             build_id: self.image.build_id.clone(),
             certificate: CertificateBinding::new(
                 CertificatePolicy::ExactCurrent,
@@ -146,6 +151,9 @@ impl AndroidRuntimePlan {
             response_policy: ResponsePolicy::default(),
         })
         .map_err(|_| refuse("APK graph generation failed"))?;
+        if let Some(diversity) = &self.diversity {
+            manifest = diversity.integrity_manifest(manifest)?;
+        }
         let payload = ApkGuardPayload {
             schema: 1,
             manifest,

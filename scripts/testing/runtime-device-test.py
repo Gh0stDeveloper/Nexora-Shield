@@ -23,10 +23,16 @@ root = args.directory
 evidence = json.loads((root/'evidence.json').read_text())
 results = {}
 guarded = evidence.get('guard_selected', False)
+if 'diversity' in evidence:
+    required={'baseline','runtime','tampered','guard-signature','guard-missing','resource-tampered','encrypted-asset-tampered','dex-tampered','native-tampered','provider-removed','extra-entry','foreign-native','resigned','diversified'}
+    if set(evidence['artifacts'])!=required or not guarded:raise SystemExit('Incomplete guarded diversity APK matrix')
+    proof=evidence['diversity']
+    if not all(proof.get(k) is True for k in ['runtime_image_reproduced','native_libraries_reproduced','rebuilt_apk_reproduced','signed_apk_reproduced','private_inputs_absent','vm_cfg_materialized','vm_opcode_map_varied','final_native_payloads_verified']):raise SystemExit('Incomplete final-payload diversity/reproduction proof')
+    if proof['signed_apk_sha256']!=evidence['artifacts']['runtime'] or proof['unique_signed_apk_sha256']!=evidence['artifacts']['diversified']:raise SystemExit('Diversity proof is not bound to installed APK hashes')
 adb('uninstall', 'dev.nexora.runtime', check=False)
 for name, expected_hash in evidence['artifacts'].items():
     print(f'Android runtime case: {name}', flush=True)
-    positive = name in ('baseline', 'runtime')
+    positive = name in ('baseline', 'runtime','diversified')
     expected = 'NEXORA_RUNTIME_OK' if positive else (
         'NEXORA_GUARD_REJECTED' if guarded and name != 'provider-removed' else 'NEXORA_RUNTIME_REJECTED')
     apk = root/f'{name}.apk'
@@ -65,7 +71,7 @@ for name, expected_hash in evidence['artifacts'].items():
     else:
         raise SystemExit(f'Android execution evidence timed out: {name}')
     results[name] = {'installed_sha256': expected_hash, 'result': expected}
-    if name == 'runtime' and guarded:
+    if name in ['runtime','diversified'] and guarded:
         match = re.search(r'NEXORA_GUARD_STATUS=(\d+)', log)
         if match is None:
             raise SystemExit('Protected app did not execute its startup guard')
@@ -76,10 +82,11 @@ for name, expected_hash in evidence['artifacts'].items():
             raise SystemExit('Installed RASP policy differs from selected mode')
         if status & 0xffff == 0:
             raise SystemExit('Emulator RASP observation was not collected')
-        evidence['rasp_runtime'] = {'mode': evidence['rasp_mode'],
+        evidence['rasp_runtime' if name=='runtime' else 'diversified_rasp_runtime'] = {'mode': evidence['rasp_mode'],
             'signals_evaluated': status & 0xffff, 'risk_level': (status >> 16) & 0xff,
             'normal_execution_allowed': True}
 evidence['android_execution'] = 'passed'
+if 'diversity' in evidence:evidence['diversity']['android_execution']='passed'
 evidence['device'] = {
     'sdk': adb('shell', 'getprop', 'ro.build.version.sdk').strip(),
     'abi': adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),

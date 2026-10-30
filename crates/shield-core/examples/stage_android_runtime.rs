@@ -15,20 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = PathBuf::from(&args[1]);
     let target = PathBuf::from(&args[2]);
     let key_path = PathBuf::from(&args[3]);
-    let metadata = fs::symlink_metadata(&key_path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o077 != 0 {
-            return Err("runtime root file must be private".into());
-        }
-    }
-    if !metadata.file_type().is_file() || metadata.len() != 32 {
-        return Err("runtime root must be a regular 32-byte file".into());
-    }
-    let mut root = zeroize::Zeroizing::new([0; 32]);
-    let mut file = std::fs::File::open(key_path)?;
-    std::io::Read::read_exact(&mut file, root.as_mut())?;
+    let root = read_root(&key_path)?;
     let mut selection = DexSelectorPolicy::default();
     let mut index = 6;
     while index < args.len() && !args[index].starts_with("--") {
@@ -59,7 +46,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &ProductionOverrides::default(),
         &selection,
     )?;
-    let plan = context.prepare_android_runtime(&root, BuildIdentity::new(&args[4], &args[5])?);
+    let identity = BuildIdentity::new(&args[4], &args[5])?;
+    let plan = if args.get(index).map(String::as_str) == Some("--diversity-file") {
+        let path = PathBuf::from(
+            args.get(index + 1)
+                .ok_or("private diversity file required")?,
+        );
+        let (seed, mode) = read_diversity(&path)?;
+        index += 2;
+        context.prepare_android_runtime_with_diversity(&root, identity, &seed, mode)
+    } else {
+        context.prepare_android_runtime(&root, identity)
+    };
     drop(root);
     let mut plan = plan?;
     let mut assets = Vec::new();
@@ -71,6 +69,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         plan = plan.with_protected_assets(&assets)?;
     }
     let (plan, index) = bind_guard(plan, &args, index)?;
+    if let Some(info) = plan.diversity_evidence() {
+        println!("Diversity mode: {}", info.mode);
+        println!("Diversity commitment: {}", info.context_commitment);
+        println!(
+            "Diversified VM/CFG methods: {}/{}",
+            info.vm_methods, info.cfg_methods
+        );
+    }
     if args[0] == "prepare" {
         if index != args.len() {
             return Err("prepare does not accept execution options".into());
@@ -91,15 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PathBuf::from(&extra[1]).as_path(),
         )?;
         let evidence = plan.stage(&target, &tools, PathBuf::from(&extra[5]).as_path())?;
-        println!("FUNCTIONAL RUNTIME STAGING; production_protected=false");
-        println!("Input SHA-256: {}", evidence.input_sha256);
-        println!("Output SHA-256: {}", evidence.output_sha256);
-        println!("Protected strings: {}", evidence.protected_strings);
-        println!("Protected constants: {}", evidence.protected_constants);
-        println!("Virtualized methods: {}", evidence.virtualized_methods);
-        println!("Protected resources: {}", evidence.protected_resources);
-        println!("Rewritten asset calls: {}", evidence.asset_calls);
-        println!("Runtime fingerprint: {}", evidence.runtime_fingerprint);
+        print_stage(&evidence);
     } else {
         return Err("unknown operation".into());
     }
@@ -143,4 +141,80 @@ fn bind_guard(
         index += 6;
     }
     Ok((plan, index))
+}
+
+fn read_diversity(
+    path: &std::path::Path,
+) -> Result<
+    (
+        nexora_shield_diversity::PrivateBuildSeed,
+        nexora_shield_diversity::DiversityMode,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    use nexora_shield_diversity::{DiversityMode, PrivateBuildSeed};
+    if path.extension().and_then(|p| p.to_str()) != Some("nshield-private") {
+        return Err("diversity input requires the ignored .nshield-private suffix".into());
+    }
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.file_type().is_file() || !(40..=295).contains(&metadata.len()) {
+        return Err("invalid private diversity file".into());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o077 != 0 {
+            return Err("diversity file must be private".into());
+        }
+    }
+    let bytes = zeroize::Zeroizing::new(fs::read(path)?);
+    if u64::try_from(bytes.len())? != metadata.len() || &bytes[..6] != b"NSDV1\0" {
+        return Err("invalid private diversity format".into());
+    }
+    let value = std::str::from_utf8(&bytes[39..])?;
+    if value.trim().is_empty() || value.contains('\0') {
+        return Err("invalid diversity mode identifier".into());
+    }
+    let mode = match bytes[6] {
+        0 => DiversityMode::UniqueBuild {
+            nonce: value.into(),
+        },
+        1 => DiversityMode::ReproduciblePrivate {
+            reproduction_id: value.into(),
+        },
+        _ => return Err("unsupported diversity mode".into()),
+    };
+    Ok((PrivateBuildSeed::new(bytes[7..39].to_vec())?, mode))
+}
+
+fn read_root(
+    path: &std::path::Path,
+) -> Result<zeroize::Zeroizing<[u8; 32]>, Box<dyn std::error::Error>> {
+    let metadata = fs::symlink_metadata(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o077 != 0 {
+            return Err("runtime root file must be private".into());
+        }
+    }
+    if !metadata.file_type().is_file() || metadata.len() != 32 {
+        return Err("runtime root must be a regular 32-byte file".into());
+    }
+    let mut root = zeroize::Zeroizing::new([0; 32]);
+    let mut file = std::fs::File::open(path)?;
+    std::io::Read::read_exact(&mut file, root.as_mut())?;
+    Ok(root)
+}
+
+fn print_stage(evidence: &nexora_shield_core::RuntimeStageEvidence) {
+    println!("FUNCTIONAL RUNTIME STAGING; production_protected=false");
+    println!("Input SHA-256: {}", evidence.input_sha256);
+    println!("Output SHA-256: {}", evidence.output_sha256);
+    println!("Protected strings: {}", evidence.protected_strings);
+    println!("Protected constants: {}", evidence.protected_constants);
+    println!("Virtualized methods: {}", evidence.virtualized_methods);
+    println!("Protected resources: {}", evidence.protected_resources);
+    println!("Rewritten asset calls: {}", evidence.asset_calls);
+    println!("Runtime fingerprint: {}", evidence.runtime_fingerprint);
 }

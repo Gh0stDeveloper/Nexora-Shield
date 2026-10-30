@@ -162,3 +162,31 @@ fn runtime_assets_bind_actual_bundle_path_build_and_slot() -> Result<(), Box<dyn
     image.authenticate()?;
     Ok(())
 }
+
+#[test]
+fn explicit_runtime_vm_map_rejects_foreign_build_and_broken_decode_without_partial_entries(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use nexora_shield_vm::OpcodeAllocation;
+    let mut image = image()?;
+    let foreign = OpcodeAllocation::derive("foreign-build", &[63; 32])?;
+    assert!(image
+        .protect_int_vm_with_allocation(0, &method(), foreign)
+        .is_err());
+    assert_eq!(image.entries.len(), 0);
+    let allocation = OpcodeAllocation::derive(&image.build_id, &[63; 32])?;
+    let mut encoded = serde_json::to_value(&allocation)?;
+    encoded["decode"] = serde_json::json!({});
+    let malformed = serde_json::from_value(encoded)?;
+    assert!(image
+        .protect_int_vm_with_allocation(0, &method(), malformed)
+        .is_err());
+    assert_eq!(image.entries.len(), 0);
+    image.protect_int_vm_with_allocation(0, &method(), allocation)?;
+    assert_eq!(image.execute_int_vm(0, &[i32::MAX, 1])?, i32::MIN);
+    let stats = image.int_vm_evidence(0)?;
+    assert_eq!(stats.instruction_count, 2);
+    assert_eq!(stats.opcode_map_sha256.len(), 64);
+    assert_eq!(stats.opcode_stream_sha256.len(), 64);
+    assert!(image.int_vm_evidence(99).is_err());
+    Ok(())
+}

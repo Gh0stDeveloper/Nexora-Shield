@@ -34,7 +34,11 @@ digest = base64.b64encode(hashlib.sha256(probe.encode()).digest()).decode()
 
 .method public static sum(II)I
     .registers 3
+    if-lt p0, p1, :reverse
     add-int v0, p0, p1
+    return v0
+    :reverse
+    add-int v0, p1, p0
     return v0
 .end method
 
@@ -194,6 +198,29 @@ activity.write_text(activity.read_text().replace('    const-string v0, "NEXORA_R
 with (source/'QA.smali').open('a') as out:
     out.write((Path(__file__).with_name('runtime-asset-qa.smali')).read_text())
 
+with (source/'QA.smali').open('a') as out:
+    out.write('''
+.method public static assertSum(III)V
+    .registers 4
+    invoke-static {p0,p1}, Ldev/nexora/runtime/Probe;->sum(II)I
+    move-result v0
+    if-eq v0, p2, :ok
+    new-instance v0, Ljava/lang/AssertionError;
+    invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+    throw v0
+    :ok
+    return-void
+.end method
+''')
+checks=[]
+for a,b,expected in [(1,2,3),(-18,9,-9),(-2147483648,-1,2147483647)]:
+    checks.append(f'''    const v0, {a:#x}
+    const v1, {b:#x}
+    const v2, {expected:#x}
+    invoke-static {{v0,v1,v2}}, Ldev/nexora/runtime/QA;->assertSum(III)V
+''')
+activity.write_text(activity.read_text().replace('    const-string v0, "NEXORA_RUNTIME_OK"',''.join(checks)+'    const-string v0, "NEXORA_RUNTIME_OK"'))
+
 manifest = args.output / 'AndroidManifest.xml'
 manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.nexora.runtime">
 <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35"/>
@@ -203,7 +230,7 @@ manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/r
 </intent-filter></activity></application></manifest>''')
 subprocess.run([str(args.aapt2), 'link', '-o', str(args.output / 'resources.apk'), '--manifest', str(manifest), '-I', str(args.android_jar)], check=True)
 classpath = os.pathsep.join(str(p) for p in sorted(args.smali.glob('*.jar')))
-subprocess.run([args.java, '-cp', classpath, 'com.android.tools.smali.smali.Main', 'assemble', str(args.output/'smali'), '--api', '24', '--output', str(args.output/'classes.dex')], check=True)
+subprocess.run([args.java, '-cp', classpath, 'com.android.tools.smali.smali.Main', 'assemble', str(args.output/'smali'), '--jobs', '1', '--api', '24', '--output', str(args.output/'classes.dex')], check=True)
 with zipfile.ZipFile(args.output/'resources.apk') as original, zipfile.ZipFile(args.output/'baseline-unsigned.apk', 'w') as output:
     for entry in original.infolist(): output.writestr(entry, original.read(entry))
     output.writestr('classes.dex', (args.output/'classes.dex').read_bytes())

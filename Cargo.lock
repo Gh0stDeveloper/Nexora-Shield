@@ -356,6 +356,7 @@ dependencies = [
  "ed25519-dalek",
  "nexora-shield-crypto",
  "nexora-shield-dex",
+ "nexora-shield-diversity",
  "nexora-shield-integrity",
  "nexora-shield-native",
  "nexora-shield-package",

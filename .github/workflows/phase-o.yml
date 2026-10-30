@@ -49,6 +49,7 @@ jobs:
             --smali build/tools/smali --aapt2 "$BUILD_TOOLS/aapt2" \
             --android-jar "$SDK_ROOT/platforms/android-35/android.jar"
           python scripts/testing/runtime_signing.py build/o1-runtime
+          python scripts/testing/runtime_diversity.py prepare build/o1-runtime
       - name: Test component contracts before runtime compilation
         run: |
           cargo test --locked -p nexora-shield-native --features android-runtime
@@ -60,7 +61,7 @@ jobs:
             prepare build/o1-runtime/baseline-unsigned.apk build/o1-runtime/host-runtime.nshield-private \
             build/o1-runtime/root.key dev.nexora.runtime o1-functional \
             'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum' \
-            'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' --asset assets/secret-data.bin
+            'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' --diversity-file build/o1-runtime/diversity.nshield-private --asset assets/secret-data.bin
       - name: Execute real JNI entry points and authenticated tamper rejection on JVM
         run: |
           NEXORA_RUNTIME_IMAGE="$(realpath build/o1-runtime/host-runtime.nshield-private)" \

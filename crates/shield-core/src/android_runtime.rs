@@ -6,6 +6,9 @@ pub use crate::runtime_smali::SmaliTools;
 mod assets;
 #[path = "runtime_constants.rs"]
 mod constants;
+#[path = "runtime_diversity.rs"]
+mod diversity;
+pub use diversity::RuntimeDiversityEvidence;
 #[path = "android_guard.rs"]
 mod guard;
 use crate::{
@@ -49,6 +52,7 @@ pub struct AndroidRuntimePlan {
     guard: Option<guard::GuardBuild>,
     assets: BTreeMap<String, Vec<u8>>,
     asset_calls: usize,
+    diversity: Option<diversity::RuntimeDiversity>,
 }
 impl fmt::Debug for AndroidRuntimePlan {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -71,6 +75,7 @@ pub struct RuntimeStageEvidence {
     pub virtualized_methods: usize,
     pub dex_units: usize,
     pub native_sha256: BTreeMap<String, String>,
+    pub diversity: Option<RuntimeDiversityEvidence>,
 }
 
 impl ProductionBuildContext {
@@ -80,7 +85,36 @@ impl ProductionBuildContext {
     pub fn prepare_android_runtime(
         &self,
         root: &[u8; 32],
+        identity: BuildIdentity,
+    ) -> Result<AndroidRuntimePlan> {
+        self.prepare_runtime(root, identity, None)
+    }
+
+    /// Freeze private diversity allocation before deriving data/runtime artifacts.
+    /// # Errors
+    /// Preserves all runtime eligibility, frozen selector and input validation requirements.
+    pub fn prepare_android_runtime_with_diversity(
+        &self,
+        root: &[u8; 32],
+        identity: BuildIdentity,
+        seed: &nexora_shield_diversity::PrivateBuildSeed,
+        mode: nexora_shield_diversity::DiversityMode,
+    ) -> Result<AndroidRuntimePlan> {
+        if seed.matches_material(root) {
+            return Err(refuse(
+                "private diversity seed must be independent of client key material",
+            ));
+        }
+        let diversity =
+            diversity::RuntimeDiversity::derive(seed, &identity, self.input_sha256(), mode)?;
+        self.prepare_runtime(root, identity, Some(diversity))
+    }
+
+    fn prepare_runtime(
+        &self,
+        root: &[u8; 32],
         mut identity: BuildIdentity,
+        mut diversity: Option<diversity::RuntimeDiversity>,
     ) -> Result<AndroidRuntimePlan> {
         if self.selectors().includes().is_empty() {
             return Err(refuse("Android runtime requires explicit method selection"));
@@ -101,28 +135,9 @@ impl ProductionBuildContext {
                 "runtime identity differs from the compiled Android package",
             ));
         }
-        let mut units = Vec::new();
-        let mut total = 0usize;
-        for entry in &directory.entries {
-            if canonical_dex_index(&entry.name).is_none() {
-                continue;
-            }
-            let bytes = read_decoded_entry(&path, entry, MAX_DEX_BYTES)?;
-            total = total
-                .checked_add(bytes.len())
-                .ok_or_else(|| refuse("DEX budget overflow"))?;
-            if total > MAX_TOTAL_DEX_BYTES {
-                return Err(refuse("DEX memory budget exceeded"));
-            }
-            units.push(DexInput {
-                name: entry.name.clone(),
-                bytes,
-            });
-        }
-        let set =
-            MultiDexSet::parse(units.clone()).map_err(|_| refuse("invalid runtime DEX input"))?;
+        let set = read_runtime_dex(&path, &directory)?;
         // Freeze canonical ordering, independent of ZIP central-directory order.
-        units = set
+        let units = set
             .units
             .iter()
             .map(|u| DexInput {
@@ -132,8 +147,14 @@ impl ProductionBuildContext {
             .collect();
         let selection = crate::dex_preflight::resolve_effective_selection(&set, self.selectors())?;
         identity.build_id = format!("{}:{}", identity.build_id, self.input_sha256());
+        if let Some(diversity) = &diversity {
+            diversity.bind_identity(&mut identity);
+        }
         let mut image = RuntimeImage::new(root, identity)
             .map_err(|_| refuse("invalid runtime build identity"))?;
+        if let Some(diversity) = &diversity {
+            diversity.bind_native_constants(root, &mut image)?;
+        }
         let mut bindings = Vec::new();
         for (dex_index, (unit, selected)) in set.units.iter().zip(selection).enumerate() {
             if !selected.classes.is_empty() || !selected.fields.is_empty() {
@@ -148,13 +169,16 @@ impl ProductionBuildContext {
                 return Err(refuse("runtime helper namespace already referenced"));
             }
             for index in selected.methods {
-                let slot = u32::try_from(bindings.len())
+                let ordinal = u32::try_from(bindings.len())
                     .map_err(|_| refuse("too many runtime methods"))?;
-                if slot >= 256 {
+                if ordinal >= 256 {
                     return Err(refuse("runtime method selection exceeds 256 methods"));
                 }
+                let slot = diversity
+                    .as_ref()
+                    .map_or(Ok(ordinal), |d| d.slot(ordinal, false))?;
                 let (owner, signature, arguments) = binding_identity(&unit.dex, index)?;
-                let kind = protect_binding(&unit.dex, index, slot, &mut image)?;
+                let kind = protect_binding(&unit.dex, index, slot, &mut image, diversity.as_mut())?;
                 bindings.push(MethodBinding {
                     dex: dex_index,
                     owner,
@@ -178,11 +202,18 @@ impl ProductionBuildContext {
             guard: None,
             assets: BTreeMap::new(),
             asset_calls: 0,
+            diversity,
         })
     }
 }
 
 impl AndroidRuntimePlan {
+    #[must_use]
+    pub fn diversity_evidence(&self) -> Option<RuntimeDiversityEvidence> {
+        self.diversity
+            .as_ref()
+            .map(diversity::RuntimeDiversity::evidence)
+    }
     /// Build-private configuration contains client key shares; never publish it.
     /// # Errors
     /// Requires a new Unix 0600 file with the ignored `.nshield-private` suffix.
@@ -323,6 +354,10 @@ impl AndroidRuntimePlan {
                 asset_calls: self.asset_calls,
                 dex_units: self.units.len() + 1,
                 native_sha256: native_hashes,
+                diversity: self
+                    .diversity
+                    .as_ref()
+                    .map(diversity::RuntimeDiversity::evidence),
             })
         })();
         if verified.is_err() {
@@ -471,6 +506,31 @@ fn verify_runtime_output(
     Ok(())
 }
 
+fn read_runtime_dex(
+    path: &Path,
+    directory: &nexora_shield_package::ZipDirectory,
+) -> Result<MultiDexSet> {
+    let mut units = Vec::new();
+    let mut total = 0usize;
+    for entry in &directory.entries {
+        if canonical_dex_index(&entry.name).is_none() {
+            continue;
+        }
+        let bytes = read_decoded_entry(path, entry, MAX_DEX_BYTES)?;
+        total = total
+            .checked_add(bytes.len())
+            .ok_or_else(|| refuse("DEX budget overflow"))?;
+        if total > MAX_TOTAL_DEX_BYTES {
+            return Err(refuse("DEX memory budget exceeded"));
+        }
+        units.push(DexInput {
+            name: entry.name.clone(),
+            bytes,
+        });
+    }
+    MultiDexSet::parse(units).map_err(|_| refuse("invalid runtime DEX input"))
+}
+
 fn binding_identity(
     dex: &nexora_shield_dex::DexFile,
     index: u32,
@@ -525,6 +585,7 @@ fn protect_binding(
     index: u32,
     slot: u32,
     image: &mut RuntimeImage,
+    diversity: Option<&mut diversity::RuntimeDiversity>,
 ) -> Result<RuntimeEntryKind> {
     if let Some(kind) = constants::protect_literal(dex, index, slot, image)? {
         return Ok(kind);
@@ -578,9 +639,14 @@ fn protect_binding(
             },
         )
         .map_err(|_| refuse("selected integer method is not VM eligible"))?;
-        image.protect_int_vm(slot, &lowered).map_err(|_| {
-            refuse("selected VM method exceeds the supported pure integer contract")
-        })?;
+        if let Some(diversity) = diversity {
+            let (owner, signature, _) = binding_identity(dex, index)?;
+            diversity.protect_vm(slot, &format!("{owner}#{signature}"), &lowered, image)?;
+        } else {
+            image.protect_int_vm(slot, &lowered).map_err(|_| {
+                refuse("selected VM method exceeds the supported pure integer contract")
+            })?;
+        }
         RuntimeEntryKind::IntVm
     } else {
         return Err(refuse(

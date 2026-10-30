@@ -53,6 +53,10 @@ impl AndroidRuntimePlan {
             let bytes = read_decoded_entry(&self.snapshot.path(), entry, 1024 * 1024)?;
             let slot =
                 u32::try_from(256 + self.assets.len()).map_err(|_| refuse("too many assets"))?;
+            let slot = self
+                .diversity
+                .as_ref()
+                .map_or(Ok(slot), |d| d.slot(slot - 256, true))?;
             let encrypted = self
                 .image
                 .protect_resource(slot, path, bytes)

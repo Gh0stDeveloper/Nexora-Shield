@@ -34,5 +34,6 @@ pub use hardening::{HardeningFeature, HardeningProfile, PRODUCTION_LINKER_ARGS};
 pub use integrity::{NativeDigest, NativeIntegrityCheck, NativeRegion};
 pub use runtime::{NativeRuntimeDescriptor, NATIVE_RUNTIME_API_VERSION};
 pub use runtime_guard::RuntimeApkGuard;
+pub use runtime_image::RuntimeVmEvidence;
 pub use runtime_image::{RuntimeEntry, RuntimeEntryKind, RuntimeError, RuntimeImage};
 pub use symbols::{ExportPolicy, REQUIRED_JNI_EXPORTS, RUNTIME_JNI_EXPORTS};

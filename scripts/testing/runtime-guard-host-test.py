@@ -17,10 +17,10 @@ for name, expected_hash in evidence['artifacts'].items():
     if hashlib.sha256(apk.read_bytes()).hexdigest() != expected_hash:
         raise SystemExit('Host verification requires exact final APK bytes')
     certificate = root/'alternate-signer/signer.sha256' if name == 'resigned' else root/'signer.sha256'
-    result = subprocess.run([str(args.verifier), str(apk), str(root/'runtime.nshield-private'),
+    result = subprocess.run([str(args.verifier), str(apk), str(root/('unique/runtime.nshield-private' if name=='diversified' else 'runtime.nshield-private')),
         str(certificate), 'dev.nexora.runtime', '0'], capture_output=True, text=True, timeout=120)
-    if (result.returncode == 0) != (name == 'runtime'):
+    if (result.returncode == 0) != (name in ['runtime','diversified']):
         raise SystemExit(f'Wrong host integrity outcome: {name}')
-    if name == 'runtime' and 'RASP_POLICY_VERIFIED' not in result.stdout:
+    if name in ['runtime','diversified'] and 'RASP_POLICY_VERIFIED' not in result.stdout:
         raise SystemExit('Bound RASP response contract was not exercised')
 print(f'HOST_APK_GRAPH_MATRIX_OK: artifacts={len(evidence["artifacts"])}')

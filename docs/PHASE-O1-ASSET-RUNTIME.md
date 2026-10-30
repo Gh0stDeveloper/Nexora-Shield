@@ -2,6 +2,11 @@
 
 Status: **partial Android integration; O.1 OPEN; stable v1.0.0 NO-GO**.
 
+The [delivered diversity/private reproduction increment](PHASE-O1-DIVERSITY-RUNTIME.md)
+adds executing DEX/data/VM/native/graph variation to the eligible runtime path.
+Its scope supersedes historical missing-diversity findings below; full production
+closure remains outstanding.
+
 The Ghost Developer branch HEAD was verified as
 `a7ee49ddb5239a56c4db7c860fb9b6d4d8f58a0e` before this increment.
 It extends the [constant runtime](PHASE-O1-CONSTANT-RUNTIME.md) and the

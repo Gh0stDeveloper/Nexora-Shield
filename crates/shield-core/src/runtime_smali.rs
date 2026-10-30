@@ -73,6 +73,8 @@ impl SmaliTools {
             &[
                 "assemble".as_ref(),
                 directory.as_os_str(),
+                "--jobs".as_ref(),
+                "1".as_ref(),
                 "--api".as_ref(),
                 "24".as_ref(),
                 "--output".as_ref(),
