@@ -2,7 +2,7 @@
 //!
 //! Native libraries cannot yet be rewritten or authorized by this reader.
 //! A valid ELF dynamic symbol table is evidence, not proof that the binary
-//! never calls FindClass, RegisterNatives, or other dynamic JNI APIs.
+//! never calls `FindClass`, `RegisterNatives`, or other dynamic JNI APIs.
 use crate::{CoreError, Result};
 
 const MAX_SECTIONS: usize = 4096;
@@ -94,11 +94,17 @@ fn section(data: &[u8], at: usize, wide: bool) -> Result<Section> {
 }
 
 fn machine_for_apk_path(path: &str) -> Result<u16> {
+    if !std::path::Path::new(path)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("so"))
+    {
+        return Err(reject("unsupported native library extension"));
+    }
     match path.split('/').collect::<Vec<_>>().as_slice() {
-        ["lib", "arm64-v8a", file] if file.ends_with(".so") => Ok(183),
-        ["lib", "armeabi-v7a", file] if file.ends_with(".so") => Ok(40),
-        ["lib", "x86_64", file] if file.ends_with(".so") => Ok(62),
-        ["lib", "x86", file] if file.ends_with(".so") => Ok(3),
+        ["lib", "arm64-v8a", _] => Ok(183),
+        ["lib", "armeabi-v7a", _] => Ok(40),
+        ["lib", "x86_64", _] => Ok(62),
+        ["lib", "x86", _] => Ok(3),
         _ => Err(reject("unsupported native library ABI or archive path")),
     }
 }
