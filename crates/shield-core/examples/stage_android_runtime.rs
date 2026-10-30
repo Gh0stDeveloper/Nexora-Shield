@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let plan = context.prepare_android_runtime(&root, BuildIdentity::new(&args[4], &args[5])?);
     drop(root);
-    let plan = plan?;
+    let (plan, index) = bind_guard(plan?, &args, index)?;
     if args[0] == "prepare" {
         if index != args.len() {
             return Err("prepare does not accept execution options".into());
@@ -92,4 +92,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unknown operation".into());
     }
     Ok(())
+}
+
+fn bind_guard(
+    mut plan: nexora_shield_core::AndroidRuntimePlan,
+    args: &[String],
+    mut index: usize,
+) -> Result<(nexora_shield_core::AndroidRuntimePlan, usize), Box<dyn std::error::Error>> {
+    if args.get(index).map(String::as_str) == Some("--guard-key") {
+        if args.get(index + 2).map(String::as_str) != Some("--signer-sha")
+            || args.get(index + 4).map(String::as_str) != Some("--rasp")
+            || args.len() < index + 6
+        {
+            return Err("guard requires --guard-key <private-file> --signer-sha <digest-file> --rasp <enforce|report-only>".into());
+        }
+        let key_path = PathBuf::from(&args[index + 1]);
+        let metadata = fs::symlink_metadata(&key_path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if metadata.permissions().mode() & 0o077 != 0 {
+                return Err("APK guard signing key must be private".into());
+            }
+        }
+        if !metadata.is_file() || metadata.len() != 32 {
+            return Err("APK guard signing key must be a regular 32-byte file".into());
+        }
+        let mut key = zeroize::Zeroizing::new([0u8; 32]);
+        std::io::Read::read_exact(&mut fs::File::open(key_path)?, key.as_mut())?;
+        let certificate = fs::read_to_string(&args[index + 3])?
+            .parse::<nexora_shield_integrity::Sha256Digest>()?;
+        let mode = match args[index + 5].as_str() {
+            "enforce" => nexora_shield_rasp::PolicyMode::Enforce,
+            "report-only" => nexora_shield_rasp::PolicyMode::ReportOnly,
+            _ => return Err("invalid RASP mode".into()),
+        };
+        plan = plan.bind_apk_guard(&key, certificate.0, mode)?;
+        index += 6;
+    }
+    Ok((plan, index))
 }

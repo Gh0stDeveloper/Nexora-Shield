@@ -2,6 +2,10 @@
 
 Status: **OPEN — partial integration, production graph incomplete; NO-GO**.
 
+The subsequent [signed startup graph and Android RASP increment](PHASE-O1-GUARD-RUNTIME.md)
+supersedes the "no new integration" findings below for its explicitly eligible
+APK slice. The complete production executor and parent O.1 remain open.
+
 ## Scope and decisions
 
 This increment starts from verified branch HEAD

@@ -2,6 +2,11 @@
 
 Status: **OPEN — O.1 NOT CLOSED; stable v1.0.0 NO-GO**.
 
+Current startup graph/RASP implementation and remaining limitations are recorded
+in [O.1 signed guard runtime](PHASE-O1-GUARD-RUNTIME.md). Historical missing-loader
+findings below do not describe that new eligible slice; full production closure
+requirements remain outstanding.
+
 This audit records the previous frozen-selection/input-snapshot increment.
 The subsequent runtime increment verified upstream HEAD
 `f4409a62d7234b785886feaa505048ee5cdcf270` before edits and is recorded in

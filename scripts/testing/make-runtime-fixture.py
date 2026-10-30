@@ -121,6 +121,7 @@ subprocess.run([args.java, '-cp', classpath, 'com.android.tools.smali.smali.Main
 with zipfile.ZipFile(args.output/'resources.apk') as original, zipfile.ZipFile(args.output/'baseline-unsigned.apk', 'w') as output:
     for entry in original.infolist(): output.writestr(entry, original.read(entry))
     output.writestr('classes.dex', (args.output/'classes.dex').read_bytes())
+    output.writestr('assets/guard-probe.bin', b'nexora integrity resource fixture v1')
 fd = os.open(args.output/'root.key', os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
 with os.fdopen(fd, 'wb') as handle: handle.write(os.urandom(32))
 print('Installable runtime fixture built; private root not printed')

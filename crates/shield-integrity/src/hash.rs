@@ -47,7 +47,7 @@ impl FromStr for Sha256Digest {
 
     fn from_str(value: &str) -> Result<Self> {
         let value = value.trim();
-        if value.len() != SHA256_LEN * 2 {
+        if value.len() != SHA256_LEN * 2 || !value.is_ascii() {
             return Err(IntegrityError::InvalidDigest(format!(
                 "SHA-256 must contain {} hexadecimal characters",
                 SHA256_LEN * 2

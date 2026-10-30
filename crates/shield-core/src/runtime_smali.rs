@@ -1,5 +1,8 @@
 use crate::{CoreError, Result};
 use nexora_shield_package::sha256_file;
+pub(crate) fn provider() -> String {
+    include_str!("runtime_provider.smali").to_owned()
+}
 use std::fmt::Write as _;
 use std::{
     collections::BTreeMap,
@@ -175,6 +178,8 @@ pub(crate) fn helper(fingerprint: &str) -> String {
         r#".class public final Ldev/nexora/shield/NativeShield;
 .super Ljava/lang/Object;
 
+.field public static guardStatus:I
+
 .method static constructor <clinit>()V
     .registers 1
     const-string v0, "nexora_shield_native"
@@ -191,6 +196,24 @@ pub(crate) fn helper(fingerprint: &str) -> String {
 .end method
 
 .method private static native nString(I)Ljava/lang/String;
+.end method
+
+.method private static native nStart(Landroid/content/Context;)I
+.end method
+
+.method public static install(Landroid/content/Context;)V
+    .registers 3
+    invoke-static {{p0}}, Ldev/nexora/shield/NativeShield;->nStart(Landroid/content/Context;)I
+    move-result v0
+    sput v0, Ldev/nexora/shield/NativeShield;->guardStatus:I
+    invoke-static {{v0}}, Ljava/lang/Integer;->toString(I)Ljava/lang/String;
+    move-result-object v0
+    const-string v1, "NEXORA_GUARD_STATUS="
+    invoke-virtual {{v1, v0}}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object v0
+    const-string v1, "NexoraGuard"
+    invoke-static {{v1, v0}}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+    return-void
 .end method
 
 .method public static run(I[I)I
@@ -267,6 +290,39 @@ pub(crate) fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
         return Err(refuse("runtime input exceeds budget"));
     }
     Ok(bytes)
+}
+
+pub(crate) fn ordered_methods(source: &str) -> String {
+    let mut prefix = String::new();
+    let mut methods = Vec::new();
+    let mut block = String::new();
+    for line in source.lines() {
+        if line.starts_with(".method ") || !block.is_empty() {
+            block.push_str(line);
+            block.push('\n');
+            if line == ".end method" {
+                methods.push(std::mem::take(&mut block));
+            }
+        } else if methods.is_empty() {
+            prefix.push_str(line);
+            prefix.push('\n');
+        }
+    }
+    methods.sort_by_key(|method| {
+        let header = method.lines().next().unwrap_or("");
+        let direct = header.contains(" static ")
+            || header.contains(" private ")
+            || header.contains(" constructor ");
+        (
+            !direct,
+            header.split_whitespace().last().unwrap_or("").to_owned(),
+        )
+    });
+    for method in methods {
+        prefix.push_str(&method);
+        prefix.push('\n');
+    }
+    prefix
 }
 
 #[cfg(test)]

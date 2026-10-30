@@ -429,3 +429,45 @@ fn put_u16(output: &mut [u8], offset: usize, value: u16) {
 fn put_u32(output: &mut [u8], offset: usize, value: u32) {
     output[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
 }
+
+#[test]
+fn detached_apk_guard_authenticates_graph_and_policy_with_independent_public_key() {
+    use ed25519_dalek::SigningKey;
+    use nexora_shield_integrity::{ApkGuardPayload, SignedApkGuard, APK_GUARD_PATH};
+    let (manifest, _) = manifest_and_evidence();
+    let payload = ApkGuardPayload {
+        schema: 1,
+        manifest,
+        runtime_policy: b"bound policy".to_vec(),
+    };
+    let key = SigningKey::from_bytes(&[71; 32]);
+    let signed = SignedApkGuard::sign(&payload, &key).expect("sign");
+    assert_eq!(
+        SignedApkGuard::verify(&signed, &key.verifying_key().to_bytes()).expect("verify"),
+        payload
+    );
+    let wrong = SigningKey::from_bytes(&[72; 32]);
+    assert!(SignedApkGuard::verify(&signed, &wrong.verifying_key().to_bytes()).is_err());
+    let mut json: serde_json::Value = serde_json::from_slice(&signed).expect("json");
+    let byte = json["payload"][10].as_u64().expect("byte");
+    json["payload"][10] = serde_json::json!(byte ^ 1);
+    assert!(SignedApkGuard::verify(
+        &serde_json::to_vec(&json).expect("encode"),
+        &key.verifying_key().to_bytes()
+    )
+    .is_err());
+    let mut circular = payload;
+    circular.manifest.artifacts[0].path = APK_GUARD_PATH.into();
+    assert!(SignedApkGuard::sign(&circular, &key).is_err());
+    assert!(SignedApkGuard::verify(
+        &vec![0; 4 * 1024 * 1024 + 1],
+        &key.verifying_key().to_bytes()
+    )
+    .is_err());
+}
+
+#[test]
+fn certificate_digest_parser_rejects_non_ascii_without_panicking() {
+    use std::str::FromStr;
+    assert!(Sha256Digest::from_str(&format!("a{}b", "é".repeat(31))).is_err());
+}

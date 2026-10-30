@@ -48,6 +48,7 @@ jobs:
           python scripts/testing/make-runtime-fixture.py build/o1-runtime \
             --smali build/tools/smali --aapt2 "$BUILD_TOOLS/aapt2" \
             --android-jar "$SDK_ROOT/platforms/android-35/android.jar"
+          python scripts/testing/runtime_signing.py build/o1-runtime
       - name: Test component contracts before runtime compilation
         run: |
           cargo test --locked -p nexora-shield-native --features android-runtime
@@ -56,36 +57,30 @@ jobs:
       - name: Freeze selected methods and build-private runtime image
         run: |
           cargo run --locked -p nexora-shield-core --example stage_android_runtime -- \
-            prepare build/o1-runtime/baseline-unsigned.apk build/o1-runtime/runtime.nshield-private \
+            prepare build/o1-runtime/baseline-unsigned.apk build/o1-runtime/host-runtime.nshield-private \
             build/o1-runtime/root.key dev.nexora.runtime o1-functional \
             'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum'
       - name: Execute real JNI entry points and authenticated tamper rejection on JVM
         run: |
-          NEXORA_RUNTIME_IMAGE="$(realpath build/o1-runtime/runtime.nshield-private)" \
+          NEXORA_RUNTIME_IMAGE="$(realpath build/o1-runtime/host-runtime.nshield-private)" \
             cargo build --locked --release -p nexora-shield-native --features android-runtime
-          python scripts/testing/runtime-jni-test.py --image build/o1-runtime/runtime.nshield-private \
+          python scripts/testing/runtime-jni-test.py --image build/o1-runtime/host-runtime.nshield-private \
             --library target/release/libnexora_shield_native.so
-      - name: Build arm64 and x86_64 runtimes and replace actual APK method bodies
-        run: |
-          bash scripts/build-runtime-native.sh build/o1-runtime/runtime.nshield-private build/o1-runtime/jniLibs
-          cargo run --locked -p nexora-shield-core --example stage_android_runtime -- \
-            stage build/o1-runtime/baseline-unsigned.apk build/o1-runtime/runtime-unsigned.apk \
-            build/o1-runtime/root.key dev.nexora.runtime o1-functional \
-            'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum' \
-            --tools build/tools/smali --java "$(command -v java)" --native build/o1-runtime/jniLibs
-          python scripts/testing/runtime-plan-test.py build/o1-runtime \
-            --example target/debug/examples/stage_android_runtime --tools build/tools/smali --java "$(command -v java)"
-      - name: Align sign and verify exact final APK bytes without publishing private material
-        run: python scripts/testing/qualify-runtime-apk.py build/o1-runtime --build-tools "$BUILD_TOOLS"
+      - name: Build and verify signed startup graphs with report-only and enforcing RASP
+        run: bash scripts/testing/build-guard-qualification.sh build/o1-runtime
       - name: Boot representative Android device
         run: bash scripts/testing/start-runtime-emulator.sh
       - name: Install pull hash launch compare behavior and reject native tamper
-        run: python scripts/testing/runtime-device-test.py build/o1-runtime --adb "$SDK_ROOT/platform-tools/adb"
+        run: |
+          python scripts/testing/runtime-device-test.py build/o1-runtime --adb "$SDK_ROOT/platform-tools/adb"
+          python scripts/testing/runtime-device-test.py build/o1-runtime-enforce --adb "$SDK_ROOT/platform-tools/adb"
       - name: Publish only final-artifact verification evidence
         uses: actions/upload-artifact@v4
         with:
           name: o1-android-runtime-evidence
-          path: build/o1-runtime/evidence.json
+          path: |
+            build/o1-runtime/evidence.json
+            build/o1-runtime-enforce/evidence.json
           if-no-files-found: error
       - name: Stop Android emulator
         if: always()

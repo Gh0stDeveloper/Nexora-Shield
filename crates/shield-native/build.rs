@@ -34,7 +34,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         value["schema"],
         value["application_id"],
         value["build_id"],
-        value["entries"]
+        value["entries"],
+        value["guard_key"],
+        value["guard_binding"]
     ]))?;
     let digest = Sha256::digest(&canonical);
     let mut fingerprint = String::with_capacity(64);
@@ -49,6 +51,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing runtime build identity")?;
     let left = array(&value["key_share_a"])?;
     let right = array(&value["key_share_b"])?;
+    let guard_key = optional_array(&value["guard_key"])?;
+    let guard_binding = optional_array(&value["guard_binding"])?;
     if left.len() != 32 || right.len() != 32 {
         return Err("invalid runtime key shares".into());
     }
@@ -83,7 +87,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
         write!(source,"crate::RuntimeEntry {{ slot: {slot}, kind: crate::RuntimeEntryKind::{kind}, ciphertext: std::hint::black_box(include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{binary_name}\"))).to_vec() }},")?;
     }
-    source.push_str("] }) }\n");
+    writeln!(
+        source,
+        "] , guard_key: {guard_key}, guard_binding: {guard_binding} }}) }}"
+    )?;
     fs::write(output, source)?;
     Ok(())
 }
@@ -103,4 +110,15 @@ fn array(value: &Value) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
                 })
                 .collect()
         })
+}
+
+fn optional_array(value: &Value) -> Result<String, Box<dyn std::error::Error>> {
+    if value.is_null() {
+        return Ok("None".to_owned());
+    }
+    let bytes = array(value)?;
+    if bytes.len() != 32 {
+        return Err("invalid guard public binding".into());
+    }
+    Ok(format!("Some({bytes:?})"))
 }

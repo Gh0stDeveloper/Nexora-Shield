@@ -15,7 +15,7 @@ p.add_argument('--javac', default='javac')
 p.add_argument('--ecj', type=Path)
 args = p.parse_args()
 image = json.loads(args.image.read_text())
-fingerprint = hashlib.sha256(json.dumps([image['schema'], image['application_id'], image['build_id'], image['entries']], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
+fingerprint = hashlib.sha256(json.dumps([image['schema'], image['application_id'], image['build_id'], image['entries'], image.get('guard_key'), image.get('guard_binding')], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
 string_slot = next(e['slot'] for e in image['entries'] if e['kind']=='String')
 vm_slot = next(e['slot'] for e in image['entries'] if e['kind']=='IntVm')
 with tempfile.TemporaryDirectory(prefix='nexora-jni-') as tmp:

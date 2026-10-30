@@ -1,7 +1,10 @@
 //! Strict, bounded Android `ResXMLTree` reader for O.1.3 name-link auditing.
-//! This does NOT patch compiled XML, string offsets or resource references.
+//! The guard submodule appends one narrowly verified provider; it is not a general resource relinker.
 //! A malformed or unknown chunk fails closed rather than being treated as text.
 use crate::{CoreError, Result};
+#[path = "android_manifest_guard.rs"]
+mod guard;
+pub(crate) use guard::{inject_guard_provider, runtime_manifest_version};
 
 const XML_TREE: u16 = 0x0003;
 const STRING_POOL: u16 = 0x0001;
@@ -923,5 +926,48 @@ mod tests {
             trailing.push(0);
             assert!(inspect_binary_xml(&trailing).is_err());
         }
+    }
+    #[test]
+    fn guard_provider_preserves_original_nodes_and_string_indices() -> super::Result<()> {
+        for utf8 in [true, false] {
+            let original = class_manifest(utf8, false, false);
+            let before = inspect_binary_xml(&original)?;
+            let guarded = super::inject_guard_provider(&original, "com.test.guard")?;
+            let after = inspect_binary_xml(&guarded)?;
+            assert_eq!(&after[..before.len()], before.as_slice());
+            let original_nodes = guard_node_inventory(&original, false)?;
+            assert_eq!(guard_node_inventory(&guarded, true)?, original_nodes);
+            assert!(super::inject_guard_provider(&guarded, "com.test.guard").is_err());
+        }
+        Ok(())
+    }
+
+    fn guard_node_inventory(bytes: &[u8], omit_guard: bool) -> super::Result<Vec<Vec<u8>>> {
+        let strings = inspect_binary_xml(bytes)?;
+        let mut out = Vec::new();
+        let mut offset = 8;
+        while offset < bytes.len() {
+            let item = super::chunk(bytes, offset)?;
+            let injected = matches!(item.kind, super::ELEMENT_START | super::ELEMENT_END)
+                && strings[super::usize32(bytes, offset + 20)?] == "provider";
+            if !(matches!(item.kind, super::STRING_POOL | super::RESOURCE_MAP)
+                || omit_guard && injected)
+            {
+                out.push(bytes[offset..offset + item.size].to_vec());
+            }
+            offset += item.size;
+        }
+        Ok(out)
+    }
+
+    #[test]
+    fn guard_provider_rejects_truncated_manifest_and_namespace_collision() {
+        let original = class_manifest(true, false, true);
+        assert!(super::inject_guard_provider(&original, "com.test.guard").is_err());
+        assert!(
+            super::inject_guard_provider(&original[..original.len() - 1], "com.test.guard")
+                .is_err()
+        );
+        assert!(super::inject_guard_provider(&original, "com.test.A").is_err());
     }
 }

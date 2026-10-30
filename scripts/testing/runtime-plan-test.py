@@ -18,6 +18,12 @@ key = root/'root.key'
 def run(operation, output, application, build, selectors, extra=(), source=base):
     return subprocess.run([str(args.example), operation, str(source), str(output), str(key), application, build, *selectors, *extra], capture_output=True, text=True, timeout=240)
 secret = 'Ldev/nexora/runtime/Probe;#secret'
+if (root/'guard-signing.key').exists():
+    destination=root/'reused-client-key.nshield-private'
+    result=run('prepare',destination,'dev.nexora.runtime','o1-functional',[secret],
+        ['--guard-key',str(key),'--signer-sha',str(root/'signer.sha256'),'--rasp','enforce'])
+    if result.returncode==0 or destination.exists():
+        raise SystemExit('Client root was accepted as APK graph signing key')
 for name, app, selectors in [
     ('wrong-package', 'dev.wrong.package', [secret]),
     ('instance-method', 'dev.nexora.runtime', ['Ldev/nexora/runtime/MainActivity;#onCreate']),

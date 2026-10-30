@@ -2,6 +2,8 @@
 //! The complete protection graph remains fail-closed; this is not a production release.
 
 pub use crate::runtime_smali::SmaliTools;
+#[path = "android_guard.rs"]
+mod guard;
 use crate::{
     input_snapshot::InputSnapshot,
     runtime_smali::{self, refuse, HELPER},
@@ -40,6 +42,7 @@ pub struct AndroidRuntimePlan {
     units: Vec<DexInput>,
     bindings: Vec<MethodBinding>,
     image: RuntimeImage,
+    guard: Option<guard::GuardBuild>,
 }
 impl fmt::Debug for AndroidRuntimePlan {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -163,6 +166,7 @@ impl ProductionBuildContext {
             units,
             bindings,
             image,
+            guard: None,
         })
     }
 }
@@ -247,13 +251,19 @@ impl AndroidRuntimePlan {
         let root = source
             .parent()
             .ok_or_else(|| refuse("invalid runtime workspace"))?;
-        let replacements = self.rewrite_units(tools, root)?;
+        let mut replacements = self.rewrite_units(tools, root)?;
         let helper = root.join("runtime-helper");
         fs::create_dir_all(helper.join("dev/nexora/shield"))?;
         fs::write(
             helper.join("dev/nexora/shield/NativeShield.smali"),
-            runtime_smali::helper(&fingerprint),
+            runtime_smali::ordered_methods(&runtime_smali::helper(&fingerprint)),
         )?;
+        if self.guard.is_some() {
+            fs::write(
+                helper.join("dev/nexora/shield/NexoraProvider.smali"),
+                runtime_smali::ordered_methods(&runtime_smali::provider()),
+            )?;
+        }
         let helper_bytes = assemble_verified(
             tools,
             &helper,
@@ -266,6 +276,7 @@ impl AndroidRuntimePlan {
             ),
             helper_bytes,
         );
+        self.add_guard(&mut replacements, &mut additions)?;
         self.context.verify_input_unchanged()?;
         rewrite_with_additions(&source, destination, &replacements, &additions)?;
         let verified = (|| {

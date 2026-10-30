@@ -38,6 +38,10 @@ pub struct RuntimeImage {
     pub key_share_a: [u8; 32],
     pub key_share_b: [u8; 32],
     pub entries: Vec<RuntimeEntry>,
+    #[serde(default)]
+    pub guard_key: Option<[u8; 32]>,
+    #[serde(default)]
+    pub guard_binding: Option<[u8; 32]>,
 }
 
 impl fmt::Debug for RuntimeImage {
@@ -103,6 +107,8 @@ impl RuntimeImage {
             key_share_a,
             key_share_b,
             entries: Vec::new(),
+            guard_key: None,
+            guard_binding: None,
         })
     }
 
@@ -121,7 +127,11 @@ impl RuntimeImage {
     }
 
     pub fn validate(&self) -> Result<()> {
-        if self.schema != 1 || self.entries.is_empty() || self.entries.len() > MAX_ENTRIES {
+        if self.schema != 1
+            || self.entries.is_empty()
+            || self.entries.len() > MAX_ENTRIES
+            || self.guard_key.is_some() != self.guard_binding.is_some()
+        {
             return Err(RuntimeError("invalid runtime image schema or inventory"));
         }
         let _ = self.schedule()?;
@@ -148,6 +158,8 @@ impl RuntimeImage {
             &self.application_id,
             &self.build_id,
             &self.entries,
+            &self.guard_key,
+            &self.guard_binding,
         ))
         .map_err(|_| RuntimeError("runtime encoding failed"))?;
         let mut encoded = Zeroizing::new(

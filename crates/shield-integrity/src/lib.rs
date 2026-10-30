@@ -20,6 +20,7 @@ mod artifact;
 mod distributed;
 mod error;
 mod graph;
+mod guard;
 mod hash;
 mod identity;
 mod manifest;
@@ -32,6 +33,7 @@ pub use artifact::{normalize_path, ArtifactCheck, ArtifactIntegrity, ArtifactKin
 pub use distributed::{CheckAssignment, DistributionPlan};
 pub use error::{IntegrityError, Result};
 pub use graph::{IntegrityEdge, IntegrityGraph, IntegrityNode, IntegrityNodeKind};
+pub use guard::{ApkGuardPayload, SignedApkGuard, APK_GUARD_PATH, MAX_APK_GUARD_BYTES};
 pub use hash::{hex_lower, Sha256Digest, SHA256_LEN};
 pub use identity::{
     CertificateBinding, CertificateCheck, CertificateObservation, CertificatePolicy,

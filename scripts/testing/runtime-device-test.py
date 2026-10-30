@@ -1,42 +1,77 @@
 #!/usr/bin/env python3
-"""Install/launch exact signed APKs; never infer runtime success from packaging."""
+"""Install and launch exact signed APKs, requiring real runtime security outcomes."""
 import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import time
 
-p=argparse.ArgumentParser()
-p.add_argument('directory',type=Path)
-p.add_argument('--adb',required=True)
-args=p.parse_args()
-def adb(*values,check=True):
-    return subprocess.run([args.adb,*values],check=check,capture_output=True,text=True,timeout=120).stdout
-root=args.directory
-evidence=json.loads((root/'evidence.json').read_text())
-results={}
-for name,expected in [('baseline','NEXORA_RUNTIME_OK'),('runtime','NEXORA_RUNTIME_OK'),('tampered','NEXORA_RUNTIME_REJECTED')]:
-    apk=root/f'{name}.apk'
-    if hashlib.sha256(apk.read_bytes()).hexdigest()!=evidence['artifacts'][name]: raise SystemExit('APK changed after final verification')
-    adb('shell','am','force-stop','dev.nexora.runtime',check=False)
-    adb('install','-r',str(apk))
-    installed=adb('shell','pm','path','dev.nexora.runtime').strip()
-    if not installed.startswith('package:') or '\n' in installed: raise SystemExit('Unexpected installed APK identity')
-    pulled=root/f'{name}-installed.apk'
-    adb('pull',installed.removeprefix('package:'),str(pulled))
-    if hashlib.sha256(pulled.read_bytes()).hexdigest()!=evidence['artifacts'][name]: raise SystemExit('Installed APK hash differs from verified final APK')
-    adb('logcat','-c')
-    adb('shell','am','start','-W','-n','dev.nexora.runtime/.MainActivity')
+p = argparse.ArgumentParser()
+p.add_argument('directory', type=Path)
+p.add_argument('--adb', required=True)
+args = p.parse_args()
+
+def adb(*values, check=True):
+    return subprocess.run([args.adb, *values], check=check, capture_output=True, text=True, timeout=120).stdout
+
+root = args.directory
+evidence = json.loads((root/'evidence.json').read_text())
+results = {}
+guarded = evidence.get('guard_selected', False)
+adb('uninstall', 'dev.nexora.runtime', check=False)
+for name, expected_hash in evidence['artifacts'].items():
+    positive = name in ('baseline', 'runtime')
+    expected = 'NEXORA_RUNTIME_OK' if positive else (
+        'NEXORA_GUARD_REJECTED' if guarded and name != 'provider-removed' else 'NEXORA_RUNTIME_REJECTED')
+    apk = root/f'{name}.apk'
+    if hashlib.sha256(apk.read_bytes()).hexdigest() != expected_hash:
+        raise SystemExit('APK changed after final verification')
+    adb('shell', 'am', 'force-stop', 'dev.nexora.runtime', check=False)
+    if name == 'resigned':
+        adb('uninstall', 'dev.nexora.runtime')
+    adb('install', '-r', str(apk))
+    installed = adb('shell', 'pm', 'path', 'dev.nexora.runtime').strip()
+    if not installed.startswith('package:') or '\n' in installed:
+        raise SystemExit('Unexpected installed APK identity')
+    pulled = root/f'{name}-installed.apk'
+    adb('pull', installed.removeprefix('package:'), str(pulled))
+    if hashlib.sha256(pulled.read_bytes()).hexdigest() != expected_hash:
+        raise SystemExit('Installed APK hash differs from verified final APK')
+    adb('logcat', '-c')
+    adb('shell', 'am', 'start', '-W', '-n', 'dev.nexora.runtime/.MainActivity', check=positive)
     for _ in range(40):
-        log=adb('logcat','-d','-s','NexoraRuntime:I','*:S')
-        if expected in log: break
-        if 'NEXORA_RUNTIME_' in log: raise SystemExit('Android runtime returned the wrong functional outcome')
+        log = adb('logcat', '-d', '-s', 'NexoraRuntime:I', 'NexoraGuard:I', '*:S')
+        if 'UNEXPECTED_FAILURE' in log:
+            raise SystemExit(f'Unrelated Android runtime failure: {name}')
+        if expected in log:
+            break
+        if 'NEXORA_RUNTIME_OK' in log or 'NEXORA_RUNTIME_REJECTED' in log or 'NEXORA_GUARD_REJECTED' in log:
+            raise SystemExit(f'Android returned the wrong security outcome: {name}')
         time.sleep(0.5)
-    else: raise SystemExit('Android runtime execution evidence timed out')
-    results[name]={'installed_sha256':evidence['artifacts'][name],'result':expected}
-evidence['android_execution']='passed'
-evidence['device']={'sdk':adb('shell','getprop','ro.build.version.sdk').strip(),'abi':adb('shell','getprop','ro.product.cpu.abi').strip(),'fingerprint':adb('shell','getprop','ro.build.fingerprint').strip()}
-evidence['execution_results']=results
-(root/'evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
-print('ANDROID_RUNTIME_OK: baseline/protected equivalence and authenticated native tamper refusal')
+    else:
+        raise SystemExit(f'Android execution evidence timed out: {name}')
+    results[name] = {'installed_sha256': expected_hash, 'result': expected}
+    if name == 'runtime' and guarded:
+        match = re.search(r'NEXORA_GUARD_STATUS=(\d+)', log)
+        if match is None:
+            raise SystemExit('Protected app did not execute its startup guard')
+        status = int(match.group(1))
+        if not status & (1 << 25):
+            raise SystemExit('Installed app did not verify its integrity graph')
+        if bool(status & (1 << 24)) != (evidence['rasp_mode'] == 'report_only'):
+            raise SystemExit('Installed RASP policy differs from selected mode')
+        if status & 0xffff == 0:
+            raise SystemExit('Emulator RASP observation was not collected')
+        evidence['rasp_runtime'] = {'mode': evidence['rasp_mode'],
+            'signals_evaluated': status & 0xffff, 'risk_level': (status >> 16) & 0xff,
+            'normal_execution_allowed': True}
+evidence['android_execution'] = 'passed'
+evidence['device'] = {
+    'sdk': adb('shell', 'getprop', 'ro.build.version.sdk').strip(),
+    'abi': adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
+    'fingerprint': adb('shell', 'getprop', 'ro.build.fingerprint').strip()}
+evidence['execution_results'] = results
+(root/'evidence.json').write_text(json.dumps(evidence, indent=2)+'\n')
+print(f'ANDROID_RUNTIME_OK: exact installed artifacts={len(results)}, guarded={guarded}')

@@ -15,6 +15,9 @@ The checklist is intentionally strict. A checked implementation item is not enou
 
 ## O.1 Production Protection Orchestrator
 
+The [signed startup graph/RASP slice](PHASE-O1-GUARD-RUNTIME.md) remains a
+qualification path; it does not complete the public production integrations.
+
 Current implementation/evidence boundaries: [O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md).
 The [eligible Android runtime slice](PHASE-O1-RUNTIME.md) adds actual JNI/VM
 method replacement and signed-fixture qualification. Full production items

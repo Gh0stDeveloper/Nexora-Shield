@@ -1,5 +1,7 @@
 //! JNI owns Android references; all cryptography and VM execution stay in safe Rust.
 use crate::{RuntimeError, RuntimeImage};
+#[path = "runtime_guard_jni.rs"]
+mod guard;
 use jni::{
     objects::{JClass, JIntArray, JString},
     sys::{jint, jstring},
@@ -57,6 +59,7 @@ pub extern "system" fn Java_dev_nexora_shield_NativeShield_nString(
     slot: jint,
 ) -> jstring {
     let result = catch_unwind(AssertUnwindSafe(|| {
+        guard::check(&mut env)?;
         let slot = u32::try_from(slot).map_err(|_| RuntimeError("invalid runtime slot"))?;
         image()?.decrypt_string(slot)
     }));
@@ -78,6 +81,7 @@ pub extern "system" fn Java_dev_nexora_shield_NativeShield_nInt(
     arguments: JIntArray<'_>,
 ) -> jint {
     let result = (|| {
+        guard::check(&mut env)?;
         let slot = u32::try_from(slot).map_err(|_| RuntimeError("invalid runtime slot"))?;
         let length = env
             .get_array_length(&arguments)
