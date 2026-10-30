@@ -272,8 +272,16 @@ mod tests {
         write16(&mut bytes, 16, 3);
         write16(&mut bytes, 18, if wide { 183 } else { 40 });
         write32(&mut bytes, 20, 1);
-        write16(&mut bytes, if wide { 52 } else { 40 }, u16::try_from(header).unwrap_or(0));
-        write16(&mut bytes, if wide { 58 } else { 46 }, u16::try_from(section).unwrap_or(0));
+        write16(
+            &mut bytes,
+            if wide { 52 } else { 40 },
+            u16::try_from(header).unwrap_or(0),
+        );
+        write16(
+            &mut bytes,
+            if wide { 58 } else { 46 },
+            u16::try_from(section).unwrap_or(0),
+        );
         write16(&mut bytes, if wide { 60 } else { 48 }, 3);
         if wide {
             write64(&mut bytes, 40, u64::try_from(headers).unwrap_or(0));
@@ -297,14 +305,22 @@ mod tests {
             write32(&mut bytes, sym + 40, 2);
             write64(&mut bytes, sym + 56, u64::try_from(entry).unwrap_or(0));
             write64(&mut bytes, strings + 24, u64::try_from(dynstr).unwrap_or(0));
-            write64(&mut bytes, strings + 32, u64::try_from(names.len()).unwrap_or(0));
+            write64(
+                &mut bytes,
+                strings + 32,
+                u64::try_from(names.len()).unwrap_or(0),
+            );
         } else {
             write32(&mut bytes, sym + 16, u32::try_from(dynsym).unwrap_or(0));
             write32(&mut bytes, sym + 20, u32::try_from(3 * entry).unwrap_or(0));
             write32(&mut bytes, sym + 24, 2);
             write32(&mut bytes, sym + 36, u32::try_from(entry).unwrap_or(0));
             write32(&mut bytes, strings + 16, u32::try_from(dynstr).unwrap_or(0));
-            write32(&mut bytes, strings + 20, u32::try_from(names.len()).unwrap_or(0));
+            write32(
+                &mut bytes,
+                strings + 20,
+                u32::try_from(names.len()).unwrap_or(0),
+            );
         }
         bytes
     }
