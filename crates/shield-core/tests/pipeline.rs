@@ -53,7 +53,7 @@ fn o11_frozen_selection_drives_real_staging_and_preserves_excluded_dex() {
     rules
         .add_include(Selector::new(SelectorKind::Class, "Lmissing/*;", None).unwrap())
         .unwrap();
-    assert!(context.selectors().includes().is_empty());
+    assert_eq!(context.selectors().includes(), []);
     let preflight = context.inspect_dex().unwrap();
     assert_eq!(preflight.units[0].selected_classes, 1);
     assert_eq!(preflight.units[1].selected_classes, 0);

@@ -84,8 +84,11 @@ python scripts/release/verify-phase-o-release-freeze.py
 python scripts/release/verify-docs.py
 ```
 
-The local compiler is Ubuntu Rust 1.91.1. GitHub's floating `stable` compiler
-was 1.99.1 in the baseline Rust quality job. Local results are not a substitute
+Initial local verification used Ubuntu Rust 1.91.1. GitHub's floating `stable`
+compiler was 1.99.1. Its additional Clippy rules detected an unnecessary format
+comma and an empty-collection assertion form, both corrected without suppressing
+rules. Rust 1.99.1 was then installed locally and strict all-target Clippy and
+Rustfmt passed on the corrected source. Local results are not a substitute
 for all required checks on the published commit. Phase O now explicitly runs
 the snapshot and frozen-selection regressions in its DEX preflight job, as
 well as retaining the complete pre-existing negative/adversarial checks.
