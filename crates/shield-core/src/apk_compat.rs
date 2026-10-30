@@ -206,6 +206,36 @@ fn guard_native_archive_entry(
     ))
 }
 
+fn inspect_resource_entry(
+    path: &Path,
+    entry: &ZipEntry,
+    total: &mut usize,
+    changed: &[ChangedName],
+    aliases: &BTreeMap<String, String>,
+) -> Result<Option<Vec<u8>>> {
+    let size = usize::try_from(entry.uncompressed_size)
+        .map_err(|_| CoreError::InvalidRequest("O.1.3 resource table size overflow".into()))?;
+    *total = total.checked_add(size).ok_or_else(|| {
+        CoreError::InvalidRequest("O.1.3 resource table budget overflow".into())
+    })?;
+    if size > MAX_CONTRACT_ENTRY_BYTES || *total > MAX_CONTRACT_TOTAL_BYTES {
+        return Err(CoreError::InvalidRequest(
+            "O.1.3 resource table exceeds bounded inspection budget".into(),
+        ));
+    }
+    let bytes = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
+    let rewritten = crate::android_resources::rewrite_resource_string_aliases(&bytes, aliases)?;
+    for value in crate::android_resources::inspect_resource_table(&rewritten)? {
+        // Reject unresolved class-name bindings in resource keys or values.
+        guard_text_reference(&format!("\"{value}\""), changed, &entry.name)?;
+    }
+    if rewritten == bytes {
+        Ok(None)
+    } else {
+        Ok(Some(rewritten))
+    }
+}
+
 fn verify_non_dex_entries(
     path: &Path,
     directory: &ZipDirectory,
@@ -237,26 +267,9 @@ fn verify_non_dex_entries(
             ));
         }
         if name.eq_ignore_ascii_case("resources.arsc") {
-            let size = usize::try_from(entry.uncompressed_size).map_err(|_| {
-                CoreError::InvalidRequest("O.1.3 resource table size overflow".into())
-            })?;
-            total = total.checked_add(size).ok_or_else(|| {
-                CoreError::InvalidRequest("O.1.3 resource table budget overflow".into())
-            })?;
-            if size > MAX_CONTRACT_ENTRY_BYTES || total > MAX_CONTRACT_TOTAL_BYTES {
-                return Err(CoreError::InvalidRequest(
-                    "O.1.3 resource table exceeds bounded inspection budget".into(),
-                ));
-            }
-            let bytes = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
-            let rewritten =
-                crate::android_resources::rewrite_resource_string_aliases(&bytes, &aliases)?;
-            for value in crate::android_resources::inspect_resource_table(&rewritten)? {
-                // Unlinked class aliases in a resource key/type or unsupported
-                // value still block the entire diagnostic transaction.
-                guard_text_reference(&format!("\"{value}\""), changed, name)?;
-            }
-            if rewritten != bytes {
+            if let Some(rewritten) =
+                inspect_resource_entry(path, entry, &mut total, changed, &aliases)?
+            {
                 linked_entries.insert(name.to_owned(), rewritten);
             }
             continue;
