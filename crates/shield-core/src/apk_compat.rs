@@ -200,7 +200,10 @@ fn verify_non_dex_entries(
             let elf = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
             let evidence = crate::android_jni::inspect_native_elf(&elf, name)?;
             for binding in &evidence.static_jni {
-                for change in changed.iter().filter(|change| change.kind == NameKind::Class) {
+                for change in changed
+                    .iter()
+                    .filter(|change| change.kind == NameKind::Class)
+                {
                     if crate::android_jni::references_renamed_class(binding, &change.old) {
                         return Err(CoreError::InvalidRequest(format!(
                             "O.1.3 native JNI export '{binding}' binds a renamed DEX class"
