@@ -301,3 +301,32 @@ change resource IDs, update all compiled XML references or solve native/JNI and
 reflection bindings. Real Android install/launch and OEM coverage remain
 required. The diagnostic staging harness is not a signed production artifact;
 Phase O.1.3 and stable v1.0.0 remain OPEN/NO-GO.
+
+## O.1.3 — read-only ELF/JNI contract preflight
+
+This increment adds a **bounded ELF32/ELF64 dynamic export inspector** for
+Android native libraries under supported `lib/<abi>/*.so` paths. It verifies
+the ELF class, endian, `ET_DYN` type, Android target machine, section-header
+bounds, dynamic symbol table and linked string table, symbol indices and
+export-name termination. It detects exported `Java_*` JNI entrypoints,
+`JNI_OnLoad` (which can register natives dynamically), and potential
+collisions between static JNI exports and proposed DEX class renames. JNI
+underscores in class descriptors are escaped according to the native symbol
+scheme, not matched as raw substrings.
+
+**Fail-closed policy remains intact:** native-bearing APKs still do not pass
+renaming staging merely because ELF headers are syntactically valid.
+`RegisterNatives`, `FindClass`, native reflection, C++ wrappers, stripped
+section tables, runtime `dlsym`, signature-overloaded JNI exports and
+transitive cross-library references cannot be proven safe by an export list.
+The inspector provides earlier, specific reasons for denying incompatible
+static exports, dynamic native registration, wrong-ABI or malformed native
+objects. No native library is mutated, relinked or signed by this work.
+
+Host unit tests exercise synthetic 32-bit ARM and 64-bit ARM ELF exports,
+JNI name escaping, invalid offsets and ABI mismatches. Phase O uses
+non-installable synthetic APK fixtures for exact error paths and
+no-artifact-on-rejection verification. Full native ABI bridging and
+`RegisterNatives` remapping remain unimplemented. Android installation,
+startup, JNI invocation and ABI-device matrix tests must precede production.
+O.1.3 remains **OPEN**, Phase O release decision remains **NO-GO**.
