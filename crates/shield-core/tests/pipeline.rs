@@ -6,6 +6,91 @@ use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod common;
+
+#[test]
+fn o11_frozen_selection_drives_real_staging_and_preserves_excluded_dex() {
+    use nexora_shield_core::{DexSelectorPolicy, ProductionBuildContext, ProductionOverrides};
+    use nexora_shield_dex::{MultiDexRewriteConfig, RenameConfig, Selector, SelectorKind};
+    use nexora_shield_package::{read_decoded_entry, read_zip_directory, sha256_file};
+
+    let directory = test_directory("frozen-execution");
+    let input = directory.join("input.apk");
+    let a = common::build_test_dex("Lcom/test/A;", "run");
+    let b = common::build_test_dex("Lcom/test/B;", "work");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", &a),
+            ("classes2.dex", &b),
+        ],
+    );
+    let request = ProtectionRequest {
+        input: input.clone(),
+        output: directory.join("planned.apk"),
+        profile: ProtectionProfile::Standard,
+        align: false,
+        allow_unsigned: true,
+        overwrite: false,
+        signing: None,
+        zipalign: None,
+        apksigner: None,
+        public_report: None,
+        private_report: None,
+    };
+    let mut rules = DexSelectorPolicy::default();
+    rules
+        .add_exclude(Selector::new(SelectorKind::Any, "Lcom/test/B;", None).unwrap())
+        .unwrap();
+    let context = ProductionBuildContext::prepare_with_selection(
+        &request,
+        &ProductionOverrides::default(),
+        &rules,
+    )
+    .unwrap();
+    // The caller cannot mutate the prepared execution policy after review.
+    rules
+        .add_include(Selector::new(SelectorKind::Class, "Lmissing/*;", None).unwrap())
+        .unwrap();
+    assert!(context.selectors().includes().is_empty());
+    let preflight = context.inspect_dex().unwrap();
+    assert_eq!(preflight.units[0].selected_classes, 1);
+    assert_eq!(preflight.units[1].selected_classes, 0);
+    assert_eq!(preflight.units[1].selected_methods, 0);
+    let staging = directory.join("staging.apk");
+    let config = MultiDexRewriteConfig {
+        rename: Some(RenameConfig::default()),
+        strip_metadata: true,
+        conservative_cross_dex_reflection: true,
+    };
+    let result = context.stage_dex_rewrite(&staging, &config).unwrap();
+    assert_eq!(result.changed_dex_units, 1);
+    assert_eq!(result.source_files_removed, 1);
+    assert_eq!(result.output_sha256, sha256_file(&staging).unwrap());
+    let built = read_zip_directory(&staging).unwrap();
+    for entry in &built.entries {
+        if entry.name == "classes2.dex" {
+            assert_eq!(read_decoded_entry(&staging, entry, 4096).unwrap(), b);
+        }
+    }
+    let mut conflicting = config.clone();
+    conflicting
+        .rename
+        .as_mut()
+        .unwrap()
+        .selectors
+        .push(Selector::new(SelectorKind::Class, "Lcom/test/B;", None).unwrap());
+    let refused = directory.join("refused.apk");
+    assert!(context.stage_dex_rewrite(&refused, &conflicting).is_err());
+    assert!(!refused.exists());
+    fs::write(&input, b"source substituted after planning").unwrap();
+    assert!(context.stage_dex_rewrite(&refused, &config).is_err());
+    assert!(!refused.exists());
+    assert!(!request.output.exists());
+    cleanup(&directory);
+}
+
 static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]

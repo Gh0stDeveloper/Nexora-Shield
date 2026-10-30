@@ -14,6 +14,11 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [x] Final O.0 documentation/CI gate
 
 ## O.1 Production Protection Orchestrator
+
+Current implementation/evidence boundaries: [O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md).
+Frozen selection execution and input snapshots do not complete the unchecked
+production runtime/final-APK items below.
+
 - [x] Define authoritative production stage graph
 - [x] Add typed production build context
 - [x] Resolve typed request configuration before mutation (O.1.1; YAML file binding remains O.5)

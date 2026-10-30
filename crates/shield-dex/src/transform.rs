@@ -78,12 +78,22 @@ pub struct MetadataReducer;
 
 impl MetadataReducer {
     pub fn strip_debug_metadata(dex: &DexFile) -> Result<(Vec<u8>, MetadataReductionReport)> {
+        let selection = SelectorResolver::resolve(dex, &[])?;
+        Self::strip_selected_debug_metadata(dex, &selection)
+    }
+
+    /// Strip only metadata owned by the frozen class/method selection.
+    pub fn strip_selected_debug_metadata(
+        dex: &DexFile,
+        selection: &Selection,
+    ) -> Result<(Vec<u8>, MetadataReductionReport)> {
+        selection.validate(dex)?;
         let mut output = dex.bytes.clone();
         let mut source_files_removed = 0_usize;
         let mut debug_info_detached = 0_usize;
 
         for (index, class) in dex.classes.iter().enumerate() {
-            if class.source_file_idx == NO_INDEX {
+            if class.source_file_idx == NO_INDEX || !selection.classes.contains(&class.class_idx) {
                 continue;
             }
             let offset = dex.header.class_defs_off as usize + index * 32 + 16;
@@ -91,7 +101,22 @@ impl MetadataReducer {
             source_files_removed += 1;
         }
 
+        let selected_code = selection
+            .methods
+            .iter()
+            .filter_map(|index| dex.code_for_method(*index).map(|code| code.offset))
+            .collect::<BTreeSet<_>>();
+        let unselected_code = dex
+            .class_data
+            .values()
+            .flat_map(crate::model::ClassData::methods)
+            .filter(|method| !selection.methods.contains(&method.method_idx))
+            .map(|method| method.code_off)
+            .collect::<BTreeSet<_>>();
         for code in dex.code_items.values() {
+            if !selected_code.contains(&code.offset) || unselected_code.contains(&code.offset) {
+                continue;
+            }
             if code.debug_info_off == 0 {
                 continue;
             }
@@ -325,6 +350,23 @@ pub struct RenamePass;
 impl RenamePass {
     pub fn apply(dex: &DexFile, config: &RenameConfig) -> Result<RenameResult> {
         let selection = SelectorResolver::resolve(dex, &config.selectors)?;
+        let mut effective = config.clone();
+        effective.selectors.clear();
+        Self::apply_selected(dex, &effective, &selection)
+    }
+
+    /// Apply a pre-resolved selection, without resolving a different policy.
+    pub fn apply_selected(
+        dex: &DexFile,
+        config: &RenameConfig,
+        selection: &Selection,
+    ) -> Result<RenameResult> {
+        if !config.selectors.is_empty() {
+            return Err(DexError::InvalidSelector(
+                "cannot combine resolved selection with rename selector rules".into(),
+            ));
+        }
+        selection.validate(dex)?;
         let compatibility = CompatibilityAnalyzer::analyze(dex)?;
         let mut report = RenameReport::default();
         let users = collect_name_users(dex);
@@ -352,7 +394,7 @@ impl RenamePass {
 
             let selected = symbols
                 .iter()
-                .filter(|symbol| symbol_enabled(**symbol, &selection, config))
+                .filter(|symbol| symbol_enabled(**symbol, selection, config))
                 .count();
             if selected == 0 {
                 continue;

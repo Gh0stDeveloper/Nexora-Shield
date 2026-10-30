@@ -2,6 +2,12 @@
 
 Status: **IN PROGRESS — NOT PRODUCTION READY**. Stable `v1.0.0` remains **NO-GO**.
 
+Current execution evidence and remaining work are recorded in
+[O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md). Frozen selectors now drive
+actual diagnostic transformations, and multi-read DEX operations use a private
+hash-validated input copy. These changes do not close the production executor
+or qualify any missing runtime as `ProductionIntegrated`.
+
 ## Implemented in the first O.1 pass
 
 - Ordered, typed 18-stage protection graph in `crates/shield-core/src/production.rs`.

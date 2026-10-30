@@ -619,11 +619,10 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     }
 
     if plan_only {
-        let context = ProductionBuildContext::prepare_with_overrides(&request, &overrides)
-            .map_err(|error| error.to_string())?;
-        let dex = context
-            .inspect_dex_with_selectors(&dex_selectors)
-            .map_err(|error| error.to_string())?;
+        let context =
+            ProductionBuildContext::prepare_with_selection(&request, &overrides, &dex_selectors)
+                .map_err(|error| error.to_string())?;
+        let dex = context.inspect_dex().map_err(|error| error.to_string())?;
         println!("Phase O.1 production plan: READ-ONLY, NOT PROTECTED");
         println!("Input SHA-256: {}", dex.inspected_input_sha256);
         println!("Profile: {}", context.profile());

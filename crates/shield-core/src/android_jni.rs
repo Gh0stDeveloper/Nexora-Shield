@@ -383,7 +383,8 @@ mod tests {
             assert!(inspect_native_elf(&valid, wrong_path).is_err());
             let mut bad = valid.clone();
             let symbol_headers = if wide {
-                u64::from_le_bytes(bad[40..48].try_into().unwrap_or([0; 8])) as usize
+                usize::try_from(u64::from_le_bytes(bad[40..48].try_into().unwrap_or([0; 8])))
+                    .unwrap_or_else(|_| unreachable!("fixture section offset fits usize"))
             } else {
                 u32::from_le_bytes(bad[32..36].try_into().unwrap_or([0; 4])) as usize
             };

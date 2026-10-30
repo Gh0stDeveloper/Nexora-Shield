@@ -91,6 +91,7 @@ pub struct ProductionBuildContext {
     dex_count: usize,
     profile: ProtectionProfile,
     policy: EffectiveProductionPolicy,
+    selectors: DexSelectorPolicy,
     stages: Vec<PlannedStage>,
 }
 
@@ -129,8 +130,8 @@ pub fn protect_production_apk_with_selection(
     overrides: &ProductionOverrides,
     selectors: &DexSelectorPolicy,
 ) -> Result<PipelineResult> {
-    let plan = ProductionBuildContext::prepare_with_overrides(request, overrides)?;
-    let _ = plan.inspect_dex_with_selectors(selectors)?;
+    let plan = ProductionBuildContext::prepare_with_selection(request, overrides, selectors)?;
+    let _ = plan.inspect_dex()?;
     plan.ensure_ready()?;
     // Even if the stage-status graph is mistakenly marked complete in future,
     // no output may be published until the actual executor is implemented.
@@ -271,6 +272,12 @@ impl ProductionBuildContext {
         self.policy
     }
 
+    /// Policy cloned at planning; mutating the caller's rules cannot alter execution.
+    #[must_use]
+    pub fn selectors(&self) -> &DexSelectorPolicy {
+        &self.selectors
+    }
+
     #[must_use]
     pub fn stages(&self) -> &[PlannedStage] {
         &self.stages
@@ -293,6 +300,19 @@ impl ProductionBuildContext {
     pub fn prepare_with_overrides(
         request: &ProtectionRequest,
         overrides: &ProductionOverrides,
+    ) -> Result<Self> {
+        Self::prepare_with_selection(request, overrides, &DexSelectorPolicy::default())
+    }
+
+    /// Freeze the effective controls and DEX selector policy together.
+    ///
+    /// # Errors
+    ///
+    /// Rejects the same unsafe inputs as `prepare_with_overrides`.
+    pub fn prepare_with_selection(
+        request: &ProtectionRequest,
+        overrides: &ProductionOverrides,
+        selectors: &DexSelectorPolicy,
     ) -> Result<Self> {
         let policy = EffectiveProductionPolicy::resolve(request.profile, overrides)?;
         if request.allow_unsigned && request.signing.is_some() {
@@ -339,12 +359,13 @@ impl ProductionBuildContext {
             ));
         }
         Ok(Self {
-            input: request.input.clone(),
-            output: request.output.clone(),
+            input: fs::canonicalize(&request.input)?,
+            output: normalized_destination(&request.output)?,
             input_sha256: inspected.sha256,
             dex_count: inspected.dex_files.len(),
             profile: request.profile,
             policy,
+            selectors: selectors.clone(),
             stages: Self::stage_graph_for_policy(policy, request.align, request.signing.is_some()),
         })
     }
@@ -525,6 +546,7 @@ mod tests {
             )
             .unwrap_or_else(|_| unreachable!()),
             stages: ProductionBuildContext::stage_graph(ProtectionProfile::Standard, true, true),
+            selectors: crate::DexSelectorPolicy::default(),
         };
         assert!(ctx.required_unintegrated().contains(&S::DexTransform));
         assert!(ctx.required_unintegrated().contains(&S::Inspect));

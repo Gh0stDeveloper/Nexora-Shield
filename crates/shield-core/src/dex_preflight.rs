@@ -53,7 +53,7 @@ impl ProductionBuildContext {
     /// Fails on input substitution, unsupported compression, size limits, malformed DEX,
     /// duplicated class definitions or inconsistent DEX inventory.
     pub fn inspect_dex(&self) -> Result<DexPreflight> {
-        self.inspect_dex_with_selectors(&DexSelectorPolicy::default())
+        self.inspect_dex_with_selectors(self.selectors())
     }
 
     /// Inspect with bounded, explicit include/exclude rules. Selector matching
@@ -66,7 +66,10 @@ impl ProductionBuildContext {
     /// empty effective selection without creating output or report files.
     pub fn inspect_dex_with_selectors(&self, policy: &DexSelectorPolicy) -> Result<DexPreflight> {
         self.verify_input_unchanged()?;
-        let directory = read_zip_directory(self.input())?;
+        let snapshot =
+            crate::input_snapshot::InputSnapshot::capture(self.input(), self.input_sha256())?;
+        let source = snapshot.path();
+        let directory = read_zip_directory(&source)?;
         let mut inputs = Vec::new();
         let mut total_decoded_bytes = 0_usize;
 
@@ -90,7 +93,7 @@ impl ProductionBuildContext {
                     "combined DEX size exceeds preflight memory budget".into(),
                 ));
             }
-            let bytes = read_decoded_entry(self.input(), &entry, MAX_DEX_BYTES)?;
+            let bytes = read_decoded_entry(&source, &entry, MAX_DEX_BYTES)?;
             inputs.push(DexInput {
                 name: entry.name,
                 bytes,
@@ -159,7 +162,7 @@ impl ProductionBuildContext {
     }
 }
 
-fn resolve_effective_selection(
+pub(crate) fn resolve_effective_selection(
     set: &MultiDexSet,
     policy: &DexSelectorPolicy,
 ) -> Result<Vec<Selection>> {

@@ -7,7 +7,7 @@ use crate::error::{DexError, Result};
 use crate::hierarchy::DexHierarchy;
 use crate::model::{DexFile, ACC_NATIVE, ACC_STATIC};
 use crate::multidex::MultiDexSet;
-use crate::selector::SelectorResolver;
+use crate::selector::Selection;
 use crate::transform::{is_contract_name, RenameConfig};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -71,18 +71,14 @@ pub(crate) fn plan(
     set: &MultiDexSet,
     config: &RenameConfig,
     compatibility: &[CompatibilityReport],
+    selected: &[Selection],
 ) -> Result<MemberPlan> {
-    let mut selected = Vec::with_capacity(set.units.len());
-    for unit in &set.units {
-        selected.push(SelectorResolver::resolve(&unit.dex, &config.selectors)?);
-    }
-
     let hierarchy = DexHierarchy::build(set)?;
     let mut defined = BTreeMap::<Member, bool>::new();
     let mut inheritable = BTreeSet::<Member>::new();
     let mut virtual_defs = BTreeSet::<Member>::new();
     let mut protected = BTreeSet::<Member>::new();
-    for ((unit, selection), report) in set.units.iter().zip(&selected).zip(compatibility) {
+    for ((unit, selection), report) in set.units.iter().zip(selected).zip(compatibility) {
         for class in &unit.dex.classes {
             let Some(data) = unit.dex.class_data.get(&class.class_idx) else {
                 continue;

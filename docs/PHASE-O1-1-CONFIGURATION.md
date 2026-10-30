@@ -2,6 +2,12 @@
 
 Status: **IMPLEMENTED ON FEATURE BRANCH — CI VERIFICATION REQUIRED**.
 
+The context now also clones DEX include/exclude rules at planning, binds
+absolute source/output paths and uses a hash-validated private input copy for
+multi-read DEX operations. Execution-time selector replacement is refused.
+See [execution audit](PHASE-O1-EXECUTION-AUDIT.md) for tests and limitations;
+this does not close the parent production-integration work.
+
 ## Acceptance criteria
 
 1. Effective policy computed from immutable `ProtectionProfile` plus typed

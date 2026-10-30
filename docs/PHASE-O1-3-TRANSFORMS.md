@@ -2,6 +2,14 @@
 
 Status: **PARTIAL ON FEATURE BRANCH — EXACT-HEAD CI VERIFICATION PENDING**.
 
+Actual staging now consumes the frozen globally resolved definition selection.
+An excluded independent DEX stays byte-identical; linked references are updated
+only to preserve selected owners' bindings. Metadata stripping follows selected
+ownership. Conflicting execution-time selector rules fail closed. Multi-read
+APK operations use hash-validated private source snapshots. See the
+[execution audit](PHASE-O1-EXECUTION-AUDIT.md) for the new regression cases and
+the still-missing Android runtime/production integrations.
+
 ## What is integrated
 
 - The Phase B fixed-width ASCII rename pass rewrites the actual DEX string-data

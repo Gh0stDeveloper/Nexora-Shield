@@ -83,6 +83,16 @@ impl ProductionBuildContext {
                 "staging requires a real DEX transform".into(),
             ));
         }
+        if config
+            .rename
+            .as_ref()
+            .is_some_and(|rename| !rename.selectors.is_empty())
+        {
+            return Err(CoreError::InvalidRequest(
+                "DEX selectors must be frozen in ProductionBuildContext, not supplied at execution"
+                    .into(),
+            ));
+        }
         // Compare resolved paths rather than raw strings: aliases through
         // "./", ".." and symlinked parents must not bypass output isolation.
         // symlink_metadata catches dangling final-component symlinks as well.
@@ -101,16 +111,20 @@ impl ProductionBuildContext {
         }
         // The preflight enforces conservative compatibility and class ownership.
         let _ = self.inspect_dex()?;
-        let directory = read_zip_directory(self.input())?;
-        let (inputs, originals) = self.load_dex_inputs(&directory)?;
+        let snapshot =
+            crate::input_snapshot::InputSnapshot::capture(self.input(), self.input_sha256())?;
+        let source = snapshot.path();
+        let directory = read_zip_directory(&source)?;
+        let (inputs, originals) = self.load_dex_inputs(&source, &directory)?;
         let set = MultiDexSet::parse(inputs).map_err(|error| {
             CoreError::InvalidRequest(format!("DEX staging validation: {error}"))
         })?;
-        let outputs = set.rewrite(config).map_err(|error| {
+        let selected = crate::dex_preflight::resolve_effective_selection(&set, self.selectors())?;
+        let outputs = set.rewrite_selected(config, &selected).map_err(|error| {
             CoreError::InvalidRequest(format!("DEX transform refused: {error}"))
         })?;
         let linked_xml =
-            crate::apk_compat::verify_apk_compatibility(self.input(), &directory, &set, &outputs)?;
+            crate::apk_compat::verify_apk_compatibility(&source, &directory, &set, &outputs)?;
         let (mut result, mut replacements, retrace_records) =
             collect_staged_outputs(outputs, &originals, retrace.is_some());
         // Commit verified DEX and compiled Manifest XML changes through one
@@ -129,8 +143,9 @@ impl ProductionBuildContext {
         self.verify_input_unchanged()?;
         // The ZIP writer exclusively owns the new path and cleans its own
         // partial files; never remove a concurrently created path on refusal.
-        rewrite_stored_entries(self.input(), destination, &replacements)?;
-        let reconstruction = self.verify_staged_apk(destination, &directory, &replacements);
+        rewrite_stored_entries(&source, destination, &replacements)?;
+        let reconstruction =
+            self.verify_staged_apk(&source, destination, &directory, &replacements);
         match reconstruction {
             Ok(output_hash) => {
                 if let Some((map_path, schedule)) = retrace {
@@ -151,7 +166,7 @@ impl ProductionBuildContext {
         }
     }
 
-    fn load_dex_inputs(&self, directory: &ZipDirectory) -> Result<LoadedDexSources> {
+    fn load_dex_inputs(&self, source: &Path, directory: &ZipDirectory) -> Result<LoadedDexSources> {
         let mut inputs = Vec::new();
         let mut originals = BTreeMap::new();
         let mut total = 0_usize;
@@ -170,7 +185,7 @@ impl ProductionBuildContext {
                     "DEX staging exceeds preflight memory limit".into(),
                 ));
             }
-            let bytes = read_decoded_entry(self.input(), entry, MAX_DEX_BYTES)?;
+            let bytes = read_decoded_entry(source, entry, MAX_DEX_BYTES)?;
             originals.insert(entry.name.clone(), bytes.clone());
             inputs.push(DexInput {
                 name: entry.name.clone(),
@@ -183,6 +198,7 @@ impl ProductionBuildContext {
 
     fn verify_staged_apk(
         &self,
+        source_path: &Path,
         destination: &Path,
         source: &ZipDirectory,
         replacements: &BTreeMap<String, Vec<u8>>,
@@ -194,7 +210,7 @@ impl ProductionBuildContext {
             ));
         }
         let built = read_zip_directory(destination)?;
-        verify_rebuilt_zip(self.input(), source, &built, destination, replacements)?;
+        verify_rebuilt_zip(source_path, source, &built, destination, replacements)?;
         let decoded = built
             .entries
             .iter()

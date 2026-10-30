@@ -5,6 +5,13 @@ Status: **IMPLEMENTED ON FEATURE BRANCH — CI VERIFICATION REQUIRED**.
 ## Scope and security boundary
 
 - The production planner verifies input SHA-256 before and after read-only inspection.
+- Inspection and DEX staging now capture a bounded private copy and validate
+  its SHA-256 before reading it. Parsing, linking, rebuilding and preservation
+  checks operate on those captured bytes. Before/after hashes of the mutable
+  source are additional checks, not the only defense against ABA substitution.
+- The policy frozen by `prepare_with_selection` drives actual diagnostic
+  rewriting through `rewrite_selected`; excludes also constrain metadata
+  stripping. Imported references may change to preserve selected owner binding.
 - Canonical `classes.dex`, `classes2.dex`, etc. are checked with bounded STORE
   and DEFLATE decoding: 64 MiB per DEX, 256 MiB aggregate.
 - `MultiDexSet::parse` is the common authority for contiguous DEX numbering

@@ -67,6 +67,20 @@ pub struct Selection {
 }
 
 impl Selection {
+    /// Refuse reference-only or nonexistent IDs at the transformation boundary.
+    pub fn validate(&self, dex: &DexFile) -> Result<()> {
+        let defined = select_all(dex);
+        if !self.classes.is_subset(&defined.classes)
+            || !self.methods.is_subset(&defined.methods)
+            || !self.fields.is_subset(&defined.fields)
+        {
+            return Err(DexError::InvalidSelector(
+                "resolved selection contains a non-defined DEX symbol".into(),
+            ));
+        }
+        Ok(())
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.classes.is_empty() && self.methods.is_empty() && self.fields.is_empty()

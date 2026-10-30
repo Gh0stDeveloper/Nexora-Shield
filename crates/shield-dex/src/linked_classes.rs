@@ -1,18 +1,20 @@
 //! Coordinated, fixed-layout class descriptor remapping across DEX units.
 //!
-//! This intentionally does not attempt method/field remapping, which requires
-//! binding by declaring class and signature. The output remains diagnostic.
+//! Class descriptors and the signature-bound member planner share one frozen
+//! definition selection. The output remains diagnostic.
 use crate::compatibility::CompatibilityAnalyzer;
 use crate::error::{DexError, Result};
 use crate::model::ReferenceKind;
 use crate::multidex::{DexInput, DexRewriteOutput, MultiDexRewriteConfig, MultiDexSet};
 use crate::parser::DexParser;
+use crate::selector::Selection;
 use crate::transform::{DexRewriteVerifier, DexWriter, MetadataReducer, RenamePass, RenameRecord};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) fn rewrite_linked_classes(
     set: &MultiDexSet,
     config: &MultiDexRewriteConfig,
+    selected: &[Selection],
 ) -> Result<Vec<DexRewriteOutput>> {
     let rename = config.rename.as_ref().ok_or_else(|| {
         DexError::UnsafeRename("linked class rewrite requires rename policy".into())
@@ -27,11 +29,14 @@ pub(crate) fn rewrite_linked_classes(
             .iter()
             .any(|report| report.reflection_detected)
     {
-        let mut outputs = set.rewrite(&MultiDexRewriteConfig {
-            rename: None,
-            strip_metadata: config.strip_metadata,
-            conservative_cross_dex_reflection: true,
-        })?;
+        let mut outputs = set.rewrite_selected(
+            &MultiDexRewriteConfig {
+                rename: None,
+                strip_metadata: config.strip_metadata,
+                conservative_cross_dex_reflection: true,
+            },
+            selected,
+        )?;
         for output in &mut outputs {
             output.rename_skipped_for_cross_dex_reflection = true;
         }
@@ -42,12 +47,12 @@ pub(crate) fn rewrite_linked_classes(
     // spelling for the same class. The deterministic per-unit seed is retained.
     let mut plans = Vec::with_capacity(set.units.len());
     let mut global = BTreeMap::<String, String>::new();
-    for unit in &set.units {
+    for (unit, selection) in set.units.iter().zip(selected) {
         let mut policy = rename.clone();
         policy.rename_methods = false;
         policy.rename_fields = false;
         policy.seed ^= u64::from(unit.index).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-        let planned = RenamePass::apply(&unit.dex, &policy)?;
+        let planned = RenamePass::apply_selected(&unit.dex, &policy, selection)?;
         for class in &unit.dex.classes {
             let type_id = &unit.dex.types[class.class_idx as usize];
             if let Some(record) = planned
@@ -116,7 +121,7 @@ pub(crate) fn rewrite_linked_classes(
     // Resolve defining owners and descriptor-based signatures before changing
     // any DEX string bytes. Reference-only method_ids/field_ids inherit that
     // global plan, while ambiguous or externally-bound aliases fail closed.
-    let member_plan = crate::linked_members::plan(set, rename, &compatibility)?;
+    let member_plan = crate::linked_members::plan(set, rename, &compatibility, selected)?;
     let mut outputs = Vec::with_capacity(set.units.len());
     for (unit_index, ((unit, mut report), compatibility)) in
         set.units.iter().zip(plans).zip(&compatibility).enumerate()
@@ -199,7 +204,8 @@ pub(crate) fn rewrite_linked_classes(
         let mut metadata_report = None;
         if config.strip_metadata {
             let parsed = DexParser::parse(&current)?;
-            let (bytes, metadata) = MetadataReducer::strip_debug_metadata(&parsed)?;
+            let (bytes, metadata) =
+                MetadataReducer::strip_selected_debug_metadata(&parsed, &selected[unit_index])?;
             current = bytes;
             metadata_report = Some(metadata);
         }

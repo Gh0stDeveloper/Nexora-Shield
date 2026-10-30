@@ -13,6 +13,7 @@ mod dex_preflight;
 mod dex_selection;
 mod dex_stage;
 mod error;
+mod input_snapshot;
 mod pipeline;
 mod plan;
 mod policy;

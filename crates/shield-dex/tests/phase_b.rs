@@ -770,6 +770,103 @@ fn selector_resolver_revalidates_public_fields_and_rule_limits() {
     assert!(SelectorResolver::resolve(&dex, &many).is_err());
 }
 
+#[test]
+fn o13_resolved_selection_preserves_excluded_dex_bytes_and_metadata() {
+    let before_b = build_test_dex("Lcom/test/B;", "work");
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: build_test_dex("Lcom/test/A;", "run"),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: before_b.clone(),
+        },
+    ])
+    .expect("valid set");
+    let selected = vec![
+        SelectorResolver::resolve(&set.units[0].dex, &[]).expect("defined symbols"),
+        nexora_shield_dex::Selection::default(),
+    ];
+    let config = MultiDexRewriteConfig {
+        rename: Some(RenameConfig::default()),
+        strip_metadata: true,
+        conservative_cross_dex_reflection: true,
+    };
+    let outputs = set
+        .rewrite_selected(&config, &selected)
+        .expect("selected rewrite");
+    assert_ne!(outputs[0].bytes, set.units[0].dex.bytes);
+    assert_eq!(outputs[1].bytes, before_b);
+    assert_eq!(outputs[1].audit.changed_symbol_strings, 0);
+    assert_eq!(outputs[1].audit.source_files_removed, 0);
+    assert_eq!(outputs[1].audit.debug_info_detached, 0);
+    assert_eq!(
+        set.rewrite_selected(&config, &selected).expect("repeat"),
+        outputs
+    );
+    assert!(set.rewrite_selected(&config, &selected[..1]).is_err());
+    let mut invalid = selected;
+    invalid[1].methods.insert(u32::MAX);
+    assert!(set.rewrite_selected(&config, &invalid).is_err());
+}
+
+#[test]
+fn o13_resolved_owner_selection_updates_imports_without_renaming_consumer_definitions() {
+    let set = MultiDexSet::parse(vec![
+        DexInput {
+            name: "classes.dex".into(),
+            bytes: build_linked_member_fixture(true),
+        },
+        DexInput {
+            name: "classes2.dex".into(),
+            bytes: build_linked_member_fixture(false),
+        },
+    ])
+    .expect("linked set");
+    let selected = vec![
+        SelectorResolver::resolve(&set.units[0].dex, &[]).expect("owner selection"),
+        nexora_shield_dex::Selection::default(),
+    ];
+    let outputs = set
+        .rewrite_selected(
+            &MultiDexRewriteConfig {
+                rename: Some(RenameConfig {
+                    rename_classes: false,
+                    ..RenameConfig::default()
+                }),
+                strip_metadata: true,
+                conservative_cross_dex_reflection: true,
+            },
+            &selected,
+        )
+        .expect("preserved external bindings");
+    let owner = DexParser::parse(&outputs[0].bytes).expect("owner");
+    let consumer = DexParser::parse(&outputs[1].bytes).expect("consumer");
+    assert_ne!(owner.method_name(0), Some("run"));
+    assert_eq!(owner.method_name(0), consumer.method_name(1));
+    assert_eq!(owner.field_name(0), consumer.field_name(0));
+    assert_eq!(consumer.method_name(0), Some("go"));
+    assert_eq!(outputs[1].audit.source_files_removed, 0);
+    assert_eq!(outputs[1].audit.preserved_code_items, 1);
+    let mut invalid = selected;
+    invalid[1].methods.insert(1); // imported ID, not a consumer definition
+    assert!(set
+        .rewrite_selected(&MultiDexRewriteConfig::default(), &invalid)
+        .is_err());
+}
+
+#[test]
+fn o13_resolved_selection_rejects_a_second_selector_policy() {
+    let dex = DexParser::parse(&build_test_dex("Lcom/test/A;", "run")).expect("DEX");
+    let selection = SelectorResolver::resolve(&dex, &[]).expect("selection");
+    let config = RenameConfig {
+        selectors: vec![Selector::new(SelectorKind::Class, "Lcom/test/A;", None).expect("rule")],
+        ..RenameConfig::default()
+    };
+    assert!(RenamePass::apply_selected(&dex, &config, &selection).is_err());
+}
+
 fn virtual_owner_fixture() -> Vec<u8> {
     let mut bytes = build_linked_member_fixture(true);
     let parsed = DexParser::parse(&bytes).expect("owner");

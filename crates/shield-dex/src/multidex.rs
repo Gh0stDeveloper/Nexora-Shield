@@ -2,6 +2,7 @@ use crate::compatibility::CompatibilityAnalyzer;
 use crate::error::{DexError, Result};
 use crate::model::{DexFile, ReferenceKind};
 use crate::parser::DexParser;
+use crate::selector::{Selection, SelectorResolver};
 use crate::transform::{
     DexRewriteAudit, DexRewriteVerifier, DexWriter, MetadataReducer, MetadataReductionReport,
     RenameConfig, RenamePass, RenameReport,
@@ -116,10 +117,50 @@ impl MultiDexSet {
     }
 
     pub fn rewrite(&self, config: &MultiDexRewriteConfig) -> Result<Vec<DexRewriteOutput>> {
-        // Linked class descriptors can be remapped globally. Linked methods
-        // and fields still fail closed until signature-aware binding exists.
+        let rules = config
+            .rename
+            .as_ref()
+            .map_or(&[][..], |rename| rename.selectors.as_slice());
+        let selected = self
+            .units
+            .iter()
+            .map(|unit| SelectorResolver::resolve(&unit.dex, rules))
+            .collect::<Result<Vec<_>>>()?;
+        let mut effective = config.clone();
+        if let Some(rename) = &mut effective.rename {
+            rename.selectors.clear();
+        }
+        self.rewrite_selected(&effective, &selected)
+    }
+
+    /// Use exactly one validated definition selection per canonical DEX unit.
+    /// Imported references may change only to retain a selected owner's binding.
+    pub fn rewrite_selected(
+        &self,
+        config: &MultiDexRewriteConfig,
+        selected: &[Selection],
+    ) -> Result<Vec<DexRewriteOutput>> {
+        if config
+            .rename
+            .as_ref()
+            .is_some_and(|rename| !rename.selectors.is_empty())
+        {
+            return Err(DexError::InvalidSelector(
+                "cannot combine resolved selection with rename selector rules".into(),
+            ));
+        }
+        if selected.len() != self.units.len() {
+            return Err(DexError::InvalidSelector(
+                "resolved selection count does not match canonical DEX inventory".into(),
+            ));
+        }
+        for (unit, selection) in self.units.iter().zip(selected) {
+            selection.validate(&unit.dex)?;
+        }
+        // Linked descriptors and signature-bound members share the same owner
+        // selection across all units; unresolved contracts still fail closed.
         if config.rename.is_some() && self.has_cross_dex_symbol_references()? {
-            return crate::linked_classes::rewrite_linked_classes(self, config);
+            return crate::linked_classes::rewrite_linked_classes(self, config, selected);
         }
         let cross_dex_reflection = config.conservative_cross_dex_reflection
             && self.units.len() > 1
@@ -132,7 +173,7 @@ impl MultiDexSet {
                 .any(|report| report.reflection_detected);
 
         let mut outputs = Vec::with_capacity(self.units.len());
-        for unit in &self.units {
+        for (unit, selection) in self.units.iter().zip(selected) {
             let mut current = DexWriter::round_trip(&unit.dex)?;
             let mut rename_report = None;
             let mut metadata_report = None;
@@ -148,7 +189,7 @@ impl MultiDexSet {
                     // descriptors across classes.dex/classes2.dex.
                     let mut unique_rename = rename.clone();
                     unique_rename.seed ^= u64::from(unit.index).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-                    let result = RenamePass::apply(&parsed, &unique_rename)?;
+                    let result = RenamePass::apply_selected(&parsed, &unique_rename, selection)?;
                     current = result.bytes;
                     rename_report = Some(result.report);
                 }
@@ -156,7 +197,8 @@ impl MultiDexSet {
 
             if config.strip_metadata {
                 let parsed = DexParser::parse(&current)?;
-                let (bytes, report) = MetadataReducer::strip_debug_metadata(&parsed)?;
+                let (bytes, report) =
+                    MetadataReducer::strip_selected_debug_metadata(&parsed, selection)?;
                 current = bytes;
                 metadata_report = Some(report);
             }
