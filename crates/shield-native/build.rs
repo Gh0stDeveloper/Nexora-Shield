@@ -71,6 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let kind = match entry["kind"].as_str() {
             Some("String") => "String",
             Some("IntVm") => "IntVm",
+            Some("Constant") => "Constant",
             _ => return Err("unsupported runtime entry kind".into()),
         };
         let cipher = array(&entry["ciphertext"])?;

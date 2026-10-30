@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import os
+import struct
 from pathlib import Path
 import subprocess
 import zipfile
@@ -34,6 +35,18 @@ digest = base64.b64encode(hashlib.sha256(probe.encode()).digest()).decode()
 .method public static sum(II)I
     .registers 3
     add-int v0, p0, p1
+    return v0
+.end method
+
+.method public static unsupportedNaN()F
+    .registers 1
+    const v0, 0x7fc00001
+    return v0
+.end method
+
+.method public static unsupportedByte()B
+    .registers 1
+    const/4 v0, 0x7
     return v0
 .end method
 ''', encoding='utf-8')
@@ -108,6 +121,62 @@ digest = base64.b64encode(hashlib.sha256(probe.encode()).digest()).decode()
     return-void
 .end method
 ''', encoding='utf-8')
+
+constant_methods = [
+    ('booleanConstant', 'Z', 'const/4 v0, 0x1', 'return v0'),
+    ('constant', 'I', 'const v0, 0x13579bdf', 'return v0'),
+    ('longConstant', 'J', 'const-wide v0, 0x123456789abcdefL', 'return-wide v0'),
+    ('floatConstant', 'F', 'const/high16 v0, -0x80000000', 'return v0'),
+    ('doubleConstant', 'D', 'const-wide/high16 v0, 0x4004000000000000L', 'return-wide v0'),
+]
+probe_source=source/'Probe.smali'
+with probe_source.open('a') as out:
+    for name,kind,load,ret in constant_methods:
+        out.write(f'\n.method public static {name}(){kind}\n    .registers 2\n    {load}\n    {ret}\n.end method\n')
+(source/'QA.smali').write_text('''.class public final Ldev/nexora/runtime/QA;
+.super Ljava/lang/Object;
+.method public static assertDigest(Ljava/lang/String;Ljava/lang/String;)V
+    .registers 5
+    const-string v0, "SHA-256"
+    invoke-static {v0}, Ljava/security/MessageDigest;->getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;
+    move-result-object v0
+    const-string v1, "UTF-8"
+    invoke-virtual {p0, v1}, Ljava/lang/String;->getBytes(Ljava/lang/String;)[B
+    move-result-object v1
+    invoke-virtual {v0, v1}, Ljava/security/MessageDigest;->digest([B)[B
+    move-result-object v0
+    const/4 v1, 0x2
+    invoke-static {v0, v1}, Landroid/util/Base64;->encodeToString([BI)Ljava/lang/String;
+    move-result-object v0
+    invoke-virtual {p1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :ok
+    new-instance v0, Ljava/lang/AssertionError;
+    invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+    throw v0
+    :ok
+    return-void
+.end method
+''')
+checks=[]
+values={'Z':'true','I':str(0x13579bdf),'J':str(0x123456789abcdef),'F':str(-2147483648),'D':str(struct.unpack('<q',struct.pack('<d',2.5))[0])}
+for name,kind,_,_ in constant_methods:
+    wide=kind in ['J','D']
+    code=f'    invoke-static {{}}, Ldev/nexora/runtime/Probe;->{name}(){kind}\n    '+('move-result-wide' if wide else 'move-result')+' v0\n'
+    if kind=='F':
+        code+='    invoke-static {v0}, Ljava/lang/Float;->floatToRawIntBits(F)I\n    move-result v0\n'
+    elif kind=='D':
+        code+='    invoke-static {v0, v1}, Ljava/lang/Double;->doubleToRawLongBits(D)J\n    move-result-wide v0\n'
+    owner,ty=('Boolean','Z') if kind=='Z' else ('Long','J') if wide else ('Integer','I')
+    registers='{v0, v1}' if wide else '{v0}'
+    code+=f'    invoke-static {registers}, Ljava/lang/{owner};->toString({ty})Ljava/lang/String;\n    move-result-object v0\n'
+    expected=base64.b64encode(hashlib.sha256(values[kind].encode()).digest()).decode()
+    code+=f'    const-string v1, "{expected}"\n    invoke-static {{v0, v1}}, Ldev/nexora/runtime/QA;->assertDigest(Ljava/lang/String;Ljava/lang/String;)V\n'
+    checks.append(code)
+activity=source/'MainActivity.smali'
+body=activity.read_text().replace('    const-string v0, "NEXORA_RUNTIME_OK"', ''.join(checks)+'    const-string v0, "NEXORA_RUNTIME_OK"')
+activity.write_text(body)
+
 manifest = args.output / 'AndroidManifest.xml'
 manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.nexora.runtime">
 <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35"/>

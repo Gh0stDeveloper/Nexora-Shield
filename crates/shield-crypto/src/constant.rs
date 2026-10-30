@@ -2,7 +2,7 @@ use crate::container::{open, seal, ContainerKind};
 use crate::error::{DataProtectionError, Result};
 use crate::key::KeySchedule;
 use std::fmt;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 const TAG_BOOL: u8 = 1;
 const TAG_I32: u8 = 2;
@@ -42,11 +42,11 @@ impl fmt::Debug for ConstantValue {
 impl Drop for ConstantValue {
     fn drop(&mut self) {
         match self {
-            Self::Bool(value) => *value = false,
-            Self::I32(value) => *value = 0,
-            Self::I64(value) => *value = 0,
-            Self::F32(value) => *value = 0.0,
-            Self::F64(value) => *value = 0.0,
+            Self::Bool(value) => value.zeroize(),
+            Self::I32(value) => value.zeroize(),
+            Self::I64(value) => value.zeroize(),
+            Self::F32(value) => value.zeroize(),
+            Self::F64(value) => value.zeroize(),
             Self::Bytes(value) => value.zeroize(),
         }
     }
@@ -57,12 +57,8 @@ pub fn protect_constant(
     logical_id: &str,
     value: &ConstantValue,
 ) -> Result<Vec<u8>> {
-    seal(
-        schedule,
-        ContainerKind::Constant,
-        logical_id,
-        &encode(value)?,
-    )
+    let encoded = Zeroizing::new(encode(value)?);
+    seal(schedule, ContainerKind::Constant, logical_id, &encoded)
 }
 
 pub fn unprotect_constant(
@@ -70,7 +66,12 @@ pub fn unprotect_constant(
     logical_id: &str,
     container: &[u8],
 ) -> Result<ConstantValue> {
-    let bytes = open(schedule, ContainerKind::Constant, logical_id, container)?;
+    let bytes = Zeroizing::new(open(
+        schedule,
+        ContainerKind::Constant,
+        logical_id,
+        container,
+    )?);
     decode(&bytes)
 }
 

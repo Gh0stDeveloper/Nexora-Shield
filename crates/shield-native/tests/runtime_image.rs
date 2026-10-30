@@ -85,3 +85,36 @@ fn runtime_vm_refuses_host_operations_and_unbounded_loops() -> Result<(), Box<dy
     assert_eq!(image.entries.len(), 0);
     Ok(())
 }
+
+#[test]
+fn runtime_constant_engine_preserves_integer_and_float_bits_and_rejects_tamper(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use nexora_shield_crypto::ConstantValue;
+    let cases = [
+        (ConstantValue::Bool(true), 1),
+        (
+            ConstantValue::I32(-19),
+            u64::from(u32::from_le_bytes((-19i32).to_le_bytes())),
+        ),
+        (ConstantValue::I64(i64::MIN), 1u64 << 63),
+        (ConstantValue::F32(-0.0), u64::from((-0.0f32).to_bits())),
+        (ConstantValue::F64(2.5), (2.5f64).to_bits()),
+    ];
+    let mut runtime = image()?;
+    for (index, (value, bits)) in cases.iter().enumerate() {
+        let slot = u32::try_from(index)?;
+        runtime.protect_constant(slot, value)?;
+        assert_eq!(runtime.constant_bits(slot)?, *bits);
+        assert!(runtime.decrypt_string(slot).is_err());
+        assert!(runtime.execute_int_vm(slot, &[]).is_err());
+    }
+    assert!(runtime
+        .protect_constant(71, &ConstantValue::Bytes(vec![1, 2, 3]))
+        .is_err());
+    assert!(runtime
+        .protect_constant(0, &ConstantValue::Bool(false))
+        .is_err());
+    runtime.entries[0].ciphertext[90] ^= 1;
+    assert!(runtime.constant_bits(0).is_err());
+    Ok(())
+}

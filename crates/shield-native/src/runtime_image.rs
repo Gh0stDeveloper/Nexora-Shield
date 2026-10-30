@@ -1,9 +1,9 @@
 //! Build-bound encrypted data and executable VM programs consumed by JNI.
-//! This is a narrow static-int/string runtime, not a general Java object host.
+//! This is an eligible static data/integer-VM runtime, not a general Java object host.
 
 use nexora_shield_crypto::{
-    hex_lower, open, seal, sha256, BuildIdentity, ContainerKind, KeyDomain, KeySchedule,
-    SensitiveBytes,
+    hex_lower, open, protect_constant, seal, sha256, unprotect_constant, BuildIdentity,
+    ConstantValue, ContainerKind, KeyDomain, KeySchedule, SensitiveBytes,
 };
 use nexora_shield_vm::{
     ConstantPool, ExecutionConfig, Interpreter, NullHost, OpcodeAllocation, OpcodeStream,
@@ -21,6 +21,7 @@ const MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;
 pub enum RuntimeEntryKind {
     String,
     IntVm,
+    Constant,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,6 +175,61 @@ impl RuntimeImage {
         self.insert(slot, RuntimeEntryKind::String, value.as_bytes())
     }
 
+    pub fn protect_constant(&mut self, slot: u32, value: &ConstantValue) -> Result<()> {
+        if matches!(value, ConstantValue::Bytes(_))
+            || self.entries.iter().any(|entry| entry.slot == slot)
+        {
+            return Err(RuntimeError("unsupported or duplicate runtime constant"));
+        }
+        let ciphertext = protect_constant(
+            &self.schedule()?,
+            &logical_id(RuntimeEntryKind::Constant, slot),
+            value,
+        )
+        .map_err(|_| RuntimeError("runtime constant encryption failed"))?;
+        self.entries.push(RuntimeEntry {
+            slot,
+            kind: RuntimeEntryKind::Constant,
+            ciphertext,
+        });
+        if let Err(error) = self.validate() {
+            self.entries.pop();
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    pub fn constant_bits(&self, slot: u32) -> Result<u64> {
+        let value = self.constant_value(slot)?;
+        match &value {
+            ConstantValue::Bool(v) => Ok(u64::from(*v)),
+            ConstantValue::I32(v) => Ok(u64::from(u32::from_le_bytes(v.to_le_bytes()))),
+            ConstantValue::I64(v) => Ok(u64::from_le_bytes(v.to_le_bytes())),
+            ConstantValue::F32(v) => Ok(u64::from(v.to_bits())),
+            ConstantValue::F64(v) => Ok(v.to_bits()),
+            ConstantValue::Bytes(_) => Err(RuntimeError("unsupported runtime constant type")),
+        }
+    }
+
+    pub fn constant_value(&self, slot: u32) -> Result<ConstantValue> {
+        self.validate()?;
+        let entry = self
+            .entries
+            .iter()
+            .find(|entry| entry.slot == slot && entry.kind == RuntimeEntryKind::Constant)
+            .ok_or(RuntimeError("runtime constant slot unavailable"))?;
+        let value = unprotect_constant(
+            &self.schedule()?,
+            &logical_id(RuntimeEntryKind::Constant, slot),
+            &entry.ciphertext,
+        )
+        .map_err(|_| RuntimeError("runtime constant authentication failed"))?;
+        if matches!(value, ConstantValue::Bytes(_)) {
+            return Err(RuntimeError("unsupported runtime constant type"));
+        }
+        Ok(value)
+    }
+
     pub fn protect_int_vm(&mut self, slot: u32, method: &VmMethod) -> Result<()> {
         validate_int_method(method)?;
         let schedule = self.schedule()?;
@@ -299,6 +355,7 @@ fn container_kind(kind: RuntimeEntryKind) -> ContainerKind {
     match kind {
         RuntimeEntryKind::String => ContainerKind::String,
         RuntimeEntryKind::IntVm => ContainerKind::Generic,
+        RuntimeEntryKind::Constant => ContainerKind::Constant,
     }
 }
 fn logical_id(kind: RuntimeEntryKind, slot: u32) -> String {

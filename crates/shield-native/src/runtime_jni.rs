@@ -3,8 +3,8 @@ use crate::{RuntimeError, RuntimeImage};
 #[path = "runtime_guard_jni.rs"]
 mod guard;
 use jni::{
-    objects::{JClass, JIntArray, JString},
-    sys::{jint, jstring},
+    objects::{JClass, JIntArray, JObject, JString, JValue},
+    sys::{jint, jobject, jstring},
     JNIEnv,
 };
 use std::{
@@ -101,5 +101,41 @@ pub extern "system" fn Java_dev_nexora_shield_NativeShield_nInt(
     } else {
         reject(&mut env);
         0
+    }
+}
+
+#[allow(unsafe_code)]
+#[no_mangle]
+pub extern "system" fn Java_dev_nexora_shield_NativeShield_nConstant(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    slot: jint,
+) -> jobject {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        guard::check(&mut env)?;
+        let slot = u32::try_from(slot).map_err(|_| RuntimeError("invalid constant slot"))?;
+        image()?.constant_value(slot)
+    }));
+    if let Ok(Ok(value)) = result {
+        if let Ok(object) = box_constant(&mut env, &value) {
+            return object.into_raw();
+        }
+    }
+    reject(&mut env);
+    std::ptr::null_mut()
+}
+
+fn box_constant<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &nexora_shield_crypto::ConstantValue,
+) -> jni::errors::Result<JObject<'local>> {
+    use nexora_shield_crypto::ConstantValue as C;
+    match value {
+        C::Bool(v) => env.new_object("java/lang/Boolean", "(Z)V", &[JValue::Bool(u8::from(*v))]),
+        C::I32(v) => env.new_object("java/lang/Integer", "(I)V", &[JValue::Int(*v)]),
+        C::I64(v) => env.new_object("java/lang/Long", "(J)V", &[JValue::Long(*v)]),
+        C::F32(v) => env.new_object("java/lang/Float", "(F)V", &[JValue::Float(*v)]),
+        C::F64(v) => env.new_object("java/lang/Double", "(D)V", &[JValue::Double(*v)]),
+        C::Bytes(_) => Err(jni::errors::Error::NullPtr("unsupported runtime constant")),
     }
 }

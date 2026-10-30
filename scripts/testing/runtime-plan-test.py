@@ -29,6 +29,8 @@ for name, app, selectors in [
     ('instance-method', 'dev.nexora.runtime', ['Ldev/nexora/runtime/MainActivity;#onCreate']),
     ('missing-method', 'dev.nexora.runtime', ['Ldev/nexora/runtime/Probe;#missing']),
     ('duplicate-selector', 'dev.nexora.runtime', [secret, secret]),
+    ('unsupported-nan', 'dev.nexora.runtime', ['Ldev/nexora/runtime/Probe;#unsupportedNaN']),
+    ('unsupported-byte', 'dev.nexora.runtime', ['Ldev/nexora/runtime/Probe;#unsupportedByte']),
 ]:
     destination = root/f'{name}.nshield-private'
     result = run('prepare', destination, app, 'o1-functional', selectors)

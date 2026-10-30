@@ -2,6 +2,8 @@
 //! The complete protection graph remains fail-closed; this is not a production release.
 
 pub use crate::runtime_smali::SmaliTools;
+#[path = "runtime_constants.rs"]
+mod constants;
 #[path = "android_guard.rs"]
 mod guard;
 use crate::{
@@ -59,6 +61,7 @@ pub struct RuntimeStageEvidence {
     pub output_sha256: String,
     pub runtime_fingerprint: String,
     pub protected_strings: usize,
+    pub protected_constants: usize,
     pub virtualized_methods: usize,
     pub dex_units: usize,
     pub native_sha256: BTreeMap<String, String>,
@@ -291,6 +294,11 @@ impl AndroidRuntimePlan {
                     .iter()
                     .filter(|b| b.kind == RuntimeEntryKind::String)
                     .count(),
+                protected_constants: self
+                    .bindings
+                    .iter()
+                    .filter(|binding| binding.kind == RuntimeEntryKind::Constant)
+                    .count(),
                 virtualized_methods: self
                     .bindings
                     .iter()
@@ -327,6 +335,14 @@ impl AndroidRuntimePlan {
                     String::from_utf8(runtime_smali::read_bounded(&path, 64 * 1024 * 1024)?)
                         .map_err(|_| refuse("invalid smali text"))?;
                 let body = match binding.kind {
+                    RuntimeEntryKind::Constant => runtime_smali::constant_stub(
+                        binding.slot,
+                        binding
+                            .signature
+                            .chars()
+                            .last()
+                            .ok_or_else(|| refuse("missing constant signature"))?,
+                    )?,
                     RuntimeEntryKind::String => runtime_smali::string_stub(binding.slot),
                     RuntimeEntryKind::IntVm => {
                         runtime_smali::int_stub(binding.slot, binding.arguments)
@@ -475,6 +491,9 @@ fn protect_binding(
     slot: u32,
     image: &mut RuntimeImage,
 ) -> Result<RuntimeEntryKind> {
+    if let Some(kind) = constants::protect_literal(dex, index, slot, image)? {
+        return Ok(kind);
+    }
     let method = &dex.methods[index as usize];
     let proto = &dex.protos[usize::from(method.proto_idx)];
     let return_type = dex

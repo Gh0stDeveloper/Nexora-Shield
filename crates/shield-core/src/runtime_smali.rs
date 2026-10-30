@@ -154,6 +154,24 @@ pub(crate) fn replace_method(source: &str, signature: &str, body: &str) -> Resul
     Ok(output)
 }
 
+pub(crate) fn constant_stub(slot: u32, kind: char) -> Result<String> {
+    let (class, unbox, wide) = match kind {
+        'Z' => ("Boolean", "booleanValue()Z", false),
+        'I' => ("Integer", "intValue()I", false),
+        'J' => ("Long", "longValue()J", true),
+        'F' => ("Float", "floatValue()F", false),
+        'D' => ("Double", "doubleValue()D", true),
+        _ => return Err(refuse("unsupported constant stub type")),
+    };
+    let result = if wide {
+        "move-result-wide"
+    } else {
+        "move-result"
+    };
+    let ret = if wide { "return-wide" } else { "return" };
+    Ok(format!("    .registers 2\n    const v0, 0x{slot:x}\n    invoke-static {{v0}}, {HELPER}->constant(I)Ljava/lang/Object;\n    move-result-object v0\n    check-cast v0, Ljava/lang/{class};\n    invoke-virtual {{v0}}, Ljava/lang/{class};->{unbox}\n    {result} v0\n    {ret} v0"))
+}
+
 pub(crate) fn string_stub(slot: u32) -> String {
     format!("    .registers 2\n    const v0, 0x{slot:x}\n    invoke-static {{v0}}, {HELPER}->string(I)Ljava/lang/String;\n    move-result-object v0\n    return-object v0")
 }
@@ -192,6 +210,9 @@ pub(crate) fn helper(fingerprint: &str) -> String {
 .method private static native nBind(Ljava/lang/String;)V
 .end method
 
+.method private static native nConstant(I)Ljava/lang/Object;
+.end method
+
 .method private static native nInt(I[I)I
 .end method
 
@@ -199,6 +220,13 @@ pub(crate) fn helper(fingerprint: &str) -> String {
 .end method
 
 .method private static native nStart(Landroid/content/Context;)I
+.end method
+
+.method public static constant(I)Ljava/lang/Object;
+    .registers 1
+    invoke-static {{p0}}, Ldev/nexora/shield/NativeShield;->nConstant(I)Ljava/lang/Object;
+    move-result-object p0
+    return-object p0
 .end method
 
 .method public static install(Landroid/content/Context;)V

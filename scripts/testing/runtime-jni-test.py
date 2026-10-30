@@ -18,6 +18,8 @@ image = json.loads(args.image.read_text())
 fingerprint = hashlib.sha256(json.dumps([image['schema'], image['application_id'], image['build_id'], image['entries'], image.get('guard_key'), image.get('guard_binding')], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
 string_slot = next(e['slot'] for e in image['entries'] if e['kind']=='String')
 vm_slot = next(e['slot'] for e in image['entries'] if e['kind']=='IntVm')
+constant_slots=[e['slot'] for e in image['entries'] if e['kind']=='Constant']
+if len(constant_slots)!=5: raise SystemExit('Five typed constants are required by this JNI fixture')
 with tempfile.TemporaryDirectory(prefix='nexora-jni-') as tmp:
     root = Path(tmp)
     source = root/'dev/nexora/shield/NativeShield.java'
@@ -27,6 +29,7 @@ public final class NativeShield {
   private static native void nBind(String expected);
   private static native String nString(int slot);
   private static native int nInt(int slot, int[] arguments);
+  private static native Object nConstant(int slot);
   public static void main(String[] args) {
     System.load(args[0]);
     try {
@@ -43,9 +46,18 @@ public final class NativeShield {
     try {nString(VM_SLOT);throw new AssertionError("wrong kind accepted");}catch(SecurityException expected){}
     try {nInt(VM_SLOT,new int[]{1});throw new AssertionError("arity accepted");}catch(SecurityException expected){}
     try {nString(-1);throw new AssertionError("negative slot accepted");}catch(SecurityException expected){}
+    java.util.Set<String> values=new java.util.HashSet<>();
+    for(int slot:new int[]{CONSTANT_SLOTS}) {
+      Object value=nConstant(slot);
+      String repr=value instanceof Float ? Integer.toHexString(Float.floatToRawIntBits((Float)value)) : value instanceof Double ? Long.toHexString(Double.doubleToRawLongBits((Double)value)) : value.toString();
+      values.add(value.getClass().getSimpleName()+":"+repr);
+    }
+    java.util.Set<String> expected=new java.util.HashSet<>(java.util.Arrays.asList("Boolean:true","Integer:324508639","Long:81985529216486895","Float:80000000","Double:4004000000000000"));
+    if(!values.equals(expected)) throw new AssertionError("native typed constants");
+    try {nConstant(STRING_SLOT);throw new AssertionError("constant slot type accepted");}catch(SecurityException rejected){}
     System.out.println("HOST_JNI_OK");
   }
-}'''.replace('FINGERPRINT',fingerprint).replace('STRING_SLOT',str(string_slot)).replace('VM_SLOT',str(vm_slot)),encoding='utf-8')
+}'''.replace('FINGERPRINT',fingerprint).replace('STRING_SLOT',str(string_slot)).replace('VM_SLOT',str(vm_slot)).replace('CONSTANT_SLOTS',','.join(map(str,constant_slots))),encoding='utf-8')
     compiler = [args.java,'-jar',str(args.ecj),'-1.8'] if args.ecj else [args.javac,'-source','8','-target','8']
     subprocess.run(compiler+['-encoding','UTF-8','-d',str(root),str(source)],check=True)
     command=[args.java,'-cp',str(root),'dev.nexora.shield.NativeShield']

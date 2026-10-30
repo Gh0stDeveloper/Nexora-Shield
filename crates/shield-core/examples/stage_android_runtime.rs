@@ -86,6 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Input SHA-256: {}", evidence.input_sha256);
         println!("Output SHA-256: {}", evidence.output_sha256);
         println!("Protected strings: {}", evidence.protected_strings);
+        println!("Protected constants: {}", evidence.protected_constants);
         println!("Virtualized methods: {}", evidence.virtualized_methods);
         println!("Runtime fingerprint: {}", evidence.runtime_fingerprint);
     } else {

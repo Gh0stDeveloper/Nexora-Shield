@@ -2,6 +2,10 @@
 
 Status: **OPEN — O.1 NOT CLOSED; stable v1.0.0 NO-GO**.
 
+The [encrypted constant runtime increment](PHASE-O1-CONSTANT-RUNTIME.md) adds
+eligible primitive literal getters; its evidence and limits supersede the
+constant-specific missing-integration findings below.
+
 Current startup graph/RASP implementation and remaining limitations are recorded
 in [O.1 signed guard runtime](PHASE-O1-GUARD-RUNTIME.md). Historical missing-loader
 findings below do not describe that new eligible slice; full production closure
