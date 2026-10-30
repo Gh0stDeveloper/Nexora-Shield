@@ -144,6 +144,36 @@ with zipfile.ZipFile(directory / "compressed-dex.apk", "w", compression=zipfile.
     output.writestr("AndroidManifest.xml", manifest)
     output.writestr("classes.dex", first)
 
+# O.1.3: synthetic ELF64 dynamic exports. These are structural JNI
+# fixtures, not loadable machine-code implementations.
+def elf64_jni_export(symbol: str) -> bytes:
+    names = b"\x00" + symbol.encode("ascii") + b"\x00"
+    dynstr = 64
+    dynsym = dynstr + len(names)
+    shoff = dynsym + 2 * 24
+    result = bytearray(shoff + 3 * 64)
+    result[:4] = b"\x7fELF"
+    result[4:7] = bytes([2, 1, 1])
+    struct.pack_into("<HHI", result, 16, 3, 183, 1)  # ET_DYN + AArch64
+    struct.pack_into("<Q", result, 40, shoff)
+    struct.pack_into("<HHH", result, 52, 64, 0, 0)
+    struct.pack_into("<HH", result, 58, 64, 3)
+    result[dynstr:dynstr + len(names)] = names
+    symbol_at = dynsym + 24
+    struct.pack_into("<I", result, symbol_at, 1)
+    result[symbol_at + 4] = 0x12  # STB_GLOBAL | STT_FUNC
+    struct.pack_into("<H", result, symbol_at + 6, 1)
+    symhdr = shoff + 64
+    strhdr = shoff + 2 * 64
+    struct.pack_into("<I", result, symhdr + 4, 11)  # SHT_DYNSYM
+    struct.pack_into("<QQ", result, symhdr + 24, dynsym, 48)
+    struct.pack_into("<I", result, symhdr + 40, 2)   # dynstr section link
+    struct.pack_into("<Q", result, symhdr + 56, 24)
+    struct.pack_into("<I", result, strhdr + 4, 3)   # SHT_STRTAB
+    struct.pack_into("<QQ", result, strhdr + 24, dynstr, len(names))
+    return bytes(result)
+
+
 # O.1.3: non-DEX Android ABI regressions. These fixture APKs must be
 # rejected by the diagnostic staging gate before it writes an output file.
 abi_variants = {
@@ -178,6 +208,22 @@ abi_variants = {
     "native-jni": (
         manifest,
         {"lib/arm64-v8a/libexample.so": b"\x7fELF\x02\x01"},
+    ),
+    "native-jni-static": (
+        manifest,
+        {"lib/arm64-v8a/libexample.so": elf64_jni_export("Java_com_test_A_run")},
+    ),
+    "native-jni-dynamic": (
+        manifest,
+        {"lib/arm64-v8a/libexample.so": elf64_jni_export("JNI_OnLoad")},
+    ),
+    "native-jni-opaque": (
+        manifest,
+        {"lib/arm64-v8a/libexample.so": elf64_jni_export("other_symbol")},
+    ),
+    "native-jni-wrong-abi": (
+        manifest,
+        {"lib/x86_64/libexample.so": elf64_jni_export("other_symbol")},
     ),
 }
 for variant, (variant_manifest, extras) in abi_variants.items():
