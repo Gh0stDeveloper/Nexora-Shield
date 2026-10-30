@@ -50,7 +50,7 @@ impl InputSnapshot {
         for _ in 0..128 {
             let sequence = NEXT_SNAPSHOT.fetch_add(1, Ordering::Relaxed);
             let directory = std::env::temp_dir()
-                .join(format!("nexora-input-{}-{sequence}", std::process::id(),));
+                .join(format!("nexora-input-{}-{sequence}", std::process::id()));
             let mut builder = fs::DirBuilder::new();
             #[cfg(unix)]
             {
