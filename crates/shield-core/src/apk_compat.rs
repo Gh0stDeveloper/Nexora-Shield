@@ -215,9 +215,9 @@ fn inspect_resource_entry(
 ) -> Result<Option<Vec<u8>>> {
     let size = usize::try_from(entry.uncompressed_size)
         .map_err(|_| CoreError::InvalidRequest("O.1.3 resource table size overflow".into()))?;
-    *total = total.checked_add(size).ok_or_else(|| {
-        CoreError::InvalidRequest("O.1.3 resource table budget overflow".into())
-    })?;
+    *total = total
+        .checked_add(size)
+        .ok_or_else(|| CoreError::InvalidRequest("O.1.3 resource table budget overflow".into()))?;
     if size > MAX_CONTRACT_ENTRY_BYTES || *total > MAX_CONTRACT_TOTAL_BYTES {
         return Err(CoreError::InvalidRequest(
             "O.1.3 resource table exceeds bounded inspection budget".into(),
