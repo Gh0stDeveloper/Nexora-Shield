@@ -14,7 +14,10 @@ p.add_argument('--adb', required=True)
 args = p.parse_args()
 
 def adb(*values, check=True):
-    return subprocess.run([args.adb, *values], check=check, capture_output=True, text=True, timeout=120).stdout
+    result=subprocess.run([args.adb, *values], capture_output=True, text=True, timeout=120)
+    if check and result.returncode:
+        raise SystemExit(f'ADB {values[0]} failed: {result.stderr.strip()} {result.stdout.strip()}')
+    return result.stdout
 
 root = args.directory
 evidence = json.loads((root/'evidence.json').read_text())
@@ -30,14 +33,20 @@ for name, expected_hash in evidence['artifacts'].items():
     if hashlib.sha256(apk.read_bytes()).hexdigest() != expected_hash:
         raise SystemExit('APK changed after final verification')
     adb('shell', 'am', 'force-stop', 'dev.nexora.runtime', check=False)
-    if name == 'resigned':
+    # Rejected startup can leave ActivityManager retry state. Each adversarial
+    # APK gets a separate installation; upgrade behavior belongs to the O.2 matrix.
+    if name != 'baseline':
         adb('uninstall', 'dev.nexora.runtime')
-    adb('install', '-r', str(apk))
+    install=adb('install', str(apk))
+    if 'Success' not in install.splitlines():
+        raise SystemExit(f'Android did not confirm installation: {name}')
     installed = adb('shell', 'pm', 'path', 'dev.nexora.runtime').strip()
     if not installed.startswith('package:') or '\n' in installed:
         raise SystemExit('Unexpected installed APK identity')
     pulled = root/f'{name}-installed.apk'
     adb('pull', installed.removeprefix('package:'), str(pulled))
+    if adb('shell','pm','path','dev.nexora.runtime').strip()!=installed:
+        raise SystemExit(f'Installed package path changed during verification: {name}')
     if hashlib.sha256(pulled.read_bytes()).hexdigest() != expected_hash:
         raise SystemExit('Installed APK hash differs from verified final APK')
     adb('logcat', '-c')
