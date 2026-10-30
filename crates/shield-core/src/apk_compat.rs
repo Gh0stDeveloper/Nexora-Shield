@@ -229,7 +229,12 @@ fn verify_non_dex_entries(
         if extension.is_some_and(|suffix| suffix.eq_ignore_ascii_case("so"))
             && name.starts_with("lib/")
         {
-            return guard_native_archive_entry(path, entry, &mut total, changed);
+            guard_native_archive_entry(path, entry, &mut total, changed)?;
+            // Even if the audit ever becomes permissive, the production
+            // native relinker must explicitly opt in. Never stage blindly.
+            return Err(CoreError::InvalidRequest(
+                "O.1.3 native library is not authorized for DEX renaming".into(),
+            ));
         }
         if name.eq_ignore_ascii_case("resources.arsc") {
             let size = usize::try_from(entry.uncompressed_size).map_err(|_| {
