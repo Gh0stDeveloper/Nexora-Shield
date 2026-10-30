@@ -186,8 +186,39 @@ fn verify_non_dex_entries(
         if extension.is_some_and(|suffix| suffix.eq_ignore_ascii_case("so"))
             && name.starts_with("lib/")
         {
+            let size = usize::try_from(entry.uncompressed_size).map_err(|_| {
+                CoreError::InvalidRequest("O.1.3 native library size overflow".into())
+            })?;
+            total = total.checked_add(size).ok_or_else(|| {
+                CoreError::InvalidRequest("O.1.3 native library budget overflow".into())
+            })?;
+            if size > MAX_CONTRACT_ENTRY_BYTES || total > MAX_CONTRACT_TOTAL_BYTES {
+                return Err(CoreError::InvalidRequest(
+                    "O.1.3 native ELF exceeds bounded inspection budget".into(),
+                ));
+            }
+            let elf = read_decoded_entry(path, entry, MAX_CONTRACT_ENTRY_BYTES)?;
+            let evidence = crate::android_jni::inspect_native_elf(&elf, name)?;
+            for binding in &evidence.static_jni {
+                for change in changed.iter().filter(|change| change.kind == NameKind::Class) {
+                    if crate::android_jni::references_renamed_class(binding, &change.old) {
+                        return Err(CoreError::InvalidRequest(format!(
+                            "O.1.3 native JNI export '{binding}' binds a renamed DEX class"
+                        )));
+                    }
+                }
+            }
+            if evidence.has_jni_onload {
+                return Err(CoreError::InvalidRequest(
+                    "O.1.3 JNI_OnLoad may register native methods dynamically; no verified remapper"
+                        .into(),
+                ));
+            }
+            // Even clean static exports cannot rule out FindClass,
+            // RegisterNatives or dlsym in code/data sections. No transformed
+            // native-bearing APK is authorized by this diagnostic gate yet.
             return Err(CoreError::InvalidRequest(
-                "O.1.3 packaged native library requires JNI binding verification".into(),
+                "O.1.3 native ELF inspected but dynamic JNI contracts remain unverified".into(),
             ));
         }
         if name.eq_ignore_ascii_case("resources.arsc") {
