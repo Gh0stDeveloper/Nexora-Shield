@@ -48,7 +48,8 @@ for name, expected_hash in evidence['artifacts'].items():
     adb('shell', 'am', 'force-stop', 'dev.nexora.runtime', check=False)
     # Rejected startup can leave ActivityManager retry state. Each adversarial
     # APK gets a separate installation; upgrade behavior belongs to the O.2 matrix.
-    if name != 'baseline':
+    # Frontend matrices can start with runtime directly, without a baseline case.
+    if results:
         adb('uninstall', 'dev.nexora.runtime')
     install=adb('install', str(apk))
     if 'Success' not in install.splitlines():
