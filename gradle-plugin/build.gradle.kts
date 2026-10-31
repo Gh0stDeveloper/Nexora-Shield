@@ -33,5 +33,19 @@ gradlePlugin {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform { excludeTags("integrated-apk") }
+}
+
+tasks.register<Test>("integratedEngineTest") {
+    description="Executes the real integrated APK engine through the plugin adapter."
+    val unitTests=tasks.named<Test>("test")
+    testClassesDirs=unitTests.get().testClassesDirs
+    classpath=unitTests.get().classpath
+    useJUnitPlatform {includeTags("integrated-apk")}
+    testLogging {
+        events("failed", "standardOut", "standardError")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+    outputs.upToDateWhen {false}
+    outputs.cacheIf {false}
 }

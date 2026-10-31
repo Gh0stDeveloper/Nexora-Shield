@@ -1,5 +1,11 @@
 # Phase O — Production Release Audit & Hardening checklist
 
+The [shared experimental APK transaction](PHASE-O1-INTEGRATED-ENGINE.md) now
+composes verified DEX transforms, executing runtimes, native compilation, signing
+and final-hash evidence through CLI/Gradle/Studio for an explicit eligible recipe.
+This supersedes historical separate-script findings for that scope; default
+profile subsets, optional attestation and full O.1 closure remain open.
+
 Status: **OPEN — blocks stable v1.0.0 publication**
 
 The checklist is intentionally strict. A checked implementation item is not enough by itself; its corresponding verification/evidence item must also be checked.
@@ -14,10 +20,25 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [x] Final O.0 documentation/CI gate
 
 ## O.1 Production Protection Orchestrator
-- [ ] Define authoritative production stage graph
-- [ ] Add typed production build context
-- [ ] Resolve configuration before mutation
-- [ ] Resolve effective protection profile
+
+The [signed startup graph/RASP slice](PHASE-O1-GUARD-RUNTIME.md) remains a
+qualification path; it does not complete the public production integrations.
+The [constant runtime increment](PHASE-O1-CONSTANT-RUNTIME.md) adds eligible
+primitive getters; the [raw asset runtime](PHASE-O1-ASSET-RUNTIME.md) adds
+bounded eligible asset access. [Delivered diversity and private reproduction](PHASE-O1-DIVERSITY-RUNTIME.md)
+adds verified runtime variations. These increments retain the closure boundaries.
+
+Current implementation/evidence boundaries: [O.1 execution audit](PHASE-O1-EXECUTION-AUDIT.md).
+The [eligible Android runtime slice](PHASE-O1-RUNTIME.md) adds actual JNI/VM
+method replacement and signed-fixture qualification. Full production items
+remain unchecked until all required controls run together.
+Frozen selection execution and input snapshots do not complete the unchecked
+production runtime/final-APK items below.
+
+- [x] Define authoritative production stage graph
+- [x] Add typed production build context
+- [x] Resolve typed request configuration before mutation (O.1.1; YAML file binding remains O.5)
+- [x] Resolve effective protection profile
 - [ ] Integrate DEX parse/validation
 - [ ] Integrate compatibility analysis
 - [ ] Integrate selectors
@@ -33,7 +54,7 @@ The checklist is intentionally strict. A checked implementation item is not enou
 - [ ] Align/sign final output
 - [ ] Verify final output
 - [ ] Emit executed-stage evidence
-- [ ] Fail closed for required unsupported stages
+- [x] Fail closed for required unsupported stages
 - [ ] CLI protect uses orchestrator
 - [ ] Gradle Plugin uses orchestrator
 - [ ] Shield Studio reaches same orchestrator

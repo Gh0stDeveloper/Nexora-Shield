@@ -88,6 +88,8 @@ data class PublicSecurityReport(
     val signed: Boolean,
     val strippedSignatureEntries: Int,
     val stages: List<String>,
+    val productionProtected: Boolean = false,
+    val protectionScope: String = "unverified-legacy",
 )
 
 data class BudgetEvaluation(

@@ -3,7 +3,7 @@ use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -31,6 +31,11 @@ impl PrivateBuildSeed {
 
     fn as_slice(&self) -> &[u8] {
         &self.bytes
+    }
+
+    /// Enforce role separation without exposing seed bytes to runtime configuration builders.
+    pub fn matches_material(&self, material: &[u8]) -> bool {
+        self.bytes == material
     }
 }
 
@@ -166,15 +171,15 @@ impl SeedDeriver {
     }
 
     pub fn domain_u64(&self, domain: DiversityDomain) -> Result<u64> {
-        let key = self.domain_key(domain)?;
+        let key = Zeroizing::new(self.domain_key(domain)?);
         let mut bytes = [0_u8; 8];
         bytes.copy_from_slice(&key[..8]);
         Ok(u64::from_le_bytes(bytes))
     }
 
     pub fn derive_u64(&self, domain: DiversityDomain, label: &[u8]) -> Result<u64> {
-        let domain_key = self.domain_key(domain)?;
-        let mut mac = HmacSha256::new_from_slice(&domain_key)
+        let domain_key = Zeroizing::new(self.domain_key(domain)?);
+        let mut mac = HmacSha256::new_from_slice(domain_key.as_ref())
             .map_err(|error| DiversityError::Encoding(error.to_string()))?;
         update_component(&mut mac, b"nexora-shield/diversity-item/v1");
         update_component(&mut mac, label);
@@ -197,6 +202,13 @@ impl fmt::Debug for SeedDeriver {
             .field("root", &"[REDACTED]")
             .field("context_fingerprint", &self.context_fingerprint)
             .finish()
+    }
+}
+
+impl Drop for SeedDeriver {
+    fn drop(&mut self) {
+        self.root.zeroize();
+        self.context_fingerprint.zeroize();
     }
 }
 

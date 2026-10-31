@@ -4,7 +4,7 @@ use crate::hash::{hash_components, Sha256Digest};
 use crate::identity::{CertificateBinding, PackageBinding};
 use crate::region::DexIntegrity;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -251,6 +251,32 @@ fn validate_graph(nodes: &[IntegrityNode], edges: &[IntegrityEdge]) -> Result<()
     if roots.len() != 1 || roots[0].kind != IntegrityNodeKind::Certificate {
         return Err(IntegrityError::InvalidGraph(
             "graph must have exactly one certificate root".into(),
+        ));
+    }
+    let mut remaining = incoming;
+    let mut children = BTreeMap::<Sha256Digest, Vec<Sha256Digest>>::new();
+    for edge in edges {
+        children.entry(edge.from).or_default().push(edge.to);
+    }
+    let mut ready = VecDeque::from([roots[0].id]);
+    let mut visited = 0;
+    while let Some(id) = ready.pop_front() {
+        visited += 1;
+        for child in children.get(&id).into_iter().flatten() {
+            let count = remaining
+                .get_mut(child)
+                .ok_or_else(|| IntegrityError::InvalidGraph("missing graph dependency".into()))?;
+            *count = count.checked_sub(1).ok_or_else(|| {
+                IntegrityError::InvalidGraph("invalid graph dependency count".into())
+            })?;
+            if *count == 0 {
+                ready.push_back(*child);
+            }
+        }
+    }
+    if visited != nodes.len() {
+        return Err(IntegrityError::InvalidGraph(
+            "graph contains a cycle or unreachable nodes".into(),
         ));
     }
     Ok(())

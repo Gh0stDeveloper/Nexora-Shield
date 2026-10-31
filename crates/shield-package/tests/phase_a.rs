@@ -12,6 +12,46 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+fn explicit_additions_preserve_payloads_and_reject_aliases_without_output() {
+    use nexora_shield_package::{read_decoded_entry, rewrite_with_additions};
+    use std::collections::BTreeMap;
+    let directory = test_directory("new-runtime-entries");
+    let input = directory.join("source.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"source dex"),
+            ("res/raw/keep", b"unchanged"),
+        ],
+    );
+    for name in ["classes.dex", "../escape", "META-INF/CERT.SF"] {
+        let output = directory.join("refused.apk");
+        let additions = BTreeMap::from([(name.to_owned(), b"bad".to_vec())]);
+        assert!(rewrite_with_additions(&input, &output, &BTreeMap::new(), &additions).is_err());
+        assert!(!output.exists());
+    }
+    let additions = BTreeMap::from([
+        ("classes2.dex".to_owned(), b"runtime dex".to_vec()),
+        ("lib/x86_64/runtime.so".to_owned(), b"ELF fixture".to_vec()),
+    ]);
+    let output = directory.join("augmented.apk");
+    rewrite_with_additions(&input, &output, &BTreeMap::new(), &additions).unwrap();
+    let built = read_zip_directory(&output).unwrap();
+    assert_eq!(built.entries.len(), 5);
+    for entry in &built.entries {
+        let bytes = read_decoded_entry(&output, entry, 1024).unwrap();
+        if entry.name == "res/raw/keep" {
+            assert_eq!(bytes, b"unchanged");
+        }
+        if let Some(expected) = additions.get(&entry.name) {
+            assert_eq!(&bytes, expected);
+        }
+    }
+    cleanup(&directory);
+}
+
+#[test]
 fn normalizer_preserves_payload_identity_and_discovers_multidex() {
     let directory = test_directory("normalize");
     let input = directory.join("input.apk");
@@ -66,6 +106,38 @@ fn normalizer_preserves_payload_identity_and_discovers_multidex() {
 }
 
 #[test]
+fn equivalence_rejects_payload_tamper_even_when_crc_metadata_is_unchanged() {
+    let directory = test_directory("tampered-raw-payload");
+    let input = directory.join("input.apk");
+    let output = directory.join("output.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original-dex"),
+            ("res/raw/token.bin", b"payload"),
+        ],
+    );
+    normalize_zip(&input, &output).expect("normalize fixture");
+    verify_normalized_equivalence(&input, &output).expect("unmodified archive");
+
+    let mut bytes = fs::read(&output).expect("read normalized archive");
+    let needle = b"payload";
+    let position = bytes
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .expect("find stored payload");
+    bytes[position..position + needle.len()].copy_from_slice(b"PAYLOAD");
+    fs::write(&output, bytes).expect("write byte-tampered archive");
+
+    // The ZIP still parses with original central CRC/size records, but the
+    // stream-preservation check must reject the modified payload.
+    read_zip_directory(&output).expect("unchanged ZIP directory");
+    assert!(verify_normalized_equivalence(&input, &output).is_err());
+    cleanup(&directory);
+}
+
+#[test]
 fn verifier_rejects_non_contiguous_multidex_sequence() {
     let directory = test_directory("dex-gap");
     let input = directory.join("gap.apk");
@@ -83,6 +155,74 @@ fn verifier_rejects_non_contiguous_multidex_sequence() {
     assert!(!inspection.dex_sequence_contiguous);
     assert!(verify_apk_structure(&input).is_err());
 
+    cleanup(&directory);
+}
+
+#[test]
+fn rewrite_refuses_existing_destination_without_changing_it() {
+    let directory = test_directory("existing-destination");
+    let input = directory.join("input.apk");
+    let output = directory.join("existing.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original"),
+        ],
+    );
+    fs::write(&output, b"important existing data").expect("create existing output");
+    let mut replacements = std::collections::BTreeMap::new();
+    replacements.insert("classes.dex".to_string(), b"rewritten".to_vec());
+    let failed = nexora_shield_package::rewrite_stored_entries(&input, &output, &replacements);
+    assert!(failed.is_err());
+    assert_eq!(
+        fs::read(&output).expect("read existing output"),
+        b"important existing data"
+    );
+    cleanup(&directory);
+}
+
+#[test]
+fn rewrite_does_not_publish_partial_archive_on_invalid_input() {
+    let directory = test_directory("invalid-rewrite");
+    let input = directory.join("input.apk");
+    let output = directory.join("incomplete.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original"),
+        ],
+    );
+    let mut replacements = std::collections::BTreeMap::new();
+    replacements.insert("missing.dex".to_string(), b"rewritten".to_vec());
+    assert!(nexora_shield_package::rewrite_stored_entries(&input, &output, &replacements).is_err());
+    assert!(!output.exists());
+    cleanup(&directory);
+}
+
+#[cfg(unix)]
+#[test]
+fn rewrite_does_not_follow_an_existing_destination_symlink() {
+    let directory = test_directory("symlink-destination");
+    let input = directory.join("input.apk");
+    let victim = directory.join("protected-data");
+    let symlink = directory.join("alias.apk");
+    write_stored_zip(
+        &input,
+        &[
+            ("AndroidManifest.xml", b"<manifest/>"),
+            ("classes.dex", b"original"),
+        ],
+    );
+    fs::write(&victim, b"confidential").expect("victim data");
+    std::os::unix::fs::symlink(&victim, &symlink).expect("symlink");
+    let replacements = std::collections::BTreeMap::new();
+    assert!(
+        nexora_shield_package::rewrite_stored_entries(&input, &symlink, &replacements).is_err()
+    );
+    assert_eq!(fs::read(&victim).expect("read victim"), b"confidential");
+    assert!(symlink.symlink_metadata().is_ok());
     cleanup(&directory);
 }
 

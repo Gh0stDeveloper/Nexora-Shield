@@ -46,8 +46,14 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     @get:Input
     abstract val cliExecutable: Property<String>
 
+    @get:Internal
+    abstract val engineConfig: RegularFileProperty
+
     @get:Input
     abstract val allowUnsigned: Property<Boolean>
+
+    @get:Input
+    abstract val legacyPhaseAOnly: Property<Boolean>
 
     @get:Input
     abstract val align: Property<Boolean>
@@ -96,8 +102,10 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
         val publicRoot = publicReportsDirectory.get().asFile
         val privateRoot = privateReportsDirectory.get().asFile
 
-        publicRoot.deleteRecursively()
-        privateRoot.deleteRecursively()
+        if (!engineConfig.isPresent) {
+            publicRoot.deleteRecursively()
+            privateRoot.deleteRecursively()
+        }
         publicRoot.mkdirs()
         privateRoot.mkdirs()
 
@@ -115,62 +123,7 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
 
             outputRoot.mkdirs()
             val outputApk = File(outputRoot, inputApk.name)
-            val stem = inputApk.name.removeSuffix(".apk")
-            val command = mutableListOf(
-                cliExecutable.get(),
-                "protect",
-                inputApk.absolutePath,
-                "--output",
-                outputApk.absolutePath,
-                "--profile",
-                profile.get(),
-                "--min-sdk",
-                minSdk.get().toString(),
-                "--force",
-            )
-
-            if (!align.get()) {
-                command += "--no-align"
-            }
-
-            if (signingKeystore.isPresent) {
-                command += listOf(
-                    "--keystore",
-                    signingKeystore.get().asFile.absolutePath,
-                    "--alias",
-                    signingAlias.get(),
-                    "--ks-pass-env",
-                    STORE_PASSWORD_ENV,
-                    "--key-pass-env",
-                    KEY_PASSWORD_ENV,
-                )
-            } else {
-                command += "--unsigned"
-            }
-
-            if (publicReports.get()) {
-                command += listOf(
-                    "--public-report",
-                    File(publicRoot, "$stem.json").absolutePath,
-                )
-            }
-            if (privateReports.get()) {
-                command += listOf(
-                    "--private-report",
-                    File(privateRoot, "$stem.private.json").absolutePath,
-                )
-            }
-
-            execOperations.exec {
-                commandLine(command)
-                environment(secretEnvironment)
-            }
-
-            if (!outputApk.isFile || outputApk.length() == 0L) {
-                throw GradleException(
-                    "Nexora Shield did not produce a non-empty APK for " + inputApk.name,
-                )
-            }
+            executeProtection(inputApk,outputApk,publicRoot,privateRoot,secretEnvironment)
 
             apkCount += 1
             outputApk
@@ -188,7 +141,73 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
         )
     }
 
+    internal fun executeProtection(inputApk:File,outputApk:File,publicRoot:File,privateRoot:File,secretEnvironment:Map<String,String>) {
+        validateConfiguration()
+        val stem = inputApk.name.removeSuffix(".apk")
+        val command = mutableListOf(
+            cliExecutable.get(),
+            if (legacyPhaseAOnly.get()) "package-apk" else "protect",
+            inputApk.absolutePath,
+            "--output",
+            outputApk.absolutePath,
+            "--profile",
+            profile.get(),
+            "--min-sdk",
+            minSdk.get().toString(),
+            "--force",
+        )
+
+        if (engineConfig.isPresent) { IntegratedEngineCommand.append(command, engineConfig.get().asFile) }
+
+        if (!align.get()) {
+            command += "--no-align"
+        }
+
+        if (signingKeystore.isPresent) {
+            command += listOf(
+                "--keystore",
+                signingKeystore.get().asFile.absolutePath,
+                "--alias",
+                signingAlias.get(),
+                "--ks-pass-env",
+                STORE_PASSWORD_ENV,
+                "--key-pass-env",
+                KEY_PASSWORD_ENV,
+            )
+        } else {
+            command += "--unsigned"
+        }
+
+        if (publicReports.get()) {
+            command += listOf(
+                "--public-report",
+                File(publicRoot, "$stem.json").absolutePath,
+            )
+        }
+        if (privateReports.get()) {
+            command += listOf(
+                "--private-report",
+                File(privateRoot, "$stem.private.json").absolutePath,
+            )
+        }
+
+        execOperations.exec {
+            commandLine(command)
+            environment(secretEnvironment)
+        }
+
+        if (!outputApk.isFile || outputApk.length() == 0L) {
+            throw GradleException(
+                "Nexora Shield did not produce a non-empty APK for " + inputApk.name,
+            )
+        }
+
+    }
+
     private fun validateConfiguration() {
+        if (engineConfig.isPresent && (legacyPhaseAOnly.get() || !align.get() || !signingKeystore.isPresent || !publicReports.get() || privateReports.get())) {
+            throw GradleException("Integrated execution requires signing, alignment and public reports; configure encrypted retrace_output in the private engine file.")
+        }
         if (profile.get() !in setOf("standard", "hardened", "maximum")) {
             throw GradleException(
                 "Unsupported Nexora Shield profile '" + profile.get() + "'.",
@@ -238,6 +257,8 @@ abstract class NexoraShieldApkTransformTask : DefaultTask() {
     private fun summaryJson(apkCount: Int): String {
         return "{\n" +
             "  \"schema\": 1,\n" +
+            "  \"productionProtected\": false,\n" +
+            "  \"protectionScope\": \"" + (if (engineConfig.isPresent) "o1-integrated-experimental" else "phase-a-packaging-only") + "\",\n" +
             "  \"variant\": \"" + jsonEscape(variantName.get()) + "\",\n" +
             "  \"profile\": \"" + jsonEscape(profile.get()) + "\",\n" +
             "  \"apkCount\": " + apkCount + ",\n" +

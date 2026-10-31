@@ -462,6 +462,20 @@ private fun ReportScreen(
             return@ScreenSurface
         }
 
+        Panel(
+            title = "Protection assurance",
+            subtitle = "A successful packaging task or valid signature does not prove the application is protected.",
+        ) {
+            StatusPill(
+                text = if (report.productionProtected) {
+                    "Production protection claimed — verify independent stage evidence"
+                } else {
+                    "NOT production protected — " + report.protectionScope
+                },
+                tone = if (report.productionProtected) ShieldTone.Info else ShieldTone.Warning,
+            )
+        }
+
         MetricGrid(compact) {
             MetricCard(
                 Icons.Outlined.Security,
@@ -492,7 +506,7 @@ private fun ReportScreen(
                 "Pipeline stages",
                 report.stages.size.toString(),
                 report.stages.lastOrNull() ?: "No stages",
-                ShieldTone.Success,
+                if (report.productionProtected) ShieldTone.Info else ShieldTone.Warning,
                 Modifier.weight(1f),
             )
         }
@@ -654,6 +668,35 @@ private fun BuildScreen(state: StudioState) {
                     Spacer(Modifier.width(7.dp))
                     Text("Check CLI")
                 }
+            }
+        }
+
+        Panel(title="Integrated experimental protection",subtitle="Builds a signed APK with the selected defenses. Application compatibility and production approval remain subject to validation.") {
+            OutlinedButton(onClick={chooseFile("Private engine configuration","nshield-private")?.let {state.engineConfiguration=it}},enabled=!state.busy) {
+                Text(state.engineConfiguration?.fileName?.toString() ?: "Select engine configuration")
+            }
+            OutlinedButton(onClick={chooseFile("Signing keystore","p12","jks","keystore")?.let {state.integratedKeystore=it}},enabled=!state.busy) {
+                Text(state.integratedKeystore?.fileName?.toString() ?: "Select signing keystore")
+            }
+            OutlinedTextField(value=state.integratedAlias,onValueChange={state.integratedAlias=it},label={Text("Signing alias")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=state.integratedPasswordEnvironment,onValueChange={state.integratedPasswordEnvironment=it},label={Text("Signing password environment variable")},
+                supportingText={Text("Use the variable name configured before starting Studio.")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            Button(onClick={scope.launch {state.runIntegratedProtection()}},enabled=!state.busy && state.project!=null && state.selectedArtifact!=null && state.engineConfiguration!=null && state.integratedKeystore!=null) {
+                Text("Build protected test APK")
+            }
+        }
+
+        Panel(
+            title = "Production readiness (Phase O.1)",
+            subtitle = "Runs protect --plan-only through the authoritative Rust orchestrator. This generates NO APK and grants NO production approval.",
+        ) {
+            OutlinedButton(
+                onClick = { scope.launch { state.runProductionReadinessCheck() } },
+                enabled = !state.busy && state.project != null && state.selectedArtifact != null,
+            ) {
+                Icon(Icons.Outlined.VerifiedUser, contentDescription = null)
+                Spacer(Modifier.width(7.dp))
+                Text("Inspect production readiness")
             }
         }
 

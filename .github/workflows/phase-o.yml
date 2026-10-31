@@ -17,6 +17,573 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  o1-android-runtime:
+    name: O.1 Android string JNI VM qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - name: Install pinned Android runtime build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          timeout 600 "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;27.3.13750724" "build-tools;35.0.0" "build-tools;37.0.0" "platforms;android-35"
+          echo "SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/27.3.13750724" >> "$GITHUB_ENV"
+          echo "BUILD_TOOLS=$SDK_ROOT/build-tools/35.0.0" >> "$GITHUB_ENV"
+      - name: Validate pinned assembler and build installable baseline
+        run: |
+          python scripts/testing/fetch-smali.py build/tools/smali
+          python scripts/testing/make-runtime-fixture.py build/o1-runtime \
+            --smali build/tools/smali --aapt2 "$BUILD_TOOLS/aapt2" \
+            --android-jar "$SDK_ROOT/platforms/android-35/android.jar"
+          python scripts/testing/runtime_signing.py build/o1-runtime
+          python scripts/testing/runtime_diversity.py prepare build/o1-runtime
+      - name: Test component contracts before runtime compilation
+        run: |
+          cargo test --locked -p nexora-shield-native --features android-runtime
+          cargo test --locked -p nexora-shield-core runtime_smali::tests
+          cargo test --locked -p nexora-shield-package --test phase_a
+      - name: Freeze selected methods and build-private runtime image
+        run: |
+          cargo run --locked -p nexora-shield-core --example stage_android_runtime -- \
+            prepare build/o1-runtime/baseline-unsigned.apk build/o1-runtime/host-runtime.nshield-private \
+            build/o1-runtime/root.key dev.nexora.runtime o1-functional \
+            'Ldev/nexora/runtime/Probe;#secret' 'Ldev/nexora/runtime/Probe;#sum' \
+            'Ldev/nexora/runtime/Probe;#*Constant' 'Ldev/nexora/runtime/Probe;#constant' --diversity-file build/o1-runtime/diversity.nshield-private --asset assets/secret-data.bin
+      - name: Execute real JNI entry points and authenticated tamper rejection on JVM
+        run: |
+          NEXORA_RUNTIME_IMAGE="$(realpath build/o1-runtime/host-runtime.nshield-private)" \
+            cargo build --locked --release -p nexora-shield-native --features android-runtime
+          python scripts/testing/runtime-jni-test.py --image build/o1-runtime/host-runtime.nshield-private \
+            --library target/release/libnexora_shield_native.so
+      - name: Build and verify signed startup graphs with report-only and enforcing RASP
+        run: bash scripts/testing/build-guard-qualification.sh build/o1-runtime
+      - name: Execute shared integrated engine and real frontend adapters
+        env:
+          NEXORA_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p nexora-shield
+          cargo build --locked -p nexora-shield-core --example verify_integrated_retrace
+          for mode in report-only enforce; do
+            python scripts/testing/integrated-runtime-test.py build/o1-runtime "build/o1-integrated-$mode" \
+              --mode "$mode" --cli target/debug/nexora-shield \
+              --cargo "$(command -v cargo)" --rustc "$(command -v rustc)" --java "$(command -v java)" \
+              --ndk "$ANDROID_NDK_HOME" --build-tools "$BUILD_TOOLS"
+          done
+          python scripts/testing/integrated-frontend-test.py build/o1-runtime build/o1-integrated-report-only \
+            --cli target/debug/nexora-shield --gradle "$(command -v gradle)" --sdk "$SDK_ROOT"
+      - name: Boot representative Android device
+        run: bash scripts/testing/start-runtime-emulator.sh
+      - name: Install pull hash launch compare behavior and reject native tamper
+        run: |
+          python scripts/testing/runtime-device-test.py build/o1-runtime --adb "$SDK_ROOT/platform-tools/adb"
+          python scripts/testing/runtime-device-test.py build/o1-runtime-enforce --adb "$SDK_ROOT/platform-tools/adb"
+          for directory in build/o1-integrated-report-only build/o1-integrated-enforce \
+              build/o1-integrated-report-only/gradle-plugin build/o1-integrated-report-only/studio; do
+            python scripts/testing/runtime-device-test.py "$directory" --adb "$SDK_ROOT/platform-tools/adb"
+          done
+      - name: Publish only final-artifact verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: o1-android-runtime-evidence
+          path: |
+            build/o1-runtime/evidence.json
+            build/o1-runtime-enforce/evidence.json
+            build/o1-integrated-report-only/evidence.json
+            build/o1-integrated-enforce/evidence.json
+            build/o1-integrated-report-only/gradle-plugin/evidence.json
+            build/o1-integrated-report-only/studio/evidence.json
+          if-no-files-found: error
+      - name: Stop Android emulator
+        if: always()
+        run: '"$SDK_ROOT/platform-tools/adb" emu kill || true'
+
+  o1-dex-preflight:
+    name: O.1 APK DEX preflight (read-only E2E)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Generate real DEX inputs plus adversarial APKs
+        run: python scripts/testing/make-phase-o1-fixtures.py
+      - name: Verify production planner inspects both DEX units and emits no output
+        run: |
+          cargo run --locked --quiet -p nexora-shield -- protect build/phase-o1/valid.apk \
+            --output build/phase-o1/not-created.apk \
+            --profile maximum --unsigned --no-align --plan-only \
+            > build/phase-o1/plan.txt
+          grep -q 'READ-ONLY, NOT PROTECTED' build/phase-o1/plan.txt
+          grep -q 'DEX units: 2' build/phase-o1/plan.txt
+          grep -q 'Production ready: false' build/phase-o1/plan.txt
+          grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan.txt
+          test ! -e build/phase-o1/not-created.apk
+      - name: Resolve standard hardened and maximum profiles without mutating APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for profile in standard hardened maximum; do
+            cargo run --locked --quiet -p nexora-shield -- \
+              protect build/phase-o1/valid.apk \
+              --output "build/phase-o1/not-created-${profile}.apk" \
+              --profile "${profile}" --unsigned --no-align --plan-only \
+              > "build/phase-o1/plan-${profile}.txt"
+            grep -q "Profile: ${profile}" "build/phase-o1/plan-${profile}.txt"
+            grep -q 'Stage dex-transform: Required, DiagnosticOnly' "build/phase-o1/plan-${profile}.txt"
+            grep -q 'Production ready: false' "build/phase-o1/plan-${profile}.txt"
+            test ! -e "build/phase-o1/not-created-${profile}.apk"
+          done
+          grep -q 'Stage data-protection: WhenSelected, NotIntegrated' build/phase-o1/plan-standard.txt
+          grep -q 'Stage data-protection: Required, NotIntegrated' build/phase-o1/plan-hardened.txt
+          grep -q 'Stage native-shield: Required, NotIntegrated' build/phase-o1/plan-maximum.txt
+          grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/plan-maximum.txt
+
+      - name: O.1.1 resolved policy rejects downgrade and unsupported production
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk \
+            --output build/phase-o1/o11-not-created.apk \
+            --profile standard --unsigned --no-align --plan-only \
+            --enable-control vm-shield --enable-control attestation \
+            > build/phase-o1/o11-selected.txt
+          grep -q 'Effective control vm-shield: true' build/phase-o1/o11-selected.txt
+          grep -q 'Effective control attestation: true' build/phase-o1/o11-selected.txt
+          grep -q 'Stage vm-shield: Required, NotIntegrated' build/phase-o1/o11-selected.txt
+          grep -q 'Stage attestation: Required, NotIntegrated' build/phase-o1/o11-selected.txt
+          grep -q 'Production ready: false' build/phase-o1/o11-selected.txt
+          test ! -e build/phase-o1/o11-not-created.apk
+          if cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk --output build/phase-o1/o11-forbidden.apk \
+            --profile maximum --unsigned --no-align --plan-only \
+            --disable-control native-shield > build/phase-o1/o11-rejected.txt 2>&1; then
+            echo 'Maximum profile downgrade was accepted' >&2
+            exit 1
+          fi
+          grep -q "native-shield" build/phase-o1/o11-rejected.txt
+          if cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk --output build/phase-o1/o11-forbidden.apk \
+            --profile standard --unsigned --no-align --plan-only \
+            --enable-control attestation --disable-control attestation \
+            > build/phase-o1/o11-duplicate.txt 2>&1; then
+            echo 'Duplicate control override was accepted' >&2
+            exit 1
+          fi
+          grep -q 'duplicate production control override' build/phase-o1/o11-duplicate.txt
+          test ! -e build/phase-o1/o11-forbidden.apk
+          cargo test --locked -p nexora-shield-core policy::tests
+
+      - name: O.1.2 multidex selector contract and invalid-policy rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk \
+            --output build/phase-o1/o12-not-created.apk \
+            --profile hardened --unsigned --no-align --plan-only \
+            --method 'Lcom/test/A;#run' --class 'Lcom/test/B;' \
+            > build/phase-o1/o12-selection.txt
+          grep -q 'DEX units: 2' build/phase-o1/o12-selection.txt
+          grep -q 'classes.dex: classes=1, methods=1, fields=0, selected=0/1/0' build/phase-o1/o12-selection.txt
+          grep -q 'classes2.dex: classes=1, methods=1, fields=0, selected=1/0/0' build/phase-o1/o12-selection.txt
+          grep -q 'Cross-DEX reflection risk: false' build/phase-o1/o12-selection.txt
+          grep -q 'Production ready: false' build/phase-o1/o12-selection.txt
+          test ! -e build/phase-o1/o12-not-created.apk
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk --output build/phase-o1/o12-excluded.apk \
+            --profile hardened --unsigned --no-align --plan-only \
+            --exclude-class 'Lcom/test/B;' > build/phase-o1/o12-exclusion.txt
+          grep -q 'classes2.dex: classes=1, methods=1, fields=0, selected=0/1/0' build/phase-o1/o12-exclusion.txt
+          test ! -e build/phase-o1/o12-excluded.apk
+          for mode in unmatched empty duplicate; do
+            args=(--profile hardened --unsigned --no-align --plan-only)
+            case "$mode" in
+              unmatched) args+=(--class 'Lmissing/NotDefined;') ;;
+              empty) args+=(--class 'Lcom/test/A;' --exclude-class 'Lcom/test/A;') ;;
+              duplicate) args+=(--method 'Lcom/test/A;#run' --method 'Lcom/test/A;#run') ;;
+            esac
+            if cargo run --locked --quiet -p nexora-shield -- \
+                protect build/phase-o1/valid.apk --output build/phase-o1/o12-forbidden.apk \
+                "${args[@]}" > "build/phase-o1/o12-${mode}.txt" 2>&1; then
+              echo "O.1.2 accepted invalid selector request: $mode" >&2
+              exit 1
+            fi
+            test ! -e build/phase-o1/o12-forbidden.apk
+          done
+          grep -q 'include selector matched no defined DEX symbols' build/phase-o1/o12-unmatched.txt
+          grep -q 'effective DEX selector selection is empty' build/phase-o1/o12-empty.txt
+          grep -q 'duplicate DEX selector rule' build/phase-o1/o12-duplicate.txt
+          cargo test --locked -p nexora-shield-core dex_selection::tests
+          cargo test --locked -p nexora-shield-dex multidex_parser_rejects
+      - name: O.1.3 verify real fixed-layout transformations and audit invariant
+        run: |
+          cargo test --locked -p nexora-shield-dex o13_
+          cargo test --locked -p nexora-shield-dex canonical_multidex_round_trip
+
+      - name: Frozen selection and input snapshot drive the actual DEX rewrite
+        run: |
+          cargo test --locked -p nexora-shield-core input_snapshot::tests
+          cargo test --locked -p nexora-shield-core --test pipeline o11_frozen_selection
+          cargo test --locked -p nexora-shield-dex --test phase_b o13_resolved
+
+      - name: Production protect must never return a Phase A packaging-only APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/valid.apk \
+            --output build/phase-o1/forbidden-production.apk \
+            --profile hardened --unsigned --no-align \
+            --public-report build/phase-o1/forbidden-public.json \
+            --private-report build/phase-o1/forbidden-private.json \
+            > build/phase-o1/production-denied.txt 2>&1; then
+            echo "Security regression: incomplete production path returned success" >&2
+            exit 1
+          fi
+          grep -q 'production protection unavailable' build/phase-o1/production-denied.txt
+          test ! -e build/phase-o1/forbidden-production.apk
+          test ! -e build/phase-o1/forbidden-public.json
+          test ! -e build/phase-o1/forbidden-private.json
+
+      - name: Rebuild and verify a diagnostic APK with real transformed DEX
+        run: |
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/valid.apk build/phase-o1/dex-staged.apk > build/phase-o1/staging.txt
+          grep -q 'DEX STAGING ONLY' build/phase-o1/staging.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/staging.txt
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          folder = Path("build/phase-o1")
+          with zipfile.ZipFile(folder / "valid.apk") as original, zipfile.ZipFile(folder / "dex-staged.apk") as rebuilt:
+              assert set(original.namelist()) == set(rebuilt.namelist())
+              assert original.read("AndroidManifest.xml") == rebuilt.read("AndroidManifest.xml")
+              for name in ("classes.dex", "classes2.dex"):
+                  assert original.read(name) != rebuilt.read(name)
+                  assert rebuilt.getinfo(name).compress_type == zipfile.ZIP_STORED
+                  (folder / "rewritten").mkdir(exist_ok=True)
+                  (folder / "rewritten" / name).write_bytes(rebuilt.read(name))
+          PY
+          cargo run --locked --quiet -p nexora-shield -- dex-multidex-verify \
+            build/phase-o1/rewritten/classes.dex build/phase-o1/rewritten/classes2.dex
+      - name: O.1.3 protected retrace sidecar never enters diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-crypto retrace::tests
+          cargo test --locked -p nexora-shield-core retrace_tests
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          key = Path("build/phase-o1/retrace-test-key")
+          descriptor = os.open(key, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+          try:
+              os.write(descriptor, os.urandom(32))
+          finally:
+              os.close(descriptor)
+          PY
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/valid.apk build/phase-o1/secure-stage.apk \
+            --retrace-map build/phase-o1/private-retrace.nsr \
+            --retrace-key-file build/phase-o1/retrace-test-key \
+            --application-id com.nexora.fixture --build-id ci-o13-retrace \
+            > build/phase-o1/secure-retrace-stage.txt
+          grep -q 'DEX STAGING ONLY' build/phase-o1/secure-retrace-stage.txt
+          cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/secure-stage.apk build/phase-o1/private-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture ci-o13-retrace \
+            > build/phase-o1/retrace-inspection.txt
+          grep -q 'Private retrace map authenticated' build/phase-o1/retrace-inspection.txt
+          grep -q 'Retrace records:' build/phase-o1/retrace-inspection.txt
+          if cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/valid.apk build/phase-o1/private-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture ci-o13-retrace; then
+            echo 'retrace map was accepted for the wrong APK hash' >&2
+            exit 1
+          fi
+          if cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/secure-stage.apk build/phase-o1/private-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture wrong-build; then
+            echo 'retrace map accepted a wrong build identity' >&2
+            exit 1
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          import os, stat, zipfile
+          parent = Path("build/phase-o1")
+          protected = parent / "private-retrace.nsr"
+          blob = protected.read_bytes()
+          assert blob[:4] == b"NSC1", "must be authenticated ciphertext"
+          assert b"Lcom/test/" not in blob, "class names must not leak"
+          assert b'"original"' not in blob, "raw mapping keys must not leak"
+          assert stat.S_IMODE(protected.stat().st_mode) == 0o600
+          with zipfile.ZipFile(parent / "secure-stage.apk") as apk:
+              assert not any("retrace" in name.lower() for name in apk.namelist())
+          corrupted = bytearray(blob)
+          corrupted[-1] ^= 1
+          (parent / "corrupted-retrace.nsr").write_bytes(corrupted)
+          os.chmod(parent / "corrupted-retrace.nsr", 0o600)
+          PY
+          if cargo run --locked --quiet -p nexora-shield-core --example retrace_inspect -- \
+            build/phase-o1/secure-stage.apk build/phase-o1/corrupted-retrace.nsr \
+            build/phase-o1/retrace-test-key com.nexora.fixture ci-o13-retrace; then
+            echo 'tampered retrace container passed authentication' >&2
+            exit 1
+          fi
+          if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/valid.apk build/phase-o1/refused-stage.apk \
+            --retrace-map build/phase-o1/private-retrace.nsr \
+            --retrace-key-file build/phase-o1/retrace-test-key \
+            --application-id com.nexora.fixture --build-id ci-o13-retrace; then
+            echo 'security regression: allowed replacing a protected retrace map' >&2
+            exit 1
+          fi
+          test ! -e build/phase-o1/refused-stage.apk
+      - name: O.1.3 reject unsafe Manifest resources JNI and binary XML remaps
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core apk_compat::tests
+          for variant in manifest-component manifest-fully-qualified manifest-binary resource-callback resource-config resource-binary resource-table native-jni; do
+            target="build/phase-o1/o13-refused-${variant}.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${variant}.apk" "${target}" \
+              > "build/phase-o1/o13-${variant}.txt" 2>&1; then
+              echo "O.1.3 allowed an unsafe external Android ABI rename: ${variant}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3' "build/phase-o1/o13-${variant}.txt"
+            test ! -e "${target}"
+          done
+          # The ordinary plain-text manifest with no external aliases must
+          # remain an allowed diagnostic transform. Previous step covers it.
+          test -f build/phase-o1/dex-staged.apk
+      - name: O.1.3 inspect ELF32 and ELF64 JNI contracts before any APK staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core android_jni::tests
+          for variant in native-jni-static native-jni-dynamic native-jni-opaque native-jni-wrong-abi; do
+            output="build/phase-o1/${variant}-denied.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${variant}.apk" "${output}" \
+              > "build/phase-o1/${variant}.txt" 2>&1; then
+              echo "O.1.3 allowed an unverified native ELF/JNI linkage: ${variant}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3 native ELF/JNI\|O.1.3 native JNI\|O.1.3 JNI_OnLoad\|O.1.3 native ELF inspected' \
+              "build/phase-o1/${variant}.txt"
+            test ! -e "${output}"
+          done
+          grep -q 'binds a renamed DEX class' build/phase-o1/native-jni-static.txt
+          grep -q 'may register native methods dynamically' build/phase-o1/native-jni-dynamic.txt
+          grep -q 'dynamic JNI contracts remain unverified' build/phase-o1/native-jni-opaque.txt
+          grep -q 'ELF type, machine, version or header mismatch' build/phase-o1/native-jni-wrong-abi.txt
+      - name: O.1.3 structurally parse Android binary XML and preserve safe input
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core android_binary_xml::tests
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/binary-valid-unreferenced.apk \
+            build/phase-o1/binary-valid-staged.apk \
+            > build/phase-o1/binary-valid-stage.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/binary-valid-stage.txt
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          base = Path("build/phase-o1")
+          with ZipFile(base / "binary-valid-unreferenced.apk") as source:
+              original = source.read("AndroidManifest.xml")
+          with ZipFile(base / "binary-valid-staged.apk") as output:
+              assert output.read("AndroidManifest.xml") == original, "binary XML modified unexpectedly"
+              assert output.read("classes.dex") != (base / "classes.dex").read_bytes()
+          PY
+          for mode in binary-valid-class-alias binary-valid-relative-alias; do
+            denied="build/phase-o1/${mode}-denied.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${mode}.apk" "${denied}" \
+              > "build/phase-o1/${mode}.txt" 2>&1; then
+              echo "O.1.3 accepted a compiled XML class alias: ${mode}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3' "build/phase-o1/${mode}.txt"
+            test ! -e "${denied}"
+          done
+      - name: O.1.3 rewrite class-valued compiled Manifest attributes safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core o13_compiled_manifest_rewrites
+          cargo test --locked -p nexora-shield-core o13_manifest_refuses_shared
+          for mode in binary-class-utf8 binary-class-utf16; do
+            input="build/phase-o1/${mode}.apk"
+            output="build/phase-o1/${mode}-linked.apk"
+            cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "${input}" "${output}" > "build/phase-o1/${mode}.txt"
+            grep -q 'Changed DEX units: 2' "build/phase-o1/${mode}.txt"
+            python - "${input}" "${output}" <<'PY'
+          import sys
+          from zipfile import ZipFile
+          with ZipFile(sys.argv[1]) as source, ZipFile(sys.argv[2]) as staged:
+              original = source.read("AndroidManifest.xml")
+              revised = staged.read("AndroidManifest.xml")
+              assert original != revised, "linked manifest must change"
+              assert len(original) == len(revised), "string-pool index layout must remain fixed"
+              assert source.read("classes.dex") != staged.read("classes.dex")
+              assert b"com.test.A" not in revised
+          PY
+          done
+          for mode in binary-class-shared binary-class-bad-namespace; do
+            denied="build/phase-o1/${mode}-denied.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${mode}.apk" "${denied}" \
+              > "build/phase-o1/${mode}.txt" 2>&1; then
+              echo "O.1.3 accepted ambiguous compiled Manifest class link: ${mode}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3' "build/phase-o1/${mode}.txt"
+            test ! -e "${denied}"
+          done
+      - name: O.1.3 inspect resources.arsc and refuse unsafe ABI relinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p nexora-shield-core android_resources::tests
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/arsc-unreferenced.apk \
+            build/phase-o1/arsc-preserved.apk \
+            > build/phase-o1/arsc-stage.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/arsc-stage.txt
+          python - <<'PY'
+          from zipfile import ZipFile
+          root = "build/phase-o1/"
+          with ZipFile(root + "arsc-unreferenced.apk") as original, \
+               ZipFile(root + "arsc-preserved.apk") as rewritten:
+              assert original.read("resources.arsc") == rewritten.read("resources.arsc")
+              assert original.read("classes.dex") != rewritten.read("classes.dex")
+          PY
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/arsc-class-alias.apk \
+            build/phase-o1/arsc-linked.apk \
+            > build/phase-o1/arsc-linked.txt
+          grep -q 'Changed DEX units: 2' build/phase-o1/arsc-linked.txt
+          python - <<'PY'
+          from zipfile import ZipFile
+          root = "build/phase-o1/"
+          with ZipFile(root + "arsc-class-alias.apk") as original, \
+               ZipFile(root + "arsc-linked.apk") as linked:
+              before = original.read("resources.arsc")
+              after = linked.read("resources.arsc")
+              assert before != after
+              assert len(before) == len(after)
+              assert b"com.test.A" in before
+              assert b"com.test.A" not in after
+              assert before[:12] == after[:12]
+              pool_len = int.from_bytes(before[16:20], "little")
+              assert before[12 + pool_len:] == after[12 + pool_len:], "ARSC packages or IDs changed"
+              assert original.read("classes.dex") != linked.read("classes.dex")
+          PY
+          for mode in arsc-class-unbound arsc-name-alias arsc-corrupt; do
+            denied="build/phase-o1/${mode}-denied.apk"
+            if cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+              "build/phase-o1/${mode}.apk" "${denied}" \
+              > "build/phase-o1/${mode}.txt" 2>&1; then
+              echo "O.1.3 accepted malformed or externally linked ARSC: ${mode}" >&2
+              exit 1
+            fi
+            grep -q 'O.1.3' "build/phase-o1/${mode}.txt"
+            test ! -e "${denied}"
+          done
+      - name: Accept bounded DEFLATE DEX and preserve compression-safe reconstruction
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -p nexora-shield -- \
+            protect build/phase-o1/compressed-dex.apk \
+            --output build/phase-o1/not-created-deflate.apk \
+            --unsigned --no-align --plan-only > build/phase-o1/deflate-plan.txt
+          grep -q 'DEX units: 1' build/phase-o1/deflate-plan.txt
+          test ! -e build/phase-o1/not-created-deflate.apk
+          cargo run --locked --quiet -p nexora-shield-core --example stage_dex -- \
+            build/phase-o1/compressed-dex.apk build/phase-o1/deflate-staged.apk \
+            > build/phase-o1/deflate-stage.txt
+          grep -q 'DEX STAGING ONLY' build/phase-o1/deflate-stage.txt
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("build/phase-o1/compressed-dex.apk") as original, \
+               zipfile.ZipFile("build/phase-o1/deflate-staged.apk") as rebuilt:
+              assert original.read("classes.dex") != rebuilt.read("classes.dex")
+              assert rebuilt.getinfo("classes.dex").compress_type == zipfile.ZIP_STORED
+              assert original.read("AndroidManifest.xml") == rebuilt.read("AndroidManifest.xml")
+          PY
+      - name: Reject malformed, corrupt/oversized compressed and duplicate-class DEX inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variant in invalid-dex corrupt-deflate oversized-deflate duplicate-class crc-mismatch; do
+            if cargo run --locked --quiet -p nexora-shield -- \
+                protect "build/phase-o1/${variant}.apk" \
+                --output build/phase-o1/rejected.apk \
+                --unsigned --no-align --plan-only; then
+              echo "Rejected ${variant} unexpectedly passed read-only DEX preflight" >&2
+              exit 1
+            fi
+            test ! -e build/phase-o1/rejected.apk
+          done
+
+  o1-stage-contracts:
+    name: O.1 typed stage graph contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run stage graph contracts
+        run: cargo test --locked -p nexora-shield-core production::tests
+
+
+  o1-studio-preflight:
+    name: O.1 Shield Studio production preflight routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Configure JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - name: Compile Studio and test fail-closed production planning
+        run: gradle -p studio desktopTest --no-daemon --stacktrace
+
   o0-release-freeze:
     name: O.0 release freeze and audit baseline
     runs-on: ubuntu-latest

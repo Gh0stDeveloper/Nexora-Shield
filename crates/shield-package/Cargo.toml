@@ -8,5 +8,9 @@ publish.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[dependencies]
+# Pure-Rust bounded DEFLATE for canonical classes*.dex inspection.
+miniz_oxide = { version = "=0.8.9", default-features = false, features = ["with-alloc"] }
+
 [lints]
 workspace = true

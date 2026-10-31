@@ -3,6 +3,15 @@ pub const REQUIRED_JNI_EXPORTS: [&str; 2] = [
     "Java_dev_nexora_shield_NativeShield_nativeAbiCode",
 ];
 
+pub const RUNTIME_JNI_EXPORTS: [&str; 6] = [
+    "Java_dev_nexora_shield_NativeShield_nBind",
+    "Java_dev_nexora_shield_NativeShield_nInt",
+    "Java_dev_nexora_shield_NativeShield_nString",
+    "Java_dev_nexora_shield_NativeShield_nStart",
+    "Java_dev_nexora_shield_NativeShield_nConstant",
+    "Java_dev_nexora_shield_NativeShield_nOpenAsset",
+];
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ExportPolicy;
 

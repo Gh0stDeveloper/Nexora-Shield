@@ -78,12 +78,22 @@ pub struct MetadataReducer;
 
 impl MetadataReducer {
     pub fn strip_debug_metadata(dex: &DexFile) -> Result<(Vec<u8>, MetadataReductionReport)> {
+        let selection = SelectorResolver::resolve(dex, &[])?;
+        Self::strip_selected_debug_metadata(dex, &selection)
+    }
+
+    /// Strip only metadata owned by the frozen class/method selection.
+    pub fn strip_selected_debug_metadata(
+        dex: &DexFile,
+        selection: &Selection,
+    ) -> Result<(Vec<u8>, MetadataReductionReport)> {
+        selection.validate(dex)?;
         let mut output = dex.bytes.clone();
         let mut source_files_removed = 0_usize;
         let mut debug_info_detached = 0_usize;
 
         for (index, class) in dex.classes.iter().enumerate() {
-            if class.source_file_idx == NO_INDEX {
+            if class.source_file_idx == NO_INDEX || !selection.classes.contains(&class.class_idx) {
                 continue;
             }
             let offset = dex.header.class_defs_off as usize + index * 32 + 16;
@@ -91,7 +101,22 @@ impl MetadataReducer {
             source_files_removed += 1;
         }
 
+        let selected_code = selection
+            .methods
+            .iter()
+            .filter_map(|index| dex.code_for_method(*index).map(|code| code.offset))
+            .collect::<BTreeSet<_>>();
+        let unselected_code = dex
+            .class_data
+            .values()
+            .flat_map(crate::model::ClassData::methods)
+            .filter(|method| !selection.methods.contains(&method.method_idx))
+            .map(|method| method.code_off)
+            .collect::<BTreeSet<_>>();
         for code in dex.code_items.values() {
+            if !selected_code.contains(&code.offset) || unselected_code.contains(&code.offset) {
+                continue;
+            }
             if code.debug_info_off == 0 {
                 continue;
             }
@@ -110,6 +135,168 @@ impl MetadataReducer {
                 debug_info_detached,
             },
         ))
+    }
+}
+
+/// Proof that a diagnostic DEX rewrite only touched declared metadata or
+/// fixed-width symbol strings. In particular, executable bytecode is immutable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DexRewriteAudit {
+    pub changed_symbol_strings: usize,
+    pub source_files_removed: usize,
+    pub debug_info_detached: usize,
+    pub preserved_code_items: usize,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DexRewriteVerifier;
+
+impl DexRewriteVerifier {
+    /// Compare a rewritten DEX byte-for-byte against its validated source.
+    /// Every mutation must be accounted for by the rename/metadata reports.
+    ///
+    /// # Errors
+    ///
+    /// Rejects unreported byte changes, mismatched reports, changes to executable
+    /// code, altered tables or invalid rewritten DEX.
+    pub fn verify(
+        original: &DexFile,
+        rewritten: &[u8],
+        rename: Option<&RenameReport>,
+        metadata: Option<&MetadataReductionReport>,
+    ) -> Result<DexRewriteAudit> {
+        if original.bytes.len() != rewritten.len() {
+            return Err(DexError::UnsafeRename(
+                "rewritten DEX changed file length".into(),
+            ));
+        }
+        let parsed = DexParser::parse(rewritten)?;
+        let _ = DexValidator::validate(&parsed)?;
+        if original.strings.len() != parsed.strings.len()
+            || original.types != parsed.types
+            || original.protos != parsed.protos
+            || original.fields != parsed.fields
+            || original.methods != parsed.methods
+            || original.classes.len() != parsed.classes.len()
+            || original.class_data != parsed.class_data
+            || original.code_items.len() != parsed.code_items.len()
+        {
+            return Err(DexError::UnsafeRename(
+                "rewritten DEX changed structural ownership or table layout".into(),
+            ));
+        }
+        let mut allowed = vec![false; rewritten.len()];
+        allowed[8..32].fill(true); // Adler-32 and SHA-1 are recalculated.
+        let mut changed_symbol_strings = 0_usize;
+        if let Some(report) = rename {
+            let mut reported_indices = BTreeSet::new();
+            for record in &report.records {
+                if !reported_indices.insert(record.string_idx) {
+                    return Err(DexError::UnsafeRename("duplicate rename record".into()));
+                }
+                let source = original.strings.get(record.string_idx as usize).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "string",
+                        index: record.string_idx,
+                    },
+                )?;
+                let target = parsed.strings.get(record.string_idx as usize).ok_or(
+                    DexError::InvalidIndex {
+                        kind: "string",
+                        index: record.string_idx,
+                    },
+                )?;
+                if source.value != record.old
+                    || target.value != record.new
+                    || record.old == record.new
+                    || source.byte_len != target.byte_len
+                    || source.data_start != target.data_start
+                {
+                    return Err(DexError::UnsafeRename(
+                        "rename report does not match rewritten string bytes".into(),
+                    ));
+                }
+                let start = source.data_start as usize;
+                let end = start + source.byte_len as usize;
+                if end > allowed.len() {
+                    return Err(DexError::UnsafeRename("rename offset outside DEX".into()));
+                }
+                allowed[start..end].fill(true);
+                changed_symbol_strings += 1;
+            }
+        }
+        let mut source_files_removed = 0_usize;
+        for (index, (before, after)) in original.classes.iter().zip(&parsed.classes).enumerate() {
+            if before.source_file_idx != after.source_file_idx {
+                if metadata.is_none()
+                    || before.source_file_idx == NO_INDEX
+                    || after.source_file_idx != NO_INDEX
+                {
+                    return Err(DexError::UnsafeRename(
+                        "unexpected class source-file modification".into(),
+                    ));
+                }
+                let offset = original.header.class_defs_off as usize + index * 32 + 16;
+                allowed[offset..offset + 4].fill(true);
+                source_files_removed += 1;
+            }
+        }
+        let mut debug_info_detached = 0_usize;
+        for (offset, before) in &original.code_items {
+            let after = parsed
+                .code_items
+                .get(offset)
+                .ok_or_else(|| DexError::UnsafeRename("rewritten DEX lost a code item".into()))?;
+            if before.insns != after.insns
+                || before.instructions != after.instructions
+                || before.tries != after.tries
+                || before.handlers != after.handlers
+                || before.registers_size != after.registers_size
+                || before.ins_size != after.ins_size
+                || before.outs_size != after.outs_size
+                || before.tries_size != after.tries_size
+            {
+                return Err(DexError::UnsafeRename(
+                    "rewritten DEX changed executable code".into(),
+                ));
+            }
+            if before.debug_info_off != after.debug_info_off {
+                if metadata.is_none() || before.debug_info_off == 0 || after.debug_info_off != 0 {
+                    return Err(DexError::UnsafeRename(
+                        "unexpected code debug-info modification".into(),
+                    ));
+                }
+                let start = *offset as usize + 8;
+                allowed[start..start + 4].fill(true);
+                debug_info_detached += 1;
+            }
+        }
+        if let Some(report) = metadata {
+            if report.source_files_removed != source_files_removed
+                || report.debug_info_detached != debug_info_detached
+            {
+                return Err(DexError::UnsafeRename(
+                    "metadata removal report differs from rewritten bytes".into(),
+                ));
+            }
+        }
+        if original
+            .bytes
+            .iter()
+            .zip(rewritten)
+            .enumerate()
+            .any(|(index, (before, after))| before != after && !allowed[index])
+        {
+            return Err(DexError::UnsafeRename(
+                "unreported DEX byte mutation outside declared transform regions".into(),
+            ));
+        }
+        Ok(DexRewriteAudit {
+            changed_symbol_strings,
+            source_files_removed,
+            debug_info_detached,
+            preserved_code_items: original.code_items.len(),
+        })
     }
 }
 
@@ -163,6 +350,23 @@ pub struct RenamePass;
 impl RenamePass {
     pub fn apply(dex: &DexFile, config: &RenameConfig) -> Result<RenameResult> {
         let selection = SelectorResolver::resolve(dex, &config.selectors)?;
+        let mut effective = config.clone();
+        effective.selectors.clear();
+        Self::apply_selected(dex, &effective, &selection)
+    }
+
+    /// Apply a pre-resolved selection, without resolving a different policy.
+    pub fn apply_selected(
+        dex: &DexFile,
+        config: &RenameConfig,
+        selection: &Selection,
+    ) -> Result<RenameResult> {
+        if !config.selectors.is_empty() {
+            return Err(DexError::InvalidSelector(
+                "cannot combine resolved selection with rename selector rules".into(),
+            ));
+        }
+        selection.validate(dex)?;
         let compatibility = CompatibilityAnalyzer::analyze(dex)?;
         let mut report = RenameReport::default();
         let users = collect_name_users(dex);
@@ -190,7 +394,7 @@ impl RenamePass {
 
             let selected = symbols
                 .iter()
-                .filter(|symbol| symbol_enabled(**symbol, &selection, config))
+                .filter(|symbol| symbol_enabled(**symbol, selection, config))
                 .count();
             if selected == 0 {
                 continue;
@@ -298,7 +502,7 @@ fn symbol_enabled(symbol: SymbolUse, selection: &Selection, config: &RenameConfi
     }
 }
 
-fn is_contract_name(value: &str) -> bool {
+pub(crate) fn is_contract_name(value: &str) -> bool {
     matches!(
         value,
         "<init>"

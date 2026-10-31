@@ -2,6 +2,7 @@ use crate::error::{DiversityError, Result};
 use crate::seed::{DiversityDomain, SeedDeriver};
 use nexora_shield_vm::OpcodeAllocation;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VmMapVariant {
@@ -14,8 +15,8 @@ impl VmMapVariant {
         if build_id.trim().is_empty() {
             return Err(DiversityError::EmptyBuildId);
         }
-        let key = seed.domain_key(DiversityDomain::VmMap)?;
-        let allocation = OpcodeAllocation::derive(build_id, &key)
+        let key = Zeroizing::new(seed.domain_key(DiversityDomain::VmMap)?);
+        let allocation = OpcodeAllocation::derive(build_id, key.as_ref())
             .map_err(|error| DiversityError::Vm(error.to_string()))?;
         let variant = Self {
             build_id: build_id.to_owned(),

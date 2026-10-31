@@ -5,6 +5,7 @@ import dev.nexora.shield.studio.model.CommandResult
 import dev.nexora.shield.studio.model.PerformanceBudgets
 import dev.nexora.shield.studio.model.PublicSecurityReport
 import dev.nexora.shield.studio.model.SecretReferenceStatus
+import dev.nexora.shield.studio.model.ShieldProfile
 import dev.nexora.shield.studio.model.SecretSettings
 import dev.nexora.shield.studio.model.VerificationResult
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,8 @@ class SecurityReportLoader {
             signed = root.requiredBoolean("signed"),
             strippedSignatureEntries = root.requiredInt("stripped_signature_entries"),
             stages = root["stages"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList(),
+            productionProtected = root["production_protected"]?.jsonPrimitive?.content == "true",
+            protectionScope = root["protection_scope"]?.jsonPrimitive?.content ?: "unverified-legacy",
         )
     }
 
@@ -177,6 +180,53 @@ class GradleBuildService(
     private companion object {
         val TASK_NAME = Regex("^[:A-Za-z0-9_.-]+$")
     }
+}
+
+/**
+ * Routes Studio to the same fail-closed Rust production orchestrator used
+ * by the CLI and default Gradle Plugin. This is a read-only diagnostic.
+ * A successful command exit does NOT mean production readiness.
+ */
+class ProductionReadinessService(
+    private val commandRunner: CommandRunner = CommandRunner(),
+) {
+    fun planCommand(
+        artifact: Path,
+        output: Path,
+        profile: ShieldProfile,
+        cliExecutable: String,
+    ): List<String> {
+        require(artifact.isRegularFile() && artifact.extension.lowercase() == "apk") {
+            "Production planning requires an existing APK."
+        }
+        require(cliExecutable.isNotBlank()) { "CLI executable must not be blank." }
+        val inputPath = artifact.toAbsolutePath().normalize()
+        val outputPath = output.toAbsolutePath().normalize()
+        require(inputPath != outputPath) { "Diagnostic output may not alias the input APK." }
+        return listOf(
+            cliExecutable,
+            "protect",
+            inputPath.toString(),
+            "--output",
+            outputPath.toString(),
+            "--profile",
+            profile.wireValue,
+            "--unsigned",
+            "--no-align",
+            "--plan-only",
+        )
+    }
+
+    suspend fun inspect(
+        artifact: Path,
+        output: Path,
+        profile: ShieldProfile,
+        cliExecutable: String,
+        projectRoot: Path,
+    ): CommandResult = commandRunner.run(
+        planCommand(artifact, output, profile, cliExecutable),
+        projectRoot,
+    )
 }
 
 class ArtifactVerifier(
