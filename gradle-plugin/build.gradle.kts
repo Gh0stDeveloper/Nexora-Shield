@@ -42,6 +42,10 @@ tasks.register<Test>("integratedEngineTest") {
     testClassesDirs=unitTests.get().testClassesDirs
     classpath=unitTests.get().classpath
     useJUnitPlatform {includeTags("integrated-apk")}
+    testLogging {
+        events("failed", "standardOut", "standardError")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
     outputs.upToDateWhen {false}
     outputs.cacheIf {false}
 }
