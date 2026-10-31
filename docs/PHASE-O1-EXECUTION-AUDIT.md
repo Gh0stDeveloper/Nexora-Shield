@@ -1,5 +1,11 @@
 # O.1 execution audit and remaining production work
 
+The [shared experimental APK transaction](PHASE-O1-INTEGRATED-ENGINE.md) now
+composes verified DEX transforms, executing runtimes, native compilation, signing
+and final-hash evidence through CLI/Gradle/Studio for an explicit eligible recipe.
+This supersedes historical separate-script findings for that scope; default
+profile subsets, optional attestation and full O.1 closure remain open.
+
 Status: **OPEN — O.1 NOT CLOSED; stable v1.0.0 NO-GO**.
 
 The [delivered diversity/private reproduction increment](PHASE-O1-DIVERSITY-RUNTIME.md)

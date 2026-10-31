@@ -15,6 +15,7 @@ mod dex_selection;
 mod dex_stage;
 mod error;
 mod input_snapshot;
+mod integrated;
 mod pipeline;
 mod plan;
 mod policy;
@@ -32,6 +33,7 @@ pub use dex_preflight::{DexPreflight, DexUnitPreflight, MAX_DEX_BYTES, MAX_TOTAL
 pub use dex_selection::{DexSelectorPolicy, MAX_DEX_SELECTOR_RULES};
 pub use dex_stage::StagedDexResult;
 pub use error::{CoreError, Result};
+pub use integrated::{protect_integrated_apk, IntegratedBuildResult};
 pub use pipeline::{protect_apk, PipelineResult, PipelineStage, ProtectionRequest};
 pub use plan::BuildPlan;
 pub use policy::{EffectiveProductionPolicy, ProductionControl, ProductionOverrides};

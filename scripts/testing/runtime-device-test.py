@@ -23,6 +23,13 @@ root = args.directory
 evidence = json.loads((root/'evidence.json').read_text())
 results = {}
 guarded = evidence.get('guard_selected', False)
+if 'engine_report_sha256' in evidence:
+    report_path=root/'engine-report.json'
+    if hashlib.sha256(report_path.read_bytes()).hexdigest()!=evidence['engine_report_sha256']:raise SystemExit('Integrated engine report changed before Android execution')
+    report=json.loads(report_path.read_text())
+    required={'baseline','runtime','native-tampered','provider-removed'} if evidence['entrypoint']=='cli' else {'runtime'}
+    if set(evidence['artifacts'])!=required or not guarded or report!=evidence['engine_report']:raise SystemExit('Incomplete integrated engine device matrix')
+    if report['output_sha256']!=evidence['artifacts']['runtime'] or report['production_protected'] is not False or not evidence['retrace_final_apk_verified']:raise SystemExit('Integrated proof is not bound to final experimental APK')
 if 'diversity' in evidence:
     required={'baseline','runtime','tampered','guard-signature','guard-missing','resource-tampered','encrypted-asset-tampered','dex-tampered','native-tampered','provider-removed','extra-entry','foreign-native','resigned','diversified'}
     if set(evidence['artifacts'])!=required or not guarded:raise SystemExit('Incomplete guarded diversity APK matrix')

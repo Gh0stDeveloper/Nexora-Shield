@@ -63,7 +63,7 @@ impl fmt::Debug for AndroidRuntimePlan {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct RuntimeStageEvidence {
     pub input_sha256: String,
     pub output_sha256: String,
@@ -87,7 +87,7 @@ impl ProductionBuildContext {
         root: &[u8; 32],
         identity: BuildIdentity,
     ) -> Result<AndroidRuntimePlan> {
-        self.prepare_runtime(root, identity, None)
+        self.prepare_runtime(root, identity, None, None)
     }
 
     /// Freeze private diversity allocation before deriving data/runtime artifacts.
@@ -107,7 +107,25 @@ impl ProductionBuildContext {
         }
         let diversity =
             diversity::RuntimeDiversity::derive(seed, &identity, self.input_sha256(), mode)?;
-        self.prepare_runtime(root, identity, Some(diversity))
+        self.prepare_runtime(root, identity, Some(diversity), None)
+    }
+
+    pub(crate) fn prepare_runtime_resolved(
+        &self,
+        root: &[u8; 32],
+        identity: BuildIdentity,
+        seed: &nexora_shield_diversity::PrivateBuildSeed,
+        mode: nexora_shield_diversity::DiversityMode,
+        selected: &[nexora_shield_dex::Selection],
+    ) -> Result<AndroidRuntimePlan> {
+        if seed.matches_material(root) {
+            return Err(refuse(
+                "private diversity seed must be independent of client key material",
+            ));
+        }
+        let diversity =
+            diversity::RuntimeDiversity::derive(seed, &identity, self.input_sha256(), mode)?;
+        self.prepare_runtime(root, identity, Some(diversity), Some(selected))
     }
 
     fn prepare_runtime(
@@ -115,6 +133,7 @@ impl ProductionBuildContext {
         root: &[u8; 32],
         mut identity: BuildIdentity,
         mut diversity: Option<diversity::RuntimeDiversity>,
+        resolved: Option<&[nexora_shield_dex::Selection]>,
     ) -> Result<AndroidRuntimePlan> {
         if self.selectors().includes().is_empty() {
             return Err(refuse("Android runtime requires explicit method selection"));
@@ -145,7 +164,19 @@ impl ProductionBuildContext {
                 bytes: u.dex.bytes.clone(),
             })
             .collect();
-        let selection = crate::dex_preflight::resolve_effective_selection(&set, self.selectors())?;
+        let selection = if let Some(selected) = resolved {
+            if selected.len() != set.units.len() {
+                return Err(refuse("resolved runtime DEX inventory mismatch"));
+            }
+            for (unit, selection) in set.units.iter().zip(selected) {
+                selection
+                    .validate(&unit.dex)
+                    .map_err(|_| refuse("resolved runtime index is not defined"))?;
+            }
+            selected.to_vec()
+        } else {
+            crate::dex_preflight::resolve_effective_selection(&set, self.selectors())?
+        };
         identity.build_id = format!("{}:{}", identity.build_id, self.input_sha256());
         if let Some(diversity) = &diversity {
             diversity.bind_identity(&mut identity);
@@ -261,6 +292,17 @@ impl AndroidRuntimePlan {
     /// Rejects incompatible libraries, unsafe selection, tool failures and any unplanned change.
     pub fn stage(
         self,
+        destination: &Path,
+        tools: &SmaliTools,
+        native_directory: &Path,
+    ) -> Result<RuntimeStageEvidence> {
+        self.stage_in_transaction(destination, tools, native_directory)
+    }
+    pub(crate) fn image(&self) -> &RuntimeImage {
+        &self.image
+    }
+    pub(crate) fn stage_in_transaction(
+        &self,
         destination: &Path,
         tools: &SmaliTools,
         native_directory: &Path,
@@ -506,7 +548,7 @@ fn verify_runtime_output(
     Ok(())
 }
 
-fn read_runtime_dex(
+pub(crate) fn read_runtime_dex(
     path: &Path,
     directory: &nexora_shield_package::ZipDirectory,
 ) -> Result<MultiDexSet> {

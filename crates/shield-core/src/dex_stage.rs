@@ -24,7 +24,7 @@ type StagedRewriteRecords = (
     Vec<RetraceRecord>,
 );
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct StagedDexResult {
     pub dex_units: usize,
     pub changed_dex_units: usize,
@@ -49,6 +49,7 @@ impl ProductionBuildContext {
         config: &MultiDexRewriteConfig,
     ) -> Result<StagedDexResult> {
         self.stage_dex_rewrite_internal(destination, config, None)
+            .map(|(result, _)| result)
     }
 
     /// Produce an unsigned diagnostic APK and a separate, encrypted retrace
@@ -70,6 +71,15 @@ impl ProductionBuildContext {
             config,
             Some((retrace_destination, key_schedule)),
         )
+        .map(|(result, _)| result)
+    }
+
+    pub(crate) fn stage_dex_for_engine(
+        &self,
+        destination: &Path,
+        config: &MultiDexRewriteConfig,
+    ) -> Result<(StagedDexResult, Vec<RetraceRecord>)> {
+        self.stage_dex_rewrite_internal(destination, config, None)
     }
 
     fn stage_dex_rewrite_internal(
@@ -77,7 +87,7 @@ impl ProductionBuildContext {
         destination: &Path,
         config: &MultiDexRewriteConfig,
         retrace: Option<(&Path, &KeySchedule)>,
-    ) -> Result<StagedDexResult> {
+    ) -> Result<(StagedDexResult, Vec<RetraceRecord>)> {
         if config.rename.is_none() && !config.strip_metadata {
             return Err(CoreError::InvalidRequest(
                 "staging requires a real DEX transform".into(),
@@ -126,7 +136,7 @@ impl ProductionBuildContext {
         let linked_xml =
             crate::apk_compat::verify_apk_compatibility(&source, &directory, &set, &outputs)?;
         let (mut result, mut replacements, retrace_records) =
-            collect_staged_outputs(outputs, &originals, retrace.is_some());
+            collect_staged_outputs(outputs, &originals, true);
         // Commit verified DEX and compiled Manifest XML changes through one
         // exclusive staging ZIP transaction, not multiple APK writes.
         replacements.extend(linked_xml);
@@ -149,15 +159,18 @@ impl ProductionBuildContext {
         match reconstruction {
             Ok(output_hash) => {
                 if let Some((map_path, schedule)) = retrace {
-                    if let Err(error) =
-                        seal_and_store_retrace(map_path, schedule, &output_hash, retrace_records)
-                    {
+                    if let Err(error) = seal_and_store_retrace(
+                        map_path,
+                        schedule,
+                        &output_hash,
+                        retrace_records.clone(),
+                    ) {
                         let _ = fs::remove_file(destination);
                         return Err(error);
                     }
                 }
                 result.output_sha256 = output_hash;
-                Ok(result)
+                Ok((result, retrace_records))
             }
             Err(error) => {
                 let _ = fs::remove_file(destination);

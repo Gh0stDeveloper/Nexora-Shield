@@ -60,6 +60,7 @@ class NexoraShieldPlugin : Plugin<Project> {
                 variantName.set(variant.name)
                 profile.set(extension.profile)
                 cliExecutable.set(extension.cliExecutable)
+                engineConfig.set(extension.engineConfig)
                 allowUnsigned.set(extension.allowUnsigned)
                 legacyPhaseAOnly.set(extension.legacyPhaseAOnly)
                 align.set(extension.align)
@@ -81,10 +82,10 @@ class NexoraShieldPlugin : Plugin<Project> {
                 )
 
                 outputs.upToDateWhen {
-                    !extension.signingKeystore.isPresent
+                    !extension.engineConfig.isPresent && !extension.signingKeystore.isPresent
                 }
                 outputs.cacheIf("explicit safe Nexora Shield build-cache mode") {
-                    extension.buildCacheEnabled.get() &&
+                    !extension.engineConfig.isPresent && extension.buildCacheEnabled.get() &&
                         extension.allowUnsigned.get() &&
                         !extension.signingKeystore.isPresent &&
                         !extension.publicReports.get() &&

@@ -18,9 +18,10 @@ use phase_k_cli::{
 };
 
 use nexora_shield_core::{
-    apk_inspection_json, protect_apk, protect_production_apk_with_selection, DexSelectorPolicy,
-    ProductionBuildContext, ProductionControl, ProductionOverrides, ProtectionProfile,
-    ProtectionRequest, CONFIG_SCHEMA_VERSION,
+    apk_inspection_json, protect_apk, protect_integrated_apk,
+    protect_production_apk_with_selection, DexSelectorPolicy, ProductionBuildContext,
+    ProductionControl, ProductionOverrides, ProtectionProfile, ProtectionRequest,
+    CONFIG_SCHEMA_VERSION,
 };
 use nexora_shield_dex::{
     CompatibilityAnalyzer, ControlFlowGraph, DexInput, DexParser, DexValidator, DexWriter,
@@ -447,6 +448,7 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
     let mut public_report = None;
     let mut private_report = None;
     let mut plan_only = false;
+    let mut integrated_config = None;
     let mut overrides = ProductionOverrides::default();
     let mut dex_selectors = DexSelectorPolicy::default();
     let mut index = 1_usize;
@@ -474,6 +476,17 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
             "--plan-only" => {
                 plan_only = true;
                 index += 1;
+            }
+            "--engine-config" => {
+                if integrated_config.is_some() {
+                    return Err("duplicate --engine-config".into());
+                }
+                integrated_config = Some(PathBuf::from(require_value(
+                    args,
+                    index,
+                    "--engine-config",
+                )?));
+                index += 2;
             }
             "--enable-control" | "--disable-control" => {
                 let enable = args[index] == "--enable-control";
@@ -608,6 +621,28 @@ fn run_protect(args: &[String], phase_a_only: bool) -> Result<(), String> {
         public_report,
         private_report,
     };
+
+    if let Some(configuration) = integrated_config {
+        if phase_a_only
+            || plan_only
+            || overrides != ProductionOverrides::default()
+            || !dex_selectors.is_empty()
+        {
+            return Err("--engine-config cannot be combined with legacy packaging, plan-only or separate control/selector overrides".into());
+        }
+        let result = protect_integrated_apk(&request, &configuration).map_err(|e| e.to_string())?;
+        println!("O.1 integrated experimental protection; production_protected=false");
+        println!("Output SHA-256: {}", result.output_sha256);
+        println!("Evidence SHA-256: {}", result.evidence_sha256);
+        println!(
+            "Protected strings/constants/resources/VM: {}/{}/{}/{}",
+            result.protected_strings,
+            result.protected_constants,
+            result.protected_resources,
+            result.virtualized_methods
+        );
+        return Ok(());
+    }
 
     if plan_only && phase_a_only {
         return Err("package-apk does not support --plan-only; use protect --plan-only".into());
@@ -813,6 +848,7 @@ Production protection fails closed while O.1 is unfinished. Use --plan-only for\
 read-only inspection. package-apk is legacy Phase A packaging ONLY.\n\
 Signing and alignment are required unless disabled explicitly.\n\n\
 OPTIONS:\n\
+  --engine-config <file>      Execute the integrated experimental O.1 engine\n\
   -o, --output <apk>          Output APK\n\
   --profile <name>            standard|hardened|maximum (default: hardened)\n\
   --keystore <file>           Signing keystore\n\

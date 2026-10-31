@@ -671,6 +671,21 @@ private fun BuildScreen(state: StudioState) {
             }
         }
 
+        Panel(title="Integrated experimental protection",subtitle="Builds a signed APK with the selected defenses. Application compatibility and production approval remain subject to validation.") {
+            OutlinedButton(onClick={chooseFile("Private engine configuration","nshield-private")?.let {state.engineConfiguration=it}},enabled=!state.busy) {
+                Text(state.engineConfiguration?.fileName?.toString() ?: "Select engine configuration")
+            }
+            OutlinedButton(onClick={chooseFile("Signing keystore","p12","jks","keystore")?.let {state.integratedKeystore=it}},enabled=!state.busy) {
+                Text(state.integratedKeystore?.fileName?.toString() ?: "Select signing keystore")
+            }
+            OutlinedTextField(value=state.integratedAlias,onValueChange={state.integratedAlias=it},label={Text("Signing alias")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=state.integratedPasswordEnvironment,onValueChange={state.integratedPasswordEnvironment=it},label={Text("Signing password environment variable")},
+                supportingText={Text("Use the variable name configured before starting Studio.")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            Button(onClick={scope.launch {state.runIntegratedProtection()}},enabled=!state.busy && state.project!=null && state.selectedArtifact!=null && state.engineConfiguration!=null && state.integratedKeystore!=null) {
+                Text("Build protected test APK")
+            }
+        }
+
         Panel(
             title = "Production readiness (Phase O.1)",
             subtitle = "Runs protect --plan-only through the authoritative Rust orchestrator. This generates NO APK and grants NO production approval.",

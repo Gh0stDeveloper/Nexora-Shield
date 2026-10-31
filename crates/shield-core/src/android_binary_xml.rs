@@ -144,6 +144,17 @@ fn parse_pool(data: &[u8], at: usize, item: Chunk) -> Result<Vec<String>> {
     if count > MAX_POOL_STRINGS || styles > MAX_POOL_STRINGS {
         return Err(reject("string/style count exceeds budget"));
     }
+    // AAPT2 emits a bounded header-only global pool for resource-free apps.
+    if count == 0 {
+        if styles != 0
+            || styles_start != 0
+            || strings_start != item.header
+            || item.size != item.header
+        {
+            return Err(reject("invalid empty string pool layout"));
+        }
+        return Ok(Vec::new());
+    }
     let slots = count
         .checked_add(styles)
         .and_then(|sum| sum.checked_mul(4))
@@ -675,6 +686,25 @@ pub(crate) fn rewrite_manifest_class_aliases(
 #[cfg(test)]
 mod tests {
     use super::inspect_binary_xml;
+
+    #[test]
+    fn aapt_empty_pool_rejects_corrupt_and_nonempty_boundaries() {
+        for flags in [0u32, 0x100] {
+            let mut pool = Vec::new();
+            pool.extend(1u16.to_le_bytes());
+            pool.extend(28u16.to_le_bytes());
+            pool.extend(28u32.to_le_bytes());
+            for word in [0, 0, flags, 28, 0] {
+                pool.extend(word.to_le_bytes());
+            }
+            assert_eq!(super::inspect_string_pool(&pool).ok(), Some(Vec::new()));
+            for (offset, value) in [(8, 1u32), (12, 1), (20, 27), (20, 29), (24, 28)] {
+                let mut b = pool.clone();
+                b[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+                assert!(super::inspect_string_pool(&b).is_err());
+            }
+        }
+    }
 
     fn le16(n: u16) -> [u8; 2] {
         n.to_le_bytes()

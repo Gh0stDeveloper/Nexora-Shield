@@ -1,5 +1,11 @@
 # Phase O.1.3 — Auditable DEX transformations (diagnostic stage)
 
+The [shared experimental APK transaction](PHASE-O1-INTEGRATED-ENGINE.md) now
+composes verified DEX transforms, executing runtimes, native compilation, signing
+and final-hash evidence through CLI/Gradle/Studio for an explicit eligible recipe.
+This supersedes historical separate-script findings for that scope; default
+profile subsets, optional attestation and full O.1 closure remain open.
+
 Status: **PARTIAL ON FEATURE BRANCH — EXACT-HEAD CI VERIFICATION PENDING**.
 
 Actual staging now consumes the frozen globally resolved definition selection.

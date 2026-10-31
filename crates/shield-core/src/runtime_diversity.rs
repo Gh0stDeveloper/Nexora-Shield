@@ -10,7 +10,7 @@ use nexora_shield_vm::VmMethod;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Public observations never contain private seed/mode identifiers or original symbol mappings.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct RuntimeDiversityEvidence {
     pub mode: &'static str,
     pub context_commitment: String,

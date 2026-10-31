@@ -362,6 +362,7 @@ dependencies = [
  "nexora-shield-package",
  "nexora-shield-rasp",
  "nexora-shield-vm",
+ "serde",
  "serde_json",
  "zeroize",
 ]

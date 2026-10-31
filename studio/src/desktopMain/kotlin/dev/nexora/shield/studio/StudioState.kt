@@ -14,6 +14,8 @@ import dev.nexora.shield.studio.service.BudgetEvaluator
 import dev.nexora.shield.studio.service.ConfigCodec
 import dev.nexora.shield.studio.service.GradleBuildService
 import dev.nexora.shield.studio.service.ProjectImporter
+import dev.nexora.shield.studio.service.IntegratedProtectionService
+import dev.nexora.shield.studio.service.IntegratedSigning
 import dev.nexora.shield.studio.service.ProductionReadinessService
 import dev.nexora.shield.studio.service.RetraceService
 import dev.nexora.shield.studio.service.SecretReferenceInspector
@@ -25,6 +27,7 @@ class StudioState(
     private val configCodec: ConfigCodec = ConfigCodec(),
     private val reportLoader: SecurityReportLoader = SecurityReportLoader(),
     val buildService: GradleBuildService = GradleBuildService(),
+    val integratedProtectionService: IntegratedProtectionService = IntegratedProtectionService(),
     val productionReadinessService: ProductionReadinessService = ProductionReadinessService(),
     val artifactVerifier: ArtifactVerifier = ArtifactVerifier(),
     val retraceService: RetraceService = RetraceService(),
@@ -57,6 +60,10 @@ class StudioState(
     var selectedArtifact by mutableStateOf<Path?>(null)
     var mappingFile by mutableStateOf<Path?>(null)
     var stacktraceFile by mutableStateOf<Path?>(null)
+    var engineConfiguration by mutableStateOf<Path?>(null)
+    var integratedKeystore by mutableStateOf<Path?>(null)
+    var integratedAlias by mutableStateOf("")
+    var integratedPasswordEnvironment by mutableStateOf("NEXORA_SHIELD_SIGNING_PASSWORD")
 
     fun importProject(root: Path) {
         runCatching {
@@ -135,6 +142,20 @@ class StudioState(
                 cliExecutable,
                 root,
             )
+        }
+    }
+
+    suspend fun runIntegratedProtection() {
+        val root=project?.root ?: run {statusMessage="Import a project before protection.";return}
+        val artifact=selectedArtifact
+        val configuration=engineConfiguration
+        val keystore=integratedKeystore
+        if (artifact==null || configuration==null || keystore==null) {statusMessage="Select an APK, private engine configuration and signing keystore.";return}
+        val output=root.resolve("build/nexora-shield/o1-integrated").resolve(artifact.fileName)
+        val report=output.resolveSibling(output.fileName.toString().removeSuffix(".apk")+".json")
+        execute("Integrated experimental protection") {
+            integratedProtectionService.protect(artifact,output,report,configuration,config.profile,
+                IntegratedSigning(keystore,integratedAlias,integratedPasswordEnvironment,config.minSdk),cliExecutable,root)
         }
     }
 

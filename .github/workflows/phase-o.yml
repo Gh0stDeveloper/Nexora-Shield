@@ -33,6 +33,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
       - name: Install pinned Android runtime build tools
         shell: bash
         run: |
@@ -70,12 +73,32 @@ jobs:
             --library target/release/libnexora_shield_native.so
       - name: Build and verify signed startup graphs with report-only and enforcing RASP
         run: bash scripts/testing/build-guard-qualification.sh build/o1-runtime
+      - name: Execute shared integrated engine and real frontend adapters
+        env:
+          NEXORA_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p nexora-shield
+          cargo build --locked -p nexora-shield-core --example verify_integrated_retrace
+          for mode in report-only enforce; do
+            python scripts/testing/integrated-runtime-test.py build/o1-runtime "build/o1-integrated-$mode" \
+              --mode "$mode" --cli target/debug/nexora-shield \
+              --cargo "$(command -v cargo)" --rustc "$(command -v rustc)" --java "$(command -v java)" \
+              --ndk "$ANDROID_NDK_HOME" --build-tools "$BUILD_TOOLS"
+          done
+          python scripts/testing/integrated-frontend-test.py build/o1-runtime build/o1-integrated-report-only \
+            --cli target/debug/nexora-shield --gradle "$(command -v gradle)" --sdk "$SDK_ROOT"
       - name: Boot representative Android device
         run: bash scripts/testing/start-runtime-emulator.sh
       - name: Install pull hash launch compare behavior and reject native tamper
         run: |
           python scripts/testing/runtime-device-test.py build/o1-runtime --adb "$SDK_ROOT/platform-tools/adb"
           python scripts/testing/runtime-device-test.py build/o1-runtime-enforce --adb "$SDK_ROOT/platform-tools/adb"
+          for directory in build/o1-integrated-report-only build/o1-integrated-enforce \
+              build/o1-integrated-report-only/gradle-plugin build/o1-integrated-report-only/studio; do
+            python scripts/testing/runtime-device-test.py "$directory" --adb "$SDK_ROOT/platform-tools/adb"
+          done
       - name: Publish only final-artifact verification evidence
         uses: actions/upload-artifact@v4
         with:
@@ -83,6 +106,10 @@ jobs:
           path: |
             build/o1-runtime/evidence.json
             build/o1-runtime-enforce/evidence.json
+            build/o1-integrated-report-only/evidence.json
+            build/o1-integrated-enforce/evidence.json
+            build/o1-integrated-report-only/gradle-plugin/evidence.json
+            build/o1-integrated-report-only/studio/evidence.json
           if-no-files-found: error
       - name: Stop Android emulator
         if: always()
