@@ -120,6 +120,15 @@ qualification records device observations after installation/launch. No build-on
 constructor reports an Android success. No APK, private image, keystore or key is
 uploaded by this gate.
 
+Signer observation is tested with official Build Tools 35 and 37. The latter
+labels its single v3 certificate `V3.0 Signer:` instead of `Signer #1`.
+The reader requires exactly one explicit signer count and one complete certificate
+digest in either exact layout, then compares it with the guard-bound certificate.
+Duplicate digests/counts, extra signers, rotation, stamps and unknown layouts are
+rejected. CI installs both versions: CLI uses explicit 35 paths, while the real
+frontend adapters exercise SDK discovery with 37 available. Dedicated frontend
+tests expose the CLI's sanitized error so tool format failures remain diagnosable.
+
 ## Remaining closure work
 
 Global readiness is unchanged: production_protected=false, scope

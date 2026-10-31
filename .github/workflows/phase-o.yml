@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          timeout 600 "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;27.3.13750724" "build-tools;35.0.0" "platforms;android-35"
+          timeout 600 "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;27.3.13750724" "build-tools;35.0.0" "build-tools;37.0.0" "platforms;android-35"
           echo "SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/27.3.13750724" >> "$GITHUB_ENV"
           echo "BUILD_TOOLS=$SDK_ROOT/build-tools/35.0.0" >> "$GITHUB_ENV"

@@ -11,16 +11,33 @@ use nexora_shield_rasp::{
 };
 use std::{collections::BTreeSet, path::Path, process::Command, time::Duration};
 pub(super) fn signer_digest(text: &str) -> Result<Sha256Digest> {
-    let d = text
+    let counts = text
         .lines()
-        .filter_map(|l| l.strip_prefix("Signer #1 certificate SHA-256 digest: "))
+        .filter_map(|line| line.strip_prefix("Number of signers: "))
         .collect::<Vec<_>>();
-    if d.len() != 1 || text.lines().any(|l| l.starts_with("Signer #2 ")) {
+    let certificates = text
+        .lines()
+        .filter(|line| line.contains("certificate SHA-256 digest:"))
+        .collect::<Vec<_>>();
+    if counts != ["1"]
+        || certificates.len() != 1
+        || text
+            .lines()
+            .any(|line| line.starts_with("Signer #") && !line.starts_with("Signer #1 "))
+    {
         return Err(refuse(
             "integrated APK requires exactly one observed signer",
         ));
     }
-    d[0].parse()
+    // Build Tools 37 names the single v3.0 certificate by scheme instead of
+    // ordinal. Accept these exact observed layouts, never a suffix-only digest
+    // match that could conceal another signer, rotation or a source stamp.
+    let digest = certificates[0]
+        .strip_prefix("Signer #1 certificate SHA-256 digest: ")
+        .or_else(|| certificates[0].strip_prefix("V3.0 Signer: certificate SHA-256 digest: "))
+        .ok_or_else(|| refuse("unsupported integrated APK signer observation"))?;
+    digest
+        .parse()
         .map_err(|_| refuse("invalid signer SHA-256 returned by apksigner"))
 }
 pub(super) fn signing_payloads(before: &Path, after: &Path) -> Result<()> {
@@ -180,8 +197,39 @@ mod tests {
     #[test]
     fn signer_parser_requires_one_exact_certificate_digest() {
         let d = "a".repeat(64);
-        assert!(signer_digest(&format!("Signer #1 certificate SHA-256 digest: {d}\n")).is_ok());
-        for text in ["none".into(),format!("Signer #1 certificate SHA-256 digest: {d}\nSigner #2 certificate SHA-256 digest: {d}"),format!("Signer #1 certificate SHA-256 digest: {d}\nSigner #1 certificate SHA-256 digest: {d}"),"Signer #1 certificate SHA-256 digest: invalid".into()]{assert!(signer_digest(&text).is_err());}
+        let legacy = format!("Number of signers: 1\nSigner #1 certificate SHA-256 digest: {d}\n");
+        assert!(signer_digest(&legacy).is_ok());
+        for text in [
+            "none".into(),
+            format!("Signer #1 certificate SHA-256 digest: {d}\n"),
+            legacy.replace("Number of signers: 1", "Number of signers: 2"),
+            format!("{legacy}Number of signers: 1\n"),
+            format!("{legacy}Signer #2 certificate SHA-256 digest: {d}\n"),
+            format!("{legacy}Signer #3 certificate DN: other\n"),
+            format!("{legacy}Signer #1 certificate SHA-256 digest: {d}\n"),
+            legacy.replace(&d, "invalid"),
+        ] {
+            assert!(signer_digest(&text).is_err());
+        }
+    }
+    #[test]
+    fn signer_parser_accepts_build_tools_37_single_v3_observation() {
+        let d = "b".repeat(64);
+        let modern =
+            format!("Number of signers: 1\nV3.0 Signer: certificate SHA-256 digest: {d}\n");
+        assert_eq!(signer_digest(&modern).ok(), d.parse().ok());
+        for text in [
+            modern.replace("Number of signers: 1", "Number of signers: 2"),
+            modern.replace("V3.0 Signer:", "V3.1 Signer:"),
+            modern.replace("V3.0 Signer:", "Unknown Signer:"),
+            modern.replace(&d, "invalid"),
+            format!("{modern}V3.0 Signer: certificate SHA-256 digest: {d}\n"),
+            format!("{modern}V3.1 Signer: certificate SHA-256 digest: {d}\n"),
+            format!("{modern}Signer #1 certificate SHA-256 digest: {d}\n"),
+            format!("{modern}Source Stamp Signer certificate SHA-256 digest: {d}\n"),
+        ] {
+            assert!(signer_digest(&text).is_err());
+        }
     }
     #[test]
     fn exposure_probes_cover_dex_modified_utf8() {
